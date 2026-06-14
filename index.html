@@ -29,6 +29,7 @@
   .zoomctl button:active{background:var(--paper)}
   select{font:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);width:100%}
   .ward-fill{fill:var(--ward);stroke:var(--ward-b);stroke-width:.8;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .ward-hi{fill:#CFE9DA;stroke:var(--hit);stroke-width:1.4;stroke-linejoin:round;vector-effect:non-scaling-stroke}
   .pref-fill{fill:#E2E7E5;stroke:#B7C2BE;stroke-width:1;stroke-linejoin:round;vector-effect:non-scaling-stroke}
   .pref-label{fill:#9AA6A1;font-weight:800;text-anchor:middle;dominant-baseline:central;pointer-events:none;letter-spacing:.06em}
   .ward-label{fill:#8A958F;font-weight:700;text-anchor:middle;dominant-baseline:central;pointer-events:none}
@@ -103,6 +104,7 @@
 
   <div class="controls">
     <div class="row" id="g-st"><span class="glabel">通り・路線（タップで表示）</span></div>
+    <div class="row" id="g-ward"><span class="glabel">区域（タップで地名が出る）</span></div>
     <div class="row" id="g-x"><span class="glabel">表示</span>
       <button class="chip" id="t-label" aria-pressed="true">区名</button></div>
   </div>
@@ -223,7 +225,8 @@ const prefL=el('g'),wardL=el('g'),streetL=el('g'),labelL=el('g'),prefLabelL=el('
 svg.append(prefL,wardL,streetL,labelL,prefLabelL);
 (D.prefs||[]).forEach(pf=>{prefL.append(el('path',{d:pf.d,class:'pref-fill'}));
   const t=el('text',{x:pf.lx,y:pf.ly,class:'pref-label'});t.textContent=pf.name;prefLabelL.append(t);});
-D.wards.forEach(w=>{wardL.append(el('path',{d:w.d,class:'ward-fill'}));
+const wardPathByName={};
+D.wards.forEach(w=>{const wp=el('path',{d:w.d,class:'ward-fill'});wardL.append(wp);wardPathByName[w.name]=wp;
   const t=el('text',{x:w.lx,y:w.ly,class:'ward-label'});t.textContent=w.name.replace('区','');labelL.append(t);});
 const railD={}, railColor={}, railName={};
 D.lines.forEach(l=>{ railD[l.code]=l.d; railColor[l.code]=l.color;
@@ -296,11 +299,14 @@ svg.addEventListener('click',evt=>{
 /* ---------- render streets + markers ---------- */
 function renderStreets(temp){
   streetL.innerHTML=''; markerEls=[];
+  if(typeof wardPathByName!=='undefined')Object.values(wardPathByName).forEach(p=>p.setAttribute('class','ward-fill'));
   const s0=markerScale();
   streets.forEach(s=>{
     if(!vis.has(s.id)) return;
     const g=el('g'); streetL.append(g);
-    if(s.railCode && railD[s.railCode]){
+    if(s.kind==='ward'){
+      const wp=(typeof wardPathByName!=='undefined')?wardPathByName[s.name]:null; if(wp)wp.setAttribute('class','ward-hi');
+    } else if(s.railCode && railD[s.railCode]){
       g.append(el('path',{d:railD[s.railCode],class:'road',stroke:s.color,'stroke-width':3}));
     } else {
       const line=(s.path&&s.path.length>=2)?s.path:s.places.map(p=>[p.lon,p.lat]);
@@ -315,8 +321,11 @@ function renderStreets(temp){
       mg.append(el('circle',{class:'dot',cx:0,cy:0,r:9,stroke:s.color}));  // 本体（小さく）
       const num=el('text',{class:'num',x:0,y:0,fill:s.color});num.textContent=(idx+1);mg.append(num);
       const sub=(p.ward||'')+(p.station?(' ／ '+p.station):'');
-      const maxch=Math.max(p.name.length, sub.length, 1);
-      const w=Math.min(184,Math.max(80,14+maxch*12)), h=sub?38:26;
+      const ci=p.name.indexOf('：');
+      const nameLines=(ci>0&&p.name.length>12)?[p.name.slice(0,ci+1),p.name.slice(ci+1)]:[p.name];
+      const nameW=Math.max.apply(null,nameLines.map(t=>t.length))*13.5;
+      const w=Math.max(80,Math.min(300,Math.ceil(Math.max(nameW,sub.length*10.5))+20));
+      const h=8+nameLines.length*17+(sub?15:0);
       const dir=x>D.viewW*0.6?-1:1, gap=13;
       const bx=dir>0?gap:-(gap+w), by=-h/2;
       const ans=el('g',{class:'ans'});
@@ -324,8 +333,10 @@ function renderStreets(temp){
       const href=gmaps(p);
       const a=el('a',{}); a.setAttributeNS('http://www.w3.org/1999/xlink','xlink:href',href);
       a.setAttribute('href',href);a.setAttribute('target','_blank');a.setAttribute('rel','noopener');
-      const pl=el('text',{class:'pl',x:bx+9,y:by+(sub?16:17)});pl.textContent=p.name;a.append(pl);ans.append(a);
-      if(sub){const wd=el('text',{class:'wd',x:bx+9,y:by+30});wd.textContent=sub;ans.append(wd);}
+      let ty=by+18;
+      nameLines.forEach(t=>{const pl=el('text',{class:'pl',x:bx+9,y:ty});pl.textContent=t;a.append(pl);ty+=17;});
+      ans.append(a);
+      if(sub){const wd=el('text',{class:'wd',x:bx+9,y:ty-2});wd.textContent=sub;ans.append(wd);}
       mg.append(ans);
       const reveal=()=>ans.classList.contains('show');
       const setRev=v=>{mg.classList.toggle('on',v);ans.classList.toggle('show',v);};
@@ -356,7 +367,9 @@ function updateCount(){
 /* ---------- street chips ---------- */
 function renderStreetChips(){
   const row=document.getElementById('g-st');
+  const wrow=document.getElementById('g-ward');
   row.querySelectorAll('.chip').forEach(c=>c.remove());
+  if(wrow)wrow.querySelectorAll('.chip').forEach(c=>c.remove());
   streets.forEach(s=>{
     const b=document.createElement('button');b.className='chip';
     b.setAttribute('aria-pressed',vis.has(s.id)); if(!vis.has(s.id))b.classList.add('dim');
@@ -364,7 +377,7 @@ function renderStreetChips(){
     b.onclick=()=>{ if(vis.has(s.id))vis.delete(s.id); else vis.add(s.id);
       b.setAttribute('aria-pressed',vis.has(s.id));b.classList.toggle('dim',!vis.has(s.id));
       renderStreets(); };
-    row.append(b);
+    ((s.kind==='ward'&&wrow)?wrow:row).append(b);
   });
 }
 function renderEdStreets(){
