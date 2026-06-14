@@ -105,6 +105,7 @@
   <div class="controls">
     <div class="row" id="g-st"><span class="glabel">通り・路線（タップで表示）</span></div>
     <div class="row" id="g-ward"><span class="glabel">区域（タップで地名が出る）</span></div>
+    <div class="row" id="g-exp"><span class="glabel">首都高（タップで出入口）</span></div>
     <div class="row" id="g-x"><span class="glabel">表示</span>
       <button class="chip" id="t-label" aria-pressed="true">区名</button></div>
   </div>
@@ -368,8 +369,10 @@ function updateCount(){
 function renderStreetChips(){
   const row=document.getElementById('g-st');
   const wrow=document.getElementById('g-ward');
+  const exrow=document.getElementById('g-exp');
   row.querySelectorAll('.chip').forEach(c=>c.remove());
   if(wrow)wrow.querySelectorAll('.chip').forEach(c=>c.remove());
+  if(exrow)exrow.querySelectorAll('.chip').forEach(c=>c.remove());
   streets.forEach(s=>{
     const b=document.createElement('button');b.className='chip';
     b.setAttribute('aria-pressed',vis.has(s.id)); if(!vis.has(s.id))b.classList.add('dim');
@@ -377,7 +380,7 @@ function renderStreetChips(){
     b.onclick=()=>{ if(vis.has(s.id))vis.delete(s.id); else vis.add(s.id);
       b.setAttribute('aria-pressed',vis.has(s.id));b.classList.toggle('dim',!vis.has(s.id));
       renderStreets(); };
-    ((s.kind==='ward'&&wrow)?wrow:row).append(b);
+    ((s.kind==='ward'&&wrow)?wrow:(s.kind==='expressway'&&exrow)?exrow:row).append(b);
   });
 }
 function renderEdStreets(){
