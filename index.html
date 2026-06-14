@@ -76,6 +76,7 @@
   .hint{font-size:12px;color:var(--soft);margin:14px 2px 0;line-height:1.7}
   .muted{color:var(--soft);font-size:12px;margin:6px 0 0}
   hr{border:0;border-top:1px solid var(--line);margin:14px 0}
+  code{background:#F0F2F1;padding:2px 6px;border-radius:5px;font-size:12px}
 </style>
 </head>
 <body>
@@ -134,17 +135,19 @@
       <button class="btn" id="f-cancel">クリア</button>
     </div>
     <hr>
-    <h3>③ データの保存 / 受け渡し</h3>
+    <h3>③ 全端末で同期する（GitHubの data.json に貼る）</h3>
+    <p class="muted">この端末で追加した内容を全端末に反映したいときは、下のボタンでJSONをコピー → GitHubの <code>data.json</code> に貼って Commit。<br>
+    自分用メモのままにしたいなら何もしなくてOK（この端末にだけ残る）。</p>
     <div class="ed-actions">
-      <button class="btn" id="ex-copy">エクスポート（コピー）</button>
-      <button class="btn" id="ex-dl">ダウンロード</button>
-      <button class="btn" id="im-open">インポート</button>
+      <button class="btn solid" id="ex-copy">GitHub用にコピー</button>
+      <button class="btn" id="ex-dl">JSONをダウンロード</button>
+      <button class="btn" id="im-open">JSONを手動で読込</button>
     </div>
     <div id="io" style="display:none;margin-top:10px">
       <textarea id="io-text" placeholder="ここにJSONを貼り付け → 読み込み"></textarea>
       <div class="ed-actions"><button class="btn solid" id="im-load">読み込み</button></div>
     </div>
-    <p class="muted">自動保存に対応（環境による）。確実に残すならエクスポートも使ってね。</p>
+    <p class="muted">起動時にGitHubの正本を自動で読み込みます。読めなかった時はこの端末の編集内容にフォールバック。</p>
   </div>
 
   <div class="foot">
@@ -539,11 +542,25 @@ mS.onclick=()=>setMode('s');mT.onclick=()=>setMode('t');mE.onclick=()=>setMode('
 document.getElementById('reset').onclick=()=>{streetL.querySelectorAll('.marker.on').forEach(m=>{m.classList.remove('on');m.querySelector('.ans').classList.remove('show');});updateCount();};
 
 /* ---------- persistence ---------- */
+const REMOTE_URL='https://raw.githubusercontent.com/daiki040404/map/main/data.json';
 async function save(){ if(STORE){try{await STORE.set('chiri:data',JSON.stringify(streets),false);}catch(e){}} }
+async function fetchRemote(){
+  try{const r=await fetch(REMOTE_URL+'?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return null; const j=await r.json(); return Array.isArray(j)?j:null;
+  }catch(e){return null;}
+}
 async function boot(){
-  let loaded=null;
-  if(STORE){try{const r=await STORE.get('chiri:data');if(r&&r.value)loaded=JSON.parse(r.value);}catch(e){}}
-  streets=(loaded&&Array.isArray(loaded)&&loaded.length)?loaded:JSON.parse(JSON.stringify(SEED));
+  // 1. GitHubの正本（data.json）を最優先で読む
+  const remote=await fetchRemote();
+  // 2. 失敗時はこの端末のローカル編集を見る
+  let local=null;
+  if(STORE){try{const r=await STORE.get('chiri:data');if(r&&r.value)local=JSON.parse(r.value);}catch(e){}}
+  // 3. それも無ければSEED（初回・サンプル）
+  streets = (remote&&remote.length) ? remote
+          : (local&&Array.isArray(local)&&local.length) ? local
+          : JSON.parse(JSON.stringify(SEED));
+  // ローカルにも保存（オフライン用フォールバック）
+  save();
   renderStreetChips();renderStreets();setMode('s');
 }
 boot();
