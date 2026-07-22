@@ -14,9 +14,10 @@
   #map{flex:1;position:relative}
   #toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(17,19,25,.92);color:#fff;padding:8px 14px;border-radius:20px;font-size:12px;border:1px solid #333;z-index:1000;display:none;max-width:80%;text-align:center}
   #toast.show{display:block}
-  header{padding:11px 14px;border-bottom:1px solid var(--line)}
+  header{padding:11px 14px;border-bottom:1px solid var(--line);position:relative}
   header h1{font-size:15px;margin:0 0 3px}
   header p{font-size:11px;color:var(--sub);margin:0;line-height:1.5}
+  #menuToggle{display:none;position:absolute;top:9px;right:10px;background:var(--accent);border:none;color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer}
   .row{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap;align-items:center}
   .row .lbl{font-size:11px;color:var(--sub);width:34px;flex:none}
   .seg{display:flex;gap:5px;flex:1}
@@ -98,7 +99,31 @@
   #rowDay select{background:#12151b;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px;font-size:12px}
   .dbtn{padding:6px 9px;font-size:11px;border:1px solid var(--line);background:#12151b;color:var(--txt);border-radius:7px;cursor:pointer}
   .dbtn.now{background:#16351f;border-color:#22c55e;color:#86efac}.dbtn.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-  @media(max-width:640px){#app{flex-direction:column}#side{width:100%;min-width:0;height:52%}#map{height:48%}.legend{display:none}}
+  @media(max-width:640px){
+    #app{flex-direction:column}
+    #map{order:1;flex:1;height:auto;min-height:38vh}
+    #side{order:2;width:100%;min-width:0;height:auto;max-height:48vh;border-right:none;border-top:2px solid var(--line);display:flex;flex-direction:column}
+    #side.min{max-height:none;flex:none}
+    #side.min #panelBody{display:none}
+    #panelBody{overflow-y:auto}
+    header{padding:9px 14px;padding-right:110px}
+    header p{display:none}
+    #menuToggle{display:block}
+    .legend{display:none}
+    header h1{font-size:16px}
+    .row{padding:9px 14px}
+    .row .lbl{width:40px;font-size:12px}
+    .seg button,.modes button{padding:11px 6px;font-size:14px}
+    .chips button,.dbtn{padding:9px 12px;font-size:13px}
+    #rowDay select{padding:8px;font-size:13px}
+    #editor button{padding:10px 10px;font-size:13px}
+    .item{padding:10px 8px;font-size:14px}
+    .mini{font-size:18px;padding:4px 6px}
+    .list{max-height:36vh}
+    .leaflet-popup-content{font-size:14px}
+    .ppbtn button,.ppday button,.pptime select{padding:9px 6px;font-size:14px}
+    .medthumb{width:72px;height:72px}
+  }
 </style>
 </head>
 <body>
@@ -106,10 +131,12 @@
   <div id="side">
     <header>
       <h1>東京 通りで覚える</h1>
+      <button id="menuToggle">地図を広く</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
     <div class="row"><span class="lbl">モード</span><div class="seg"><button id="mLearn" class="on">学習</button><button id="mTest">テスト</button><button id="mEdit">編集</button></div></div>
 
+    <div id="panelBody">
     <div id="editor">
       <h3>編集モード</h3>
       <div class="eb"><button id="eNew">＋ 通りを作る</button><button id="eNewRoute">＋ ルートを作る</button></div>
@@ -141,6 +168,7 @@
     <div class="counts"><span>全 <b id="cAll">0</b></span><span>覚えた <b id="cDone">0</b></span><span>今日 <b id="cTod">0</b></span></div>
     <div class="legend"><span><i class="lg tag"></i>通り名</span><span><i class="lg route"></i>ルート</span><span><i class="lg diamond"></i>交差点</span><span><i class="lg hex"></i>高速出入口</span><span><i class="lg circle"></i>建物</span></div>
     <div class="list" id="list"></div>
+    </div>
   </div>
   <div id="map"><div id="toast"></div></div>
 </div>
@@ -472,6 +500,9 @@ document.getElementById('qLocate').onclick=function(){
 };
 document.querySelectorAll('.chips button[data-k]').forEach(b=>{b.onclick=()=>{const k=b.dataset.k;if(visibleKinds.has(k)){visibleKinds.delete(k);b.classList.add('off');}else{visibleKinds.add(k);b.classList.remove('off');}render();};});
 document.getElementById('reset').onclick=()=>{selectedId=null;view='all';document.querySelectorAll('.seg button[data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v==='all'));render();map.setView([35.6852,139.7528],13);};
+
+const menuToggle=document.getElementById('menuToggle');
+menuToggle.onclick=()=>{const s=document.getElementById('side');const min=s.classList.toggle('min');menuToggle.textContent=min?'メニュー':'地図を広く';setTimeout(()=>map.invalidateSize(),260);};
 
 rebuild();
 </script>
