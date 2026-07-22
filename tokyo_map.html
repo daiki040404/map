@@ -153,11 +153,12 @@
         <div class="eb"><button id="eAddBld">🏢 建物を追加</button><button id="eDel" class="warn">この通りを削除</button></div>
         <p class="hint" id="eHint">左のリストで通りを選ぶと編集できます。</p>
       </div>
-      <div class="eb" style="margin-top:8px"><button id="eExport">💾 ファイルに保存</button><button id="eImport">📂 ファイルから復元</button></div>
-      <p class="hint">保存＝JSONファイルがダウンロード（通り・タグ・メモ文のみ／軽い）。GitHub等に置くのはこちら。</p>
+      <div class="eb" style="margin-top:8px"><button id="eExport">💾 ファイルに保存</button><button id="eImport">📂 復元（置き換え）</button></div>
+      <div class="eb"><button id="eMerge">📎 ファイルを追加合算（複数可）</button></div>
+      <p class="hint">保存＝JSONファイル（通り・タグ・メモ文／軽い）。復元＝1つ選んで置き換え。追加合算＝複数人のファイルを今のデータに足し合わせる（重複IDは自動でずらします）。</p>
       <div class="eb"><button id="eBackup">📦 丸ごと保存（写真も）</button><button id="eRestore">📥 丸ごと復元</button></div>
       <p class="hint">パソコン↔スマホの引っ越し用。写真・動画も全部入り。作ったファイルをAirDrop/クラウド/ケーブル等で移し、移した先で「丸ごと復元」を押す。</p>
-      <div class="eb"><button id="eReset">サンプルに戻す</button><button id="eClear" class="warn">全消去（0から作る）</button></div>
+      <div class="eb"><button id="eReset">サンプルを読込む</button><button id="eClear" class="warn">全消去（0から作る）</button></div>
       <input type="file" id="eFile" accept=".json,application/json" style="display:none"/>
     </div>
 
@@ -174,6 +175,7 @@
 </div>
 <input type="file" id="medFile" accept="image/*,video/*" multiple style="display:none"/>
 <input type="file" id="eBackFile" accept=".json,application/json" style="display:none"/>
+<input type="file" id="eMergeFile" accept=".json,application/json" multiple style="display:none"/>
 <div id="medOverlay"></div>
 <div id="crossModal"><div class="cmbox"><h3 id="cmTitle">通る通りを選択</h3><div id="cmList"></div><div class="cmbtn"><button id="cmCancel">キャンセル</button><button id="cmOk">決定</button></div></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -184,7 +186,7 @@ const DEFAULT_DATA=[{"id": "sotobori", "name": "外堀通り", "color": "#C2410C
 // ===== data (editable, persisted) =====
 const LS_DATA='tokyo_map_data_v2', LS_TAG='tokyo_map_progress_v2';
 let DATA;
-try{const s=localStorage.getItem(LS_DATA);DATA=s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_DATA));}catch(e){DATA=JSON.parse(JSON.stringify(DEFAULT_DATA));}
+try{const s=localStorage.getItem(LS_DATA);DATA=s?JSON.parse(s):[];}catch(e){DATA=[];}
 function saveData(){try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){}}
 let store={learned:{},today:{},days:{},time:{},memo:{}};
 try{const s=localStorage.getItem(LS_TAG);if(s){const o=JSON.parse(s);store.learned=o.learned||{};store.today=o.today||{};store.days=o.days||{};store.time=o.time||{};store.memo=o.memo||{};}}catch(e){}
@@ -441,7 +443,15 @@ document.getElementById('eUndoPt').onclick=()=>{const o=cur();if(o&&o.path.lengt
 document.getElementById('eDel').onclick=()=>{const o=cur();if(o&&confirm('「'+o.name+'」を削除する？')){DATA=DATA.filter(x=>x.id!==o.id);selectedId=null;saveData();rebuild();}};
 document.getElementById('eExport').onclick=()=>{const blob=new Blob([JSON.stringify(DATA,null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tokyo-map-data.json';a.click();toast('ファイルに保存しました（ダウンロード）');};
 document.getElementById('eImport').onclick=()=>document.getElementById('eFile').click();
-document.getElementById('eFile').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(Array.isArray(d)){DATA=d;selectedId=null;saveData();rebuild();toast('読み込みました');}else toast('形式が違います');}catch(e){toast('読み込み失敗');}};r.readAsText(f);};
+document.getElementById('eFile').onchange=ev=>{const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(d&&!Array.isArray(d)&&Array.isArray(d.data))d=d.data;if(Array.isArray(d)){DATA=d;selectedId=null;saveData();rebuild();toast('読み込みました（'+d.length+'件）');}else toast('形式が違います');}catch(e){toast('読み込み失敗');}};r.readAsText(f);ev.target.value='';};
+// ===== 追加合算（複数ファイル） =====
+let _mid=0;
+function newId(){_mid++;return 'm'+Date.now().toString(36)+_mid.toString(36);}
+function mergeEntries(arr){const map={};arr.forEach(o=>{if(o&&o.id!=null)map[o.id]=newId();});let n=0;arr.forEach(o=>{if(!o||o.id==null)return;const c=JSON.parse(JSON.stringify(o));c.id=map[o.id];if(c.kind==='crossing'&&Array.isArray(c.roads))c.roads=c.roads.map(r=>map[r]||r);DATA.push(c);n++;});return n;}
+document.getElementById('eMerge').onclick=()=>document.getElementById('eMergeFile').click();
+document.getElementById('eMergeFile').onchange=ev=>{const files=Array.prototype.slice.call(ev.target.files);if(!files.length)return;let done=0,added=0;
+  files.forEach(f=>{const r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);if(d&&!Array.isArray(d)&&Array.isArray(d.data))d=d.data;if(Array.isArray(d))added+=mergeEntries(d);}catch(e){}done++;if(done===files.length){selectedId=null;saveData();rebuild();toast(files.length+'ファイル／'+added+'件を追加合算しました');}};r.readAsText(f);});
+  ev.target.value='';};
 document.getElementById('eRoute').onclick=async()=>{const o=cur();if(!o){toast('先に通りを選んでね');return;}if(!o.path||o.path.length<2){toast('点を2つ以上打ってからね');return;}toast('道路に沿ってルート計算中…',8000);try{const c=await osrmRoute(o.path);if(!c||c.length<2){toast('ルートを取得できませんでした');return;}o.path=c.map(p=>[p[0],p[1]]);saveData();rebuild();toast('道路に沿わせました（'+o.path.length+'点）');}catch(e){toast('取得失敗：ネット接続が必要（file://だと不可の場合あり）',3800);}};
 document.getElementById('eBackup').onclick=async()=>{
   toast('丸ごと保存を作成中…（写真が多いと少し時間がかかります）',9000);
