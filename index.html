@@ -195,7 +195,7 @@ function recalc(){
   var rows = document.querySelectorAll('#rows tr');
   var totalBindMin = 0, totalDriveMin = 0, driveCount = 0;
   var totalRev = 0, revCount = 0, cumBindMin = 0;
-  var runTgtSum = 0, runTgtCount = 0, lastTgtAvg = null;
+  var lastTgtAvg = null;
   var runActSum = 0, runActCount = 0, lastActAvg = null;
 
   rows.forEach(function(tr){
@@ -236,8 +236,7 @@ function recalc(){
 
     var tg = parseFloat(tgtStr);
     if(!isNaN(tg)){
-      runTgtSum += tg; runTgtCount++;
-      lastTgtAvg = runTgtSum / runTgtCount;
+      lastTgtAvg = (runActSum + tg) / (runActCount + 1);
       avgTgtCell.textContent = fmtYen(lastTgtAvg);
     } else {
       avgTgtCell.textContent = '—';
@@ -347,7 +346,7 @@ function exportCSV(){
   var lines = [];
   lines.push('出番,始業,終業,拘束時間,運転時間,目標営収(円),実績営収(円),平均営収(目標),平均営収(実績),この時点の拘束残り');
   var cum = 0, totalBind = 0, totalDrive = 0, driveCnt = 0;
-  var runT = 0, runTc = 0, lastT = '';
+  var lastT = '';
   var runA = 0, runAc = 0, lastA = '';
   rows.forEach(function(tr, i){
     var start = tr.querySelector('.start').value;
@@ -366,7 +365,7 @@ function exportCSV(){
     if(dv!=null){ totalDrive += dv; driveCnt++; }
     var rv = parseFloat(revStr), tg = parseFloat(tgtStr);
     var avgTstr = '', avgAstr = '';
-    if(!isNaN(tg)){ runT += tg; runTc++; avgTstr = Math.round(runT/runTc); lastT = avgTstr; }
+    if(!isNaN(tg)){ avgTstr = Math.round((runA + tg)/(runAc + 1)); lastT = avgTstr; }
     if(!isNaN(rv)){ runA += rv; runAc++; avgAstr = Math.round(runA/runAc); lastA = avgAstr; }
     lines.push([ (i+1), fmtDT(start), fmtDT(end), bindStr, (drive||''), (tgtStr||''), (revStr||''), avgTstr, avgAstr, remainStr ].join(','));
   });
