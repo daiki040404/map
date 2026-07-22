@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タクシー勤務管理（拘束時間・運転時間・営収）</title>
+<style>
+  :root{
+    --bg:#f5f5f2; --card:#ffffff; --line:#e2e1da; --line2:#cfcec5;
+    --text:#26251f; --muted:#75746c; --accent:#185fa5; --accent-bg:#e6f1fb;
+    --ok:#3b6d11; --ok-bg:#eaf3de; --warn:#854f0b; --warn-bg:#faeeda;
+    --danger:#a32d2d; --danger-bg:#fcebeb;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    line-height:1.6; padding:16px;}
+  .wrap{max-width:940px; margin:0 auto;}
+  h1{font-size:20px; font-weight:600; margin:0 0 4px;}
+  .sub{font-size:13px; color:var(--muted); margin:0 0 16px;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:14px;}
+  .controls{display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:14px;}
+  label{font-size:13px; color:var(--muted);}
+  select,input{font-family:inherit; font-size:15px; color:var(--text); background:#fff;
+    border:1px solid var(--line2); border-radius:8px; padding:6px 8px;}
+  select:focus,input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg);}
+  .stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px;}
+  .stat{background:#faf9f5; border-radius:10px; padding:10px 12px;}
+  .stat .k{font-size:12px; color:var(--muted);}
+  .stat .v{font-size:20px; font-weight:600; margin-top:2px;}
+  .stat.hl{background:var(--accent-bg);} .stat.hl .k,.stat.hl .v{color:var(--accent);}
+  .stat.warn{background:var(--warn-bg);} .stat.warn .k,.stat.warn .v{color:var(--warn);}
+  .stat.danger{background:var(--danger-bg);} .stat.danger .k,.stat.danger .v{color:var(--danger);}
+  .stat.rev{background:var(--ok-bg);} .stat.rev .k,.stat.rev .v{color:var(--ok);}
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th,td{padding:7px 5px; text-align:center; border-bottom:1px solid var(--line);}
+  th{font-size:12px; color:var(--muted); font-weight:500; white-space:nowrap;}
+  td.calc{font-weight:600; white-space:nowrap;}
+  .dt-in{width:186px;}
+  .time-in{width:96px; text-align:center;}
+  .rev-in{width:88px; text-align:right;}
+  input[type="time"],input[type="datetime-local"]{font-size:14px;}
+  .rownum{color:var(--muted); font-size:13px;}
+  .err{color:var(--danger); font-weight:600;}
+  .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}
+  button{font-family:inherit; font-size:14px; color:var(--text); background:#fff;
+    border:1px solid var(--line2); border-radius:8px; padding:8px 14px; cursor:pointer;}
+  button:hover{background:#f2f1ec;}
+  button.primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+  button.primary:hover{background:#14528d;}
+  .note{font-size:12px; color:var(--muted); margin-top:10px;}
+  .remain-neg{color:var(--danger); font-weight:700;}
+  .sec-title{font-size:14px; font-weight:600; margin:0 0 10px;}
+  .tbl-wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>タクシー勤務管理</h1>
+  <p class="sub">始業・終業をそれぞれ「日付＋時刻」で選ぶと拘束時間を自動計算します（翌日終業もそのまま正しく計算）。月間拘束の残り・運転時間の平均・営収の平均も出ます。</p>
+
+  <div class="card">
+    <div class="controls">
+      <div>
+        <label>月タイプ</label><br>
+        <select id="monthType">
+          <option value="270">大の月（270時間）</option>
+          <option value="262">小の月（262時間）</option>
+        </select>
+      </div>
+      <div>
+        <label>目標の平均運転時間</label><br>
+        <input id="target" type="time" value="14:30" style="width:96px;">
+      </div>
+      <div>
+        <label>出番数</label><br>
+        <input id="shiftCount" type="number" min="1" max="40" value="13" style="width:66px;">
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat hl"><div class="k">拘束 合計 / 上限</div><div class="v" id="sumBind">—</div></div>
+      <div class="stat" id="remainCard"><div class="k">月間拘束 残り</div><div class="v" id="remainBind">—</div></div>
+      <div class="stat"><div class="k">運転 現在の平均</div><div class="v" id="avgDrive">—</div></div>
+      <div class="stat warn"><div class="k">残り出番の必要運転/出番</div><div class="v" id="needDrive">—</div></div>
+      <div class="stat rev"><div class="k">平均営収（目標）</div><div class="v" id="avgTgt">—</div></div>
+      <div class="stat rev"><div class="k">平均営収（実績）</div><div class="v" id="avgAct">—</div></div>
+    </div>
+    <p class="note" id="needNote"></p>
+  </div>
+
+  <div class="card">
+    <p class="sec-title">出番ごとの入力</p>
+    <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>出番</th>
+          <th>始業（日付＋時刻）</th>
+          <th>終業（日付＋時刻）</th>
+          <th>拘束<br>時間</th>
+          <th>運転<br>時間</th>
+          <th>目標<br>営収(円)</th>
+          <th>実績<br>営収(円)</th>
+          <th>平均営収<br>(目標)</th>
+          <th>平均営収<br>(実績)</th>
+          <th>この時点の<br>拘束残り</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    </div>
+    <div class="btns">
+      <button class="primary" onclick="saveData()">保存</button>
+      <button onclick="exportCSV()">CSVで書き出し</button>
+      <button onclick="exportJSON()">バックアップ保存</button>
+      <button onclick="document.getElementById('importFile').click()">バックアップ読み込み</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
+      <button onclick="clearData()">全部クリア</button>
+    </div>
+    <p class="note">始業・終業のカレンダーは空のとき今日の日付で開きます。営収は金額を数字で記入してください。入力はこのブラウザに自動保存されます。「CSVで書き出し」で記録をファイルに残せます（Excel等で開けます）。「バックアップ保存」したファイルは「バックアップ読み込み」でこのツールに戻せます。</p>
+  </div>
+</div>
+
+<script>
+var KEY = 'taxi_kinmu_v3';
+
+function parseTime(s){
+  if(!s) return null;
+  var m = String(s).match(/^(\d{1,2}):(\d{2})$/);
+  if(!m) return null;
+  var h = parseInt(m[1],10), mi = parseInt(m[2],10);
+  if(mi>59) return null;
+  return h*60 + mi;
+}
+function fmtHM(mins){
+  var neg = mins < 0; mins = Math.abs(Math.round(mins));
+  var h = Math.floor(mins/60), m = mins%60;
+  return (neg?'-':'') + h + '時間' + (m<10?'0'+m:m) + '分';
+}
+function bindMinutes(startStr, endStr){
+  if(!startStr || !endStr) return null;
+  var s = new Date(startStr), e = new Date(endStr);
+  if(isNaN(s.getTime()) || isNaN(e.getTime())) return null;
+  var diff = (e - s) / 60000;
+  return {mins:diff, valid: diff > 0};
+}
+function fmtYen(n){ return '¥' + Math.round(n).toLocaleString('ja-JP'); }
+
+function buildRows(){
+  var n = parseInt(document.getElementById('shiftCount').value,10) || 13;
+  var tbody = document.getElementById('rows');
+  var existing = readInputs();
+  tbody.innerHTML = '';
+  for(var i=0;i<n;i++){
+    var d = existing[i] || {start:'',end:'',drive:'',rev:''};
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="rownum">'+(i+1)+'</td>'+
+      '<td><input type="datetime-local" class="dt-in start" value="'+d.start+'"></td>'+
+      '<td><input type="datetime-local" class="dt-in end" value="'+d.end+'"></td>'+
+      '<td class="calc bind">—</td>'+
+      '<td><input type="time" class="time-in drive" value="'+d.drive+'"></td>'+
+      '<td><input class="rev-in tgt" inputmode="numeric" placeholder="50000" value="'+(d.tgt||'')+'"></td>'+
+      '<td><input class="rev-in rev" inputmode="numeric" placeholder="45000" value="'+d.rev+'"></td>'+
+      '<td class="calc avgtgt">—</td>'+
+      '<td class="calc avgact">—</td>'+
+      '<td class="calc remain">—</td>';
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('input').forEach(function(inp){
+    inp.addEventListener('input', function(){ recalc(); saveData(true); });
+  });
+  recalc();
+}
+
+function readInputs(){
+  var out = [];
+  document.querySelectorAll('#rows tr').forEach(function(tr){
+    out.push({
+      start: tr.querySelector('.start').value,
+      end: tr.querySelector('.end').value,
+      drive: tr.querySelector('.drive').value,
+      tgt: tr.querySelector('.tgt').value.trim(),
+      rev: tr.querySelector('.rev').value.trim()
+    });
+  });
+  return out;
+}
+
+function recalc(){
+  var limit = parseInt(document.getElementById('monthType').value,10);
+  var targetMin = parseTime(document.getElementById('target').value);
+  if(targetMin==null) targetMin = 870;
+  var rows = document.querySelectorAll('#rows tr');
+  var totalBindMin = 0, totalDriveMin = 0, driveCount = 0;
+  var totalRev = 0, revCount = 0, cumBindMin = 0;
+  var lastTgtAvg = null;
+  var runActSum = 0, runActCount = 0, lastActAvg = null;
+
+  rows.forEach(function(tr){
+    var start = tr.querySelector('.start').value;
+    var end = tr.querySelector('.end').value;
+    var driveStr = tr.querySelector('.drive').value;
+    var tgtStr = tr.querySelector('.tgt').value.replace(/[,\s¥￥]/g,'').trim();
+    var revStr = tr.querySelector('.rev').value.replace(/[,\s¥￥]/g,'').trim();
+    var bindCell = tr.querySelector('.bind');
+    var remainCell = tr.querySelector('.remain');
+    var avgTgtCell = tr.querySelector('.avgtgt');
+    var avgActCell = tr.querySelector('.avgact');
+
+    var b = bindMinutes(start, end);
+    if(b && b.valid){
+      totalBindMin += b.mins;
+      cumBindMin += b.mins;
+      bindCell.textContent = fmtHM(b.mins);
+      bindCell.className = 'calc bind';
+      var remMin = limit*60 - cumBindMin;
+      remainCell.textContent = fmtHM(remMin);
+      remainCell.className = 'calc remain' + (remMin < 0 ? ' remain-neg' : '');
+    } else if(b && !b.valid){
+      bindCell.textContent = '確認';
+      bindCell.className = 'calc bind err';
+      remainCell.textContent = '—';
+      remainCell.className = 'calc remain';
+    } else {
+      bindCell.textContent = '—';
+      bindCell.className = 'calc bind';
+      remainCell.textContent = '—';
+      remainCell.className = 'calc remain';
+    }
+    var dv = parseTime(driveStr);
+    if(dv!=null){ totalDriveMin += dv; driveCount++; }
+    var rv = parseFloat(revStr);
+    if(!isNaN(rv)){ totalRev += rv; revCount++; }
+
+    var tg = parseFloat(tgtStr);
+    if(!isNaN(tg)){
+      lastTgtAvg = (runActSum + tg) / (runActCount + 1);
+      avgTgtCell.textContent = fmtYen(lastTgtAvg);
+    } else {
+      avgTgtCell.textContent = '—';
+    }
+    if(!isNaN(rv)){
+      runActSum += rv; runActCount++;
+      lastActAvg = runActSum / runActCount;
+      avgActCell.textContent = fmtYen(lastActAvg);
+    } else {
+      avgActCell.textContent = '—';
+    }
+  });
+
+  document.getElementById('sumBind').textContent = fmtHM(totalBindMin) + ' / ' + limit + '時間';
+  var remainTotalMin = limit*60 - totalBindMin;
+  document.getElementById('remainBind').textContent = fmtHM(remainTotalMin);
+  var remCard = document.getElementById('remainCard');
+  remCard.className = 'stat' + (remainTotalMin < 0 ? ' danger' : (remainTotalMin < 1200 ? ' warn' : ''));
+
+  document.getElementById('avgDrive').textContent = driveCount>0 ? fmtHM(totalDriveMin/driveCount) : '—';
+  document.getElementById('avgTgt').textContent = lastTgtAvg!=null ? fmtYen(lastTgtAvg) : '—';
+  document.getElementById('avgAct').textContent = lastActAvg!=null ? fmtYen(lastActAvg) : '—';
+
+  var totalShifts = parseInt(document.getElementById('shiftCount').value,10) || 13;
+  var remainingShifts = totalShifts - driveCount;
+  var need = document.getElementById('needDrive');
+  var note = document.getElementById('needNote');
+  var tH = fmtHM(targetMin);
+  if(driveCount === 0){
+    need.textContent = '—';
+    note.textContent = '運転時間を入力すると、残り出番で1出番あたり何時間運転すれば目標平均('+tH+')に届くか表示します。';
+  } else if(remainingShifts <= 0){
+    need.textContent = '—';
+    var avgMin = totalDriveMin/driveCount;
+    note.textContent = '全出番が入力済み。最終的な平均運転時間は ' + fmtHM(avgMin) + ' '
+      + (avgMin >= targetMin ? '（目標達成）' : '（目標に ' + fmtHM(targetMin-avgMin) + ' 不足）');
+  } else {
+    var requiredMin = (targetMin*totalShifts - totalDriveMin) / remainingShifts;
+    if(requiredMin <= 0){
+      need.textContent = '0時間でOK';
+      note.textContent = 'すでに目標達成ペース。残り'+remainingShifts+'出番は0時間でも平均'+tH+'を超えます。';
+    } else {
+      need.textContent = fmtHM(requiredMin);
+      note.textContent = '残り'+remainingShifts+'出番すべてで、1出番あたり平均 約'+fmtHM(requiredMin)+' 以上の運転が必要（目標平均'+tH+'）。';
+    }
+  }
+}
+
+function saveData(silent){
+  var data = {
+    monthType: document.getElementById('monthType').value,
+    target: document.getElementById('target').value,
+    shiftCount: document.getElementById('shiftCount').value,
+    rows: readInputs()
+  };
+  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  if(!silent && window.event && window.event.target){ var b=window.event.target; var t=b.textContent; b.textContent='保存しました'; setTimeout(function(){b.textContent=t;},1200); }
+}
+
+function loadData(){
+  var raw;
+  try{ raw = localStorage.getItem(KEY); }catch(e){}
+  if(raw){
+    try{
+      var d = JSON.parse(raw);
+      if(d.monthType) document.getElementById('monthType').value = d.monthType;
+      if(d.target) document.getElementById('target').value = d.target;
+      if(d.shiftCount) document.getElementById('shiftCount').value = d.shiftCount;
+      buildRows();
+      if(d.rows){
+        var trs = document.querySelectorAll('#rows tr');
+        d.rows.forEach(function(r,i){
+          if(trs[i]){
+            trs[i].querySelector('.start').value = r.start||'';
+            trs[i].querySelector('.end').value = r.end||'';
+            trs[i].querySelector('.drive').value = r.drive||'';
+            trs[i].querySelector('.tgt').value = r.tgt||'';
+            trs[i].querySelector('.rev').value = r.rev||'';
+          }
+        });
+        recalc();
+      }
+      return;
+    }catch(e){}
+  }
+  buildRows();
+}
+
+function fmtDT(v){ return v ? v.replace('T',' ').replace(/-/g,'/') : ''; }
+function todayStamp(){
+  var d = new Date();
+  var p = function(n){ return (n<10?'0':'')+n; };
+  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+}
+function download(name, content, type){
+  var blob = new Blob([content], {type:type});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function exportCSV(){
+  var rows = document.querySelectorAll('#rows tr');
+  var limit = parseInt(document.getElementById('monthType').value,10);
+  var lines = [];
+  lines.push('出番,始業,終業,拘束時間,運転時間,目標営収(円),実績営収(円),平均営収(目標),平均営収(実績),この時点の拘束残り');
+  var cum = 0, totalBind = 0, totalDrive = 0, driveCnt = 0;
+  var lastT = '';
+  var runA = 0, runAc = 0, lastA = '';
+  rows.forEach(function(tr, i){
+    var start = tr.querySelector('.start').value;
+    var end = tr.querySelector('.end').value;
+    var drive = tr.querySelector('.drive').value;
+    var tgtStr = tr.querySelector('.tgt').value.replace(/[,\s¥￥]/g,'').trim();
+    var revStr = tr.querySelector('.rev').value.replace(/[,\s¥￥]/g,'').trim();
+    var b = bindMinutes(start, end);
+    var bindStr = '', remainStr = '';
+    if(b && b.valid){
+      totalBind += b.mins; cum += b.mins;
+      bindStr = fmtHM(b.mins);
+      remainStr = fmtHM(limit*60 - cum);
+    }
+    var dv = parseTime(drive);
+    if(dv!=null){ totalDrive += dv; driveCnt++; }
+    var rv = parseFloat(revStr), tg = parseFloat(tgtStr);
+    var avgTstr = '', avgAstr = '';
+    if(!isNaN(tg)){ avgTstr = Math.round((runA + tg)/(runAc + 1)); lastT = avgTstr; }
+    if(!isNaN(rv)){ runA += rv; runAc++; avgAstr = Math.round(runA/runAc); lastA = avgAstr; }
+    lines.push([ (i+1), fmtDT(start), fmtDT(end), bindStr, (drive||''), (tgtStr||''), (revStr||''), avgTstr, avgAstr, remainStr ].join(','));
+  });
+  lines.push('');
+  lines.push('月タイプ,'+ limit +'時間');
+  lines.push('拘束合計,'+ fmtHM(totalBind));
+  lines.push('月間拘束残り,'+ fmtHM(limit*60 - totalBind));
+  lines.push('運転平均,'+ (driveCnt>0 ? fmtHM(totalDrive/driveCnt) : ''));
+  lines.push('平均営収(目標),'+ lastT);
+  lines.push('平均営収(実績),'+ lastA);
+  var csv = '﻿' + lines.join('\r\n');
+  download('タクシー勤務記録_'+todayStamp()+'.csv', csv, 'text/csv;charset=utf-8;');
+}
+
+function exportJSON(){
+  var data = {
+    monthType: document.getElementById('monthType').value,
+    target: document.getElementById('target').value,
+    shiftCount: document.getElementById('shiftCount').value,
+    rows: readInputs()
+  };
+  download('タクシー勤務バックアップ_'+todayStamp()+'.json', JSON.stringify(data,null,2), 'application/json');
+}
+
+function importJSON(input){
+  var file = input.files[0];
+  if(!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var d = JSON.parse(e.target.result);
+      if(d.monthType) document.getElementById('monthType').value = d.monthType;
+      if(d.target) document.getElementById('target').value = d.target;
+      if(d.shiftCount) document.getElementById('shiftCount').value = d.shiftCount;
+      buildRows();
+      if(d.rows){
+        var trs = document.querySelectorAll('#rows tr');
+        d.rows.forEach(function(r,i){
+          if(trs[i]){
+            trs[i].querySelector('.start').value = r.start||'';
+            trs[i].querySelector('.end').value = r.end||'';
+            trs[i].querySelector('.drive').value = r.drive||'';
+            trs[i].querySelector('.tgt').value = r.tgt||'';
+            trs[i].querySelector('.rev').value = r.rev||'';
+          }
+        });
+      }
+      recalc(); saveData(true);
+      alert('読み込みました。');
+    }catch(err){ alert('読み込めませんでした。バックアップ(JSON)ファイルを選んでください。'); }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function clearData(){
+  if(!confirm('入力を全部消しますか？')) return;
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  document.querySelectorAll('#rows input').forEach(function(i){ i.value=''; });
+  recalc();
+}
+
+document.getElementById('monthType').addEventListener('change', function(){ recalc(); saveData(true); });
+document.getElementById('target').addEventListener('input', function(){ recalc(); saveData(true); });
+document.getElementById('shiftCount').addEventListener('input', function(){ buildRows(); saveData(true); });
+
+loadData();
+</script>
+</body>
+</html>
