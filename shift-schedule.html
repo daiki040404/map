@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>営業・休憩スケジュール自動計算</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1f2430; --sub:#6b7280;
+    --line:#e5e7eb; --work:#2563eb; --workbg:#eaf1ff;
+    --brk:#0f9d6b; --brkbg:#e7f7f0; --warn:#c2410c; --warnbg:#fff2e8;
+    --accent:#7c3aed;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
+    -webkit-text-size-adjust:100%;}
+  .wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
+  h1{font-size:19px;margin:4px 0 2px;}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 16px;line-height:1.6;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  .fld{display:flex;flex-direction:column;gap:5px;}
+  label{font-size:12px;color:var(--sub);font-weight:600;}
+  input[type=time],input[type=number]{font-size:16px;padding:9px 10px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;color:var(--ink);width:100%;}
+  input[type=number]{width:88px;}
+  .out{width:118px;}
+  .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;
+    cursor:pointer;background:var(--accent);color:#fff;}
+  .btn.sec{background:#eef0f4;color:#374151;}
+  .btn.mini{padding:6px 10px;font-size:13px;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+
+  .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;}
+  .seg.work{background:var(--workbg);border-color:#cfe0ff;}
+  .seg.brk{background:var(--brkbg);border-color:#c7ecdd;}
+  .seg-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
+  .tag.work{background:var(--work);} .tag.brk{background:var(--brk);}
+  .clock{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .dur{font-size:12px;color:var(--sub);margin-top:3px;}
+  .adj{color:var(--warn);font-weight:700;}
+  .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
+    padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
+  .seg-ctrl .fld label{font-size:11px;}
+  .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
+  .del{background:transparent;border:0;color:#9ca3af;font-size:18px;cursor:pointer;line-height:1;padding:0 2px;}
+
+  .summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  .pill{flex:1;min-width:130px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+  .pill .k{font-size:11px;color:var(--sub);font-weight:600;}
+  .pill .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .pill.hi{background:#f3ecff;border-color:#e2d4ff;}
+  .banner{background:var(--warnbg);border:1px solid #f6d3b8;color:var(--warn);
+    font-size:12.5px;border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.5;}
+  details{margin-top:6px;} summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:600;}
+  .settings{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
+  .foot{color:var(--sub);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.6;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>営業・休憩スケジュール自動計算</h1>
+  <p class="lead">出庫時刻を入れるだけで、営業と休憩の時間が自動で並びます。時刻がずれても全部まとめて計算し直し。休憩がずれ込んだ時は「次の営業を縮めて、帰庫時刻と合計休憩は変えない」で調整します。</p>
+
+  <div class="card">
+    <div class="row">
+      <div class="fld">
+        <label>出庫時刻</label>
+        <input class="out" type="time" id="outTime" value="13:50">
+      </div>
+      <div class="btnrow" style="margin-bottom:2px">
+        <button class="btn sec mini" id="addBlk">＋ 営業ブロックを追加</button>
+        <button class="btn sec mini" id="reset">リセット</button>
+      </div>
+    </div>
+    <details>
+      <summary>基本設定を変える（営業・休憩の長さ、合計休憩の上限）</summary>
+      <div class="settings">
+        <div class="fld"><label>1営業ブロック（分）</label><input type="number" id="defWork" value="180" min="0" step="5"></div>
+        <div class="fld"><label>1回の休憩（分）</label><input type="number" id="defBreak" value="30" min="30" step="5"></div>
+        <div class="fld"><label>合計休憩の上限（分）</label><input type="number" id="cap" value="210" min="30" step="10"></div>
+      </div>
+      <p class="hint">初期値：3時間営業ごとに30分休憩／合計休憩は3時間30分（210分）まで。</p>
+    </details>
+  </div>
+
+  <div id="warn"></div>
+  <div id="sched"></div>
+
+  <div class="card">
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <p class="foot">
+    使い方：休憩場所がなくてずれ込んだ営業ブロックは「実際に休憩を始めた時刻」を入れてください。<br>
+    そのぶん次の営業が自動で短くなり、帰庫時刻と合計休憩は変わりません。
+  </p>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const state={
+  out:"13:50",
+  defWork:180, defBreak:30, cap:210,
+  // blocks: {work: 予定営業(分), brk: 休憩(分), actual: "HH:MM"|null }
+  blocks:[]
+};
+function defaultBlocks(){
+  state.blocks=[];
+  for(let i=0;i<5;i++){
+    state.blocks.push({work:state.defWork, brk:state.defBreak, actual:null});
+  }
+}
+defaultBlocks();
+
+function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
+function fmtClock(baseMin, elapsed){
+  let total=baseMin+elapsed;
+  let day=Math.floor(total/1440);
+  let m=((total%1440)+1440)%1440;
+  let hh=String(Math.floor(m/60)).padStart(2,"0");
+  let mm=String(m%60).padStart(2,"0");
+  let pre = day<=0?"":(day===1?"翌 ":`+${day}日 `);
+  return pre+hh+":"+mm;
+}
+function fmtDur(min){
+  min=Math.round(min);
+  const s=min<0?"-":""; min=Math.abs(min);
+  const h=Math.floor(min/60), m=min%60;
+  if(h&&m) return `${s}${h}時間${m}分`;
+  if(h) return `${s}${h}時間`;
+  return `${s}${m}分`;
+}
+
+// 核となる計算
+function compute(){
+  const base=toMin(state.out)??0;
+  let elapsed=0;      // 出庫からの経過分
+  let carry=0;        // 次の営業から差し引く「ずれ込み分」
+  let breakUsed=0;
+  const rows=[]; const notes=[];
+  const cap=Math.max(0,state.cap);
+
+  state.blocks.forEach((b,i)=>{
+    // --- 営業 ---
+    const wStart=elapsed;
+    const planned=Math.max(0,b.work);
+    let effPlanned=planned-carry;   // ずれ込み分を差し引いた「本来の」営業
+    let leftover=0;
+    if(effPlanned<0){ leftover=-effPlanned; effPlanned=0; }
+    carry=leftover;
+
+    let workDur, adj=0;
+    const actual=toMin(b.actual);
+    if(actual!==null){
+      // 実際に休憩を始めた時刻 → その時点まで営業
+      let aElapsed=actual-base;
+      while(aElapsed<wStart) aElapsed+=1440;   // 翌日回り込み
+      workDur=aElapsed-wStart;
+      // 本来より長く走った分を次に繰り越し（次の営業が減る）
+      carry+=(workDur-effPlanned);
+    }else{
+      workDur=effPlanned;
+    }
+    adj=workDur-planned;   // 予定3hからのズレ表示用
+
+    rows.push({type:"work",i, start:wStart, dur:workDur, planned, adj});
+    elapsed=wStart+workDur;
+
+    // --- 休憩（最後のブロックの後は帰庫なので休憩なし）---
+    const isLast=i===state.blocks.length-1;
+    if(!isLast){
+      let br=Math.max(30, b.brk||0);   // 最低30分
+      const remain=cap-breakUsed;
+      if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は取れません。`);}
+      else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
+      if(br>0){
+        rows.push({type:"brk",i, start:elapsed, dur:br});
+        breakUsed+=br;
+        elapsed+=br;
+      }
+    }
+  });
+
+  return {base, rows, kikoElapsed:elapsed, breakUsed, workTotal:elapsed-breakUsed, notes};
+}
+
+function render(){
+  const r=compute();
+  const S=$("#sched"); S.innerHTML="";
+  r.rows.forEach(row=>{
+    if(row.type==="work"){
+      const el=document.createElement("div");
+      el.className="seg work";
+      const adjTxt = Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"";
+      el.innerHTML=`
+        <div class="seg-top">
+          <div><span class="tag work">営業 ${row.i+1}</span></div>
+          <div style="text-align:right">
+            <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
+            <div class="dur">営業 ${fmtDur(row.dur)}${adjTxt}</div>
+          </div>
+        </div>
+        <div class="seg-ctrl">
+          <div class="fld">
+            <label>予定の営業（分）</label>
+            <input type="number" min="0" step="5" value="${row.planned}" data-k="work" data-i="${row.i}">
+          </div>
+          <div class="fld">
+            <label>実際に休憩を始めた時刻</label>
+            <input type="time" value="${state.blocks[row.i].actual||""}" data-k="actual" data-i="${row.i}">
+            <span class="hint">ずれ込んだ時だけ入力</span>
+          </div>
+          <button class="del" title="このブロックを削除" data-del="${row.i}">🗑</button>
+        </div>`;
+      S.appendChild(el);
+    }else{
+      const el=document.createElement("div");
+      el.className="seg brk";
+      el.innerHTML=`
+        <div class="seg-top">
+          <div><span class="tag brk">休憩</span></div>
+          <div style="text-align:right">
+            <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
+            <div class="dur">休憩 ${fmtDur(row.dur)}</div>
+          </div>
+        </div>
+        <div class="seg-ctrl">
+          <div class="fld">
+            <label>休憩（分・最低30）</label>
+            <input type="number" min="30" step="5" value="${state.blocks[row.i].brk}" data-k="brk" data-i="${row.i}">
+          </div>
+        </div>`;
+      S.appendChild(el);
+    }
+  });
+
+  // 帰庫
+  const kiko=document.createElement("div");
+  kiko.className="seg"; kiko.style.background="#111827"; kiko.style.borderColor="#111827";
+  kiko.innerHTML=`<div class="seg-top">
+      <div><span class="tag" style="background:#fff;color:#111827">帰庫</span></div>
+      <div class="clock" style="color:#fff">${fmtClock(r.base,r.kikoElapsed)}</div>
+    </div>`;
+  S.appendChild(kiko);
+
+  // 警告
+  const W=$("#warn");
+  const capLeft=state.cap-r.breakUsed;
+  const notes=[...new Set(r.notes)];
+  W.innerHTML = notes.length? `<div class="banner">⚠ ${notes.join("<br>⚠ ")}</div>`:"";
+
+  // サマリー
+  $("#summary").innerHTML=`
+    <div class="pill hi"><div class="k">帰庫時刻</div><div class="v">${fmtClock(r.base,r.kikoElapsed)}</div></div>
+    <div class="pill"><div class="k">合計 営業</div><div class="v">${fmtDur(r.workTotal)}</div></div>
+    <div class="pill"><div class="k">合計 休憩</div><div class="v">${fmtDur(r.breakUsed)}</div></div>
+    <div class="pill"><div class="k">拘束（出庫→帰庫）</div><div class="v">${fmtDur(r.kikoElapsed)}</div></div>`;
+}
+
+// イベント
+$("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
+$("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;});
+$("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(30,+e.target.value||30);});
+$("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
+$("#addBlk").addEventListener("click",()=>{state.blocks.push({work:state.defWork,brk:state.defBreak,actual:null});render();});
+$("#reset").addEventListener("click",()=>{defaultBlocks();$("#outTime").value=state.out;render();});
+
+$("#sched").addEventListener("input",e=>{
+  const i=e.target.dataset.i, k=e.target.dataset.k;
+  if(i===undefined) return;
+  const b=state.blocks[+i];
+  if(k==="work") b.work=+e.target.value||0;
+  else if(k==="brk") b.brk=Math.max(30,+e.target.value||30);
+  else if(k==="actual") b.actual=e.target.value||null;
+  render();
+});
+$("#sched").addEventListener("click",e=>{
+  const d=e.target.dataset.del;
+  if(d!==undefined && state.blocks.length>1){ state.blocks.splice(+d,1); render(); }
+});
+
+render();
+</script>
+</body>
+</html>
