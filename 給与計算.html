@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>給与計算ツール</title>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  background: #f5f6f8; color: #1a1d21; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 760px; margin: 0 auto; }
+h1 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: #6b7280; font-size: 13px; margin: 0 0 16px; }
+.card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+.card h2 { font-size: 14px; margin: 0 0 12px; color: #374151; letter-spacing: .02em; }
+.settings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 560px){ .settings { grid-template-columns: 1fr 1fr; } }
+.field label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+.field .unit { color: #9ca3af; font-size: 12px; margin-left: 4px; }
+input[type=number], input[type=date] {
+  width: 100%; padding: 8px 10px; font-size: 15px;
+  border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+input[type=number] { text-align: right; }
+input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+
+.monthbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.monthbar .nav { display: flex; align-items: center; gap: 8px; }
+.monthbar button.arrow {
+  width: 38px; height: 38px; border: 1px solid #d1d5db; background: #fff; border-radius: 10px;
+  font-size: 18px; cursor: pointer; color: #374151;
+}
+.monthbar button.arrow:hover { background: #f3f4f6; }
+.monthbar .label { text-align: center; min-width: 150px; }
+.monthbar .label .m { font-size: 17px; font-weight: 700; }
+.monthbar .label .r { font-size: 11px; color: #9ca3af; }
+.monthbar button.today { border: 1px solid #d1d5db; background:#fff; border-radius:8px; padding:6px 10px; font-size:12px; cursor:pointer; color:#374151; }
+.monthbar button.today:hover { background:#f3f4f6; }
+
+.rows { display: flex; flex-direction: column; gap: 6px; }
+.rowhead { display: grid; grid-template-columns: 1fr 1fr 34px; gap: 8px; font-size: 11px; color: #9ca3af; padding: 0 2px 2px; }
+.row { display: grid; grid-template-columns: 1fr 1fr 34px; gap: 8px; align-items: center; }
+.row button.del { border: none; background: #f3f4f6; color: #9ca3af; border-radius: 8px; height: 38px; cursor: pointer; font-size: 16px; }
+.row button.del:hover { background: #fee2e2; color: #dc2626; }
+.empty { color:#9ca3af; font-size:13px; padding:8px 2px; }
+.actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+button.btn { border: 1px solid #d1d5db; background: #fff; color: #374151; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+button.btn:hover { background: #f9fafb; }
+button.btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+button.btn.primary:hover { background: #1d4ed8; }
+button.btn.danger { color: #dc2626; }
+.avgline { font-size: 13px; color:#6b7280; margin: 12px 2px 0; }
+
+.result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stat { background: #f9fafb; border: 1px solid #eef0f2; border-radius: 10px; padding: 12px 14px; }
+.stat .k { font-size: 12px; color: #6b7280; }
+.stat .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat.big { grid-column: 1 / -1; background: #eff6ff; border-color: #dbeafe; }
+.stat.big .v { font-size: 30px; color: #1d4ed8; }
+.breakdown { font-size: 12px; color: #6b7280; margin-top: 6px; }
+.formula { font-size: 11px; color: #9ca3af; margin-top: 10px; line-height: 1.6; }
+.warn { color: #b45309; font-size: 12px; margin-top: 8px; }
+
+table.bonus { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.bonus th, table.bonus td { text-align: right; padding: 7px 8px; border-bottom: 1px solid #eef0f2; font-variant-numeric: tabular-nums; }
+table.bonus th { color: #6b7280; font-weight: 600; font-size: 12px; }
+table.bonus td.y, table.bonus th.y { text-align: left; }
+table.bonus tr:last-child td { border-bottom: none; }
+.miss { color:#b45309; font-size: 11px; }
+
+.toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.note { font-size: 12px; color: #6b7280; background: #f9fafb; border-radius: 8px; padding: 10px 12px; }
+.note b { color: #374151; }
+.saved { font-size:11px; color:#9ca3af; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>給与計算ツール</h1>
+  <p class="sub">毎出番の税引き後営収を日付ごとに入力すると、月度別の平均・給与・賞与積立を自動計算します。<span class="saved" id="savedNote"></span></p>
+
+  <div class="toolbar">
+    <button class="btn" id="exportBtn">⬇ JSON書き出し</button>
+    <button class="btn" id="importBtn">⬆ JSON読み込み</button>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+  </div>
+
+  <div class="card">
+    <h2>設定（全月度に適用）</h2>
+    <div class="settings">
+      <div class="field"><label>所定 回数<span class="unit">回</span></label><input type="number" id="shoteiN" value="11" min="0" step="1"></div>
+      <div class="field"><label>公出 回数<span class="unit">回</span></label><input type="number" id="koshutsuN" value="2" min="0" step="1"></div>
+      <div class="field"><label>所定 賃率<span class="unit">%</span></label><input type="number" id="rateShotei" value="52" min="0" step="0.1"></div>
+      <div class="field"><label>公出 賃率<span class="unit">%</span></label><input type="number" id="rateKoshutsu" value="62" min="0" step="0.1"></div>
+    </div>
+  </div>
+
+  <div class="monthbar">
+    <div class="nav">
+      <button class="arrow" id="prevM" title="前の月度">‹</button>
+      <div class="label"><div class="m" id="mLabel">—</div><div class="r" id="mRange">—</div></div>
+      <button class="arrow" id="nextM" title="次の月度">›</button>
+    </div>
+    <button class="today" id="todayBtn">今月度へ</button>
+  </div>
+
+  <div class="card">
+    <h2>この月度の出番入力</h2>
+    <div class="rowhead"><div>日付</div><div>税引き後営収</div><div></div></div>
+    <div class="rows" id="rows"></div>
+    <div class="actions">
+      <button class="btn primary" id="addRow">＋ 出番を追加</button>
+      <button class="btn danger" id="clearMonth">この月度をクリア</button>
+    </div>
+    <p class="avgline" id="avgline">平均売上：¥0（入力 0 日）</p>
+  </div>
+
+  <div class="card">
+    <h2>給与（この月度）</h2>
+    <div class="result-grid">
+      <div class="stat big"><div class="k">支給給与</div><div class="v" id="salary">¥0</div><div class="breakdown" id="salaryBreak">所定分 ¥0 ＋ 公出分 ¥0</div></div>
+      <div class="stat"><div class="k">所定分</div><div class="v" id="shoteiPay">¥0</div></div>
+      <div class="stat"><div class="k">公出分</div><div class="v" id="koshutsuPay">¥0</div></div>
+    </div>
+    <p class="formula">給与 ＝ 平均売上 ×（所定回数 × 所定賃率 ＋ 公出回数 × 公出賃率）／ 15日締め・25日払い</p>
+  </div>
+
+  <div class="card">
+    <h2>賞与積立（この月度）</h2>
+    <div class="result-grid">
+      <div class="stat"><div class="k">この月度の積立額</div><div class="v" id="reserve">¥0</div></div>
+      <div class="stat"><div class="k">積立の元（平均×所定）</div><div class="v" id="reserveBase">¥0</div></div>
+    </div>
+    <p class="warn" id="reserveWarn" style="display:none;">※ 平均×所定 が 35万 未満のため、この月度の積立は0円です。</p>
+    <p class="formula">積立（月度）＝（平均売上 × 所定回数 − 350,000）× 18%</p>
+  </div>
+
+  <div class="card">
+    <h2>賞与（3・6・12月度／実績の積立を合算）</h2>
+    <div id="bonusWrap"><p class="empty">データが入るとここに賞与が表示されます。</p></div>
+    <p class="formula">12月度→3月度=3ヶ月分／3月度→6月度=3ヶ月分／6月度→12月度=6ヶ月分 を合算</p>
+  </div>
+
+  <div class="card">
+    <div class="note"><b>締め・支払い</b><br>給与は <b>15日締めの25日払い</b>。1ヶ月度＝<b>16日〜翌15日</b>（例：7月度＝6/16〜7/15、7/25払い）。15日の出番はその月度に含まれます。</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var STORE = "kyuyoCalc.v2";
+  var settingsIds = ["shoteiN","koshutsuN","rateShotei","rateKoshutsu"];
+  var state = { settings:{shoteiN:11,koshutsuN:2,rateShotei:52,rateKoshutsu:62}, entries:[] };
+  var cur; // {y,m} current 月度
+
+  function yen(n){ if(!isFinite(n)) n=0; return "¥"+Math.round(n).toLocaleString("ja-JP"); }
+  function pad(n){ return (n<10?"0":"")+n; }
+  function todayStr(){ var d=new Date(); return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function parseD(s){ var p=(s||"").split("-"); return {y:+p[0], m:+p[1], d:+p[2]}; }
+
+  // 月度キー: 16日以降は翌月度
+  function gedoOf(dateStr){
+    var p=parseD(dateStr); var y=p.y,m=p.m;
+    if(p.d>=16){ m+=1; if(m>12){m=1;y+=1;} }
+    return {y:y,m:m};
+  }
+  function gedoOfToday(){ return gedoOf(todayStr()); }
+  function gkey(g){ return g.y*100+g.m; }
+  // 月度の範囲: 開始=前月16日, 終了=当月15日
+  function gedoRange(g){
+    var sy=g.y, sm=g.m-1; if(sm<1){ sm=12; sy-=1; }
+    var start = sy+"-"+pad(sm)+"-16";
+    var end = g.y+"-"+pad(g.m)+"-15";
+    return {start:start, end:end, startTxt: sm+"/16", endTxt: g.m+"/15"};
+  }
+  function inGedo(dateStr, g){ var a=gedoOf(dateStr); return a.y===g.y && a.m===g.m; }
+  // 新規行の初期日付: 今日が月度内なら今日、そうでなければ月度末(15日)
+  function defaultDateFor(g){
+    var t=todayStr();
+    if(inGedo(t,g)) return t;
+    return gedoRange(g).end;
+  }
+
+  function load(){
+    try{ var s=JSON.parse(localStorage.getItem(STORE)); if(s&&s.settings&&s.entries){ state=s; } }catch(e){}
+  }
+  function save(){
+    try{ localStorage.setItem(STORE, JSON.stringify(state)); }catch(e){}
+    var el=document.getElementById("savedNote"); el.textContent="（自動保存済）";
+    clearTimeout(save._t); save._t=setTimeout(function(){ el.textContent=""; },1500);
+  }
+
+  function num(id){ var v=parseFloat(document.getElementById(id).value); return isNaN(v)?0:v; }
+  function syncSettingsFromInputs(){
+    state.settings={ shoteiN:num("shoteiN"), koshutsuN:num("koshutsuN"), rateShotei:num("rateShotei"), rateKoshutsu:num("rateKoshutsu") };
+  }
+
+  function reserveForAvg(avg){
+    var s=state.settings;
+    return Math.max(0,(avg*s.shoteiN-350000)*0.18);
+  }
+  function avgOfGedo(g){
+    var vals=state.entries.filter(function(e){ return inGedo(e.date,g) && e.amount!=="" && e.amount!==null && !isNaN(parseFloat(e.amount)); })
+                          .map(function(e){ return parseFloat(e.amount); });
+    var sum=vals.reduce(function(a,b){return a+b;},0);
+    return { avg: vals.length?sum/vals.length:0, count: vals.length, sum:sum };
+  }
+
+  // ---------- render entries ----------
+  function renderRows(){
+    var rows=document.getElementById("rows");
+    rows.innerHTML="";
+    var list=state.entries
+      .map(function(e,i){ return {e:e,i:i}; })
+      .filter(function(o){ return inGedo(o.e.date, cur); })
+      .sort(function(a,b){ return a.e.date<b.e.date?-1:(a.e.date>b.e.date?1:0); });
+    if(!list.length){
+      var p=document.createElement("div"); p.className="empty"; p.textContent="まだ入力がありません。「＋ 出番を追加」から入力してください。";
+      rows.appendChild(p);
+    }
+    list.forEach(function(o){
+      var e=o.e, idx=o.i;
+      var div=document.createElement("div"); div.className="row";
+      var dr=gedoRange(cur);
+      div.innerHTML='<input type="date" value="'+ (e.date||"") +'" min="'+dr.start+'" max="'+dr.end+'">'+
+                    '<input type="number" inputmode="numeric" placeholder="税引き後営収" step="1" value="'+ (e.amount!==""&&e.amount!=null?e.amount:"") +'">'+
+                    '<button class="del" title="削除">×</button>';
+      var dateI=div.querySelector('input[type=date]');
+      var amtI=div.querySelector('input[type=number]');
+      dateI.addEventListener("change", function(){
+        state.entries[idx].date=dateI.value; save(); renderAll();
+      });
+      amtI.addEventListener("input", function(){
+        state.entries[idx].amount = amtI.value===""?"":parseFloat(amtI.value); save(); renderResults();
+      });
+      div.querySelector(".del").addEventListener("click", function(){
+        state.entries.splice(idx,1); save(); renderAll();
+      });
+      rows.appendChild(div);
+    });
+  }
+
+  // ---------- render results ----------
+  function renderResults(){
+    var s=state.settings;
+    var a=avgOfGedo(cur);
+    var shoteiPay=a.avg*s.shoteiN*(s.rateShotei/100);
+    var koshutsuPay=a.avg*s.koshutsuN*(s.rateKoshutsu/100);
+    var salary=shoteiPay+koshutsuPay;
+    var reserveBase=a.avg*s.shoteiN;
+    var reserve=reserveForAvg(a.avg);
+
+    document.getElementById("avgline").textContent="平均売上："+yen(a.avg)+"（入力 "+a.count+" 日 ／ 合計 "+yen(a.sum)+"）";
+    document.getElementById("salary").textContent=yen(salary);
+    document.getElementById("salaryBreak").textContent="所定分 "+yen(shoteiPay)+" ＋ 公出分 "+yen(koshutsuPay);
+    document.getElementById("shoteiPay").textContent=yen(shoteiPay);
+    document.getElementById("koshutsuPay").textContent=yen(koshutsuPay);
+    document.getElementById("reserve").textContent=yen(reserve);
+    document.getElementById("reserveBase").textContent=yen(reserveBase);
+    document.getElementById("reserveWarn").style.display=(reserveBase-350000<0)?"block":"none";
+
+    renderBonus();
+  }
+
+  // 賞与: 年ごとに 3月度(1,2,3), 6月度(4,5,6), 12月度(7..12)
+  function renderBonus(){
+    // 月度ごとの積立を集計
+    var byKey={}; // key -> {avg,count}
+    var years={};
+    state.entries.forEach(function(e){
+      if(e.amount===""||e.amount==null||isNaN(parseFloat(e.amount))) return;
+      var g=gedoOf(e.date); var k=gkey(g);
+      if(!byKey[k]) byKey[k]={sum:0,n:0,y:g.y,m:g.m};
+      byKey[k].sum+=parseFloat(e.amount); byKey[k].n+=1; years[g.y]=true;
+    });
+    function reserveOfMonth(y,m){
+      var k=y*100+m; var b=byKey[k];
+      if(!b||!b.n) return null;
+      return reserveForAvg(b.sum/b.n);
+    }
+    var defs=[{name:"3月度",months:[1,2,3]},{name:"6月度",months:[4,5,6]},{name:"12月度",months:[7,8,9,10,11,12]}];
+    var yrs=Object.keys(years).map(Number).sort();
+    var wrap=document.getElementById("bonusWrap");
+    if(!yrs.length){ wrap.innerHTML='<p class="empty">データが入るとここに賞与が表示されます。</p>'; return; }
+    var html='<table class="bonus"><thead><tr><th class="y">年</th><th>3月度賞与</th><th>6月度賞与</th><th>12月度賞与</th></tr></thead><tbody>';
+    yrs.forEach(function(y){
+      html+='<tr><td class="y">'+y+'年</td>';
+      defs.forEach(function(d){
+        var total=0, have=0;
+        d.months.forEach(function(m){ var r=reserveOfMonth(y,m); if(r!==null){ total+=r; have++; } });
+        var miss=d.months.length-have;
+        html+='<td>'+ (have?yen(total):'—') + (have&&miss? ' <span class="miss">('+have+'/'+d.months.length+'月)</span>':'') +'</td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table><p class="formula" style="margin-top:8px">※ 各月度に入力がある分だけ合算。(x/y月) はデータのある月度数。</p>';
+    wrap.innerHTML=html;
+  }
+
+  function updateMonthLabel(){
+    var r=gedoRange(cur);
+    document.getElementById("mLabel").textContent=cur.y+"年 "+cur.m+"月度";
+    document.getElementById("mRange").textContent=r.startTxt+"〜"+r.endTxt+"（"+cur.m+"/25払い）";
+  }
+
+  function renderAll(){ updateMonthLabel(); renderRows(); renderResults(); }
+
+  function shiftMonth(delta){
+    var m=cur.m+delta, y=cur.y;
+    while(m>12){m-=12;y++;} while(m<1){m+=12;y--;}
+    cur={y:y,m:m}; renderAll();
+  }
+
+  // ---------- import / export ----------
+  function doExport(){
+    syncSettingsFromInputs();
+    var blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url; a.download="kyuyo-data-"+todayStr()+".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); },1000);
+  }
+  function doImport(file){
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{
+        var s=JSON.parse(reader.result);
+        if(!s.settings||!s.entries) throw new Error("形式が違います");
+        state=s;
+        settingsIds.forEach(function(id){ if(state.settings[id]!=null) document.getElementById(id).value=state.settings[id]; });
+        save(); renderAll();
+        alert("読み込みました。");
+      }catch(e){ alert("読み込めませんでした："+e.message); }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- init ----------
+  load();
+  settingsIds.forEach(function(id){
+    if(state.settings[id]!=null) document.getElementById(id).value=state.settings[id];
+    document.getElementById(id).addEventListener("input", function(){ syncSettingsFromInputs(); save(); renderResults(); });
+  });
+  cur=gedoOfToday();
+
+  document.getElementById("prevM").addEventListener("click", function(){ shiftMonth(-1); });
+  document.getElementById("nextM").addEventListener("click", function(){ shiftMonth(1); });
+  document.getElementById("todayBtn").addEventListener("click", function(){ cur=gedoOfToday(); renderAll(); });
+  document.getElementById("addRow").addEventListener("click", function(){
+    state.entries.push({date:defaultDateFor(cur), amount:""}); save(); renderAll();
+  });
+  document.getElementById("clearMonth").addEventListener("click", function(){
+    if(!confirm(cur.y+"年"+cur.m+"月度の入力を全て削除しますか？")) return;
+    state.entries=state.entries.filter(function(e){ return !inGedo(e.date,cur); });
+    save(); renderAll();
+  });
+  document.getElementById("exportBtn").addEventListener("click", doExport);
+  document.getElementById("importBtn").addEventListener("click", function(){ document.getElementById("importFile").click(); });
+  document.getElementById("importFile").addEventListener("change", function(ev){ if(ev.target.files[0]) doImport(ev.target.files[0]); ev.target.value=""; });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
