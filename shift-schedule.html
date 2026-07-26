@@ -63,7 +63,7 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで、営業と休憩の時間が自動で並びます。時刻がずれても全部まとめて計算し直し。休憩がずれ込んだ時は「次の営業を縮めて、帰庫時刻と合計休憩は変えない」で調整します。</p>
+  <p class="lead">出庫時刻を入れるだけで、営業と休憩の時間が自動で並びます。時刻がずれても全部まとめて計算し直し。休憩がずれ込んだ時は「次の営業を縮めて、帰庫時刻と合計休憩は変えない」で調整します。休憩は各回ごとに分数を自由に変えられます（30分より長くも短くもOK）。</p>
 
   <div class="card">
     <div class="row">
@@ -80,10 +80,10 @@
       <summary>基本設定を変える（営業・休憩の長さ、合計休憩の上限）</summary>
       <div class="settings">
         <div class="fld"><label>1営業ブロック（分）</label><input type="number" id="defWork" value="180" min="0" step="5"></div>
-        <div class="fld"><label>1回の休憩（分）</label><input type="number" id="defBreak" value="30" min="30" step="5"></div>
-        <div class="fld"><label>合計休憩の上限（分）</label><input type="number" id="cap" value="210" min="30" step="10"></div>
+        <div class="fld"><label>1回の休憩（分）</label><input type="number" id="defBreak" value="30" min="0" step="5"></div>
+        <div class="fld"><label>合計休憩の上限（分）</label><input type="number" id="cap" value="210" min="0" step="10"></div>
       </div>
-      <p class="hint">初期値：3時間営業ごとに30分休憩／合計休憩は3時間30分（210分）まで。</p>
+      <p class="hint">初期値：3時間営業ごとに30分休憩／合計休憩は3時間30分（210分）まで。休憩は各回で個別に変更できます。上限を空きにしたい時は大きめの数字に。</p>
     </details>
   </div>
 
@@ -96,7 +96,8 @@
 
   <p class="foot">
     使い方：休憩場所がなくてずれ込んだ営業ブロックは「実際に休憩を始めた時刻」を入れてください。<br>
-    そのぶん次の営業が自動で短くなり、帰庫時刻と合計休憩は変わりません。
+    そのぶん次の営業が自動で短くなり、帰庫時刻は変わりません。<br>
+    休憩が長引いた回は、その休憩の「分」を直接書き換えればOK（30分より短くも可）。
   </p>
 </div>
 
@@ -173,7 +174,7 @@ function compute(){
     // --- 休憩（最後のブロックの後は帰庫なので休憩なし）---
     const isLast=i===state.blocks.length-1;
     if(!isLast){
-      let br=Math.max(30, b.brk||0);   // 最低30分
+      let br=Math.max(0, b.brk||0);   // 各回で自由に設定（30分未満も可）
       const remain=cap-breakUsed;
       if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は取れません。`);}
       else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
@@ -230,8 +231,9 @@ function render(){
         </div>
         <div class="seg-ctrl">
           <div class="fld">
-            <label>休憩（分・最低30）</label>
-            <input type="number" min="30" step="5" value="${state.blocks[row.i].brk}" data-k="brk" data-i="${row.i}">
+            <label>この休憩（分）</label>
+            <input type="number" min="0" step="5" value="${state.blocks[row.i].brk}" data-k="brk" data-i="${row.i}">
+            <span class="hint">長引いた回はここを変更（30分より短くも可）</span>
           </div>
         </div>`;
       S.appendChild(el);
@@ -249,7 +251,6 @@ function render(){
 
   // 警告
   const W=$("#warn");
-  const capLeft=state.cap-r.breakUsed;
   const notes=[...new Set(r.notes)];
   W.innerHTML = notes.length? `<div class="banner">⚠ ${notes.join("<br>⚠ ")}</div>`:"";
 
@@ -264,7 +265,7 @@ function render(){
 // イベント
 $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
 $("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;});
-$("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(30,+e.target.value||30);});
+$("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
 $("#addBlk").addEventListener("click",()=>{state.blocks.push({work:state.defWork,brk:state.defBreak,actual:null});render();});
 $("#reset").addEventListener("click",()=>{defaultBlocks();$("#outTime").value=state.out;render();});
@@ -274,7 +275,7 @@ $("#sched").addEventListener("input",e=>{
   if(i===undefined) return;
   const b=state.blocks[+i];
   if(k==="work") b.work=+e.target.value||0;
-  else if(k==="brk") b.brk=Math.max(30,+e.target.value||30);
+  else if(k==="brk") b.brk=Math.max(0,+e.target.value||0);
   else if(k==="actual") b.actual=e.target.value||null;
   render();
 });
