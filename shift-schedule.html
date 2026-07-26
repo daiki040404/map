@@ -79,9 +79,9 @@
     <details>
       <summary>基本設定を変える（営業・休憩の長さ、合計休憩の上限）</summary>
       <div class="settings">
-        <div class="fld"><label>1営業ブロック（分）</label><input type="number" id="defWork" value="180" min="0" step="5"></div>
-        <div class="fld"><label>1回の休憩（分）</label><input type="number" id="defBreak" value="30" min="0" step="5"></div>
-        <div class="fld"><label>合計休憩の上限（分）</label><input type="number" id="cap" value="210" min="0" step="10"></div>
+        <div class="fld"><label>1営業ブロック（分）</label><input type="number" inputmode="numeric" id="defWork" value="180" min="0" step="5"></div>
+        <div class="fld"><label>1回の休憩（分）</label><input type="number" inputmode="numeric" id="defBreak" value="30" min="0" step="5"></div>
+        <div class="fld"><label>合計休憩の上限（分）</label><input type="number" inputmode="numeric" id="cap" value="210" min="0" step="10"></div>
       </div>
       <p class="hint">初期値：3時間営業ごとに30分休憩／合計休憩は3時間30分（210分）まで。休憩は各回で個別に変更できます。上限を空きにしたい時は大きめの数字に。</p>
     </details>
@@ -191,7 +191,16 @@ function compute(){
 
 function render(){
   const r=compute();
-  const S=$("#sched"); S.innerHTML="";
+  const S=$("#sched");
+  // 入力中の欄を作り直すとフォーカスが外れる（スマホで1文字ごとに途切れる）ので、
+  // いまの入力位置を覚えておいて、作り直した後に戻す。
+  const ae=document.activeElement;
+  let fk=null, fi=null, ss=null, se=null;
+  if(ae && ae.dataset && ae.dataset.i!==undefined){
+    fk=ae.dataset.k; fi=ae.dataset.i;
+    try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
+  }
+  S.innerHTML="";
   r.rows.forEach(row=>{
     if(row.type==="work"){
       const el=document.createElement("div");
@@ -208,7 +217,7 @@ function render(){
         <div class="seg-ctrl">
           <div class="fld">
             <label>予定の営業（分）</label>
-            <input type="number" min="0" step="5" value="${row.planned}" data-k="work" data-i="${row.i}">
+            <input type="number" inputmode="numeric" min="0" step="5" value="${row.planned}" data-k="work" data-i="${row.i}">
           </div>
           <div class="fld">
             <label>実際に休憩を始めた時刻</label>
@@ -232,7 +241,7 @@ function render(){
         <div class="seg-ctrl">
           <div class="fld">
             <label>この休憩（分）</label>
-            <input type="number" min="0" step="5" value="${state.blocks[row.i].brk}" data-k="brk" data-i="${row.i}">
+            <input type="number" inputmode="numeric" min="0" step="5" value="${state.blocks[row.i].brk}" data-k="brk" data-i="${row.i}">
             <span class="hint">長引いた回はここを変更（30分より短くも可）</span>
           </div>
         </div>`;
@@ -248,6 +257,15 @@ function render(){
       <div class="clock" style="color:#fff">${fmtClock(r.base,r.kikoElapsed)}</div>
     </div>`;
   S.appendChild(kiko);
+
+  // 覚えておいた入力欄にフォーカスとカーソルを戻す
+  if(fk!==null){
+    const el=S.querySelector(`[data-k="${fk}"][data-i="${fi}"]`);
+    if(el){
+      el.focus();
+      if(ss!==null){ try{ el.setSelectionRange(ss,se); }catch(e){} }
+    }
+  }
 
   // 警告
   const W=$("#warn");
