@@ -29,8 +29,10 @@
   .out{width:118px;}
   .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;
     cursor:pointer;background:var(--accent);color:#fff;}
+  .btn.work{background:var(--work);}
+  .btn.brk{background:var(--brk);}
   .btn.sec{background:#eef0f4;color:#374151;}
-  .btn.mini{padding:6px 10px;font-size:13px;}
+  .btn.mini{padding:7px 11px;font-size:13px;}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;}
@@ -46,6 +48,11 @@
     padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
   .seg-ctrl .fld label{font-size:11px;}
   .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
+  .seg-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;
+    padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#374151;line-height:1;}
+  .chip.w{color:var(--work);border-color:#cfe0ff;}
+  .chip.b{color:var(--brk);border-color:#c7ecdd;}
   .del{background:transparent;border:0;color:#9ca3af;font-size:18px;cursor:pointer;line-height:1;padding:0 2px;}
 
   .summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
@@ -63,7 +70,7 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで、営業と休憩の時間が自動で並びます。時刻がずれても全部まとめて計算し直し。休憩がずれ込んだ時は「次の営業を縮めて、帰庫時刻と合計休憩は変えない」で調整します。休憩は各回ごとに分数を自由に変えられます（30分より長くも短くもOK）。</p>
+  <p class="lead">出庫時刻を入れるだけで、営業と休憩が自動で並びます。時刻がずれても全部まとめて再計算。営業・休憩ブロックはそれぞれ好きな場所に追加・削除できます。休憩がずれ込んだ時は「次の営業を縮めて帰庫時刻は変えない」で調整します。</p>
 
   <div class="card">
     <div class="row">
@@ -72,18 +79,19 @@
         <input class="out" type="time" id="outTime" value="13:50">
       </div>
       <div class="btnrow" style="margin-bottom:2px">
-        <button class="btn sec mini" id="addBlk">＋ 営業ブロックを追加</button>
+        <button class="btn work mini" id="addWork">＋ 営業を追加</button>
+        <button class="btn brk mini" id="addBreak">＋ 休憩を追加</button>
         <button class="btn sec mini" id="reset">リセット</button>
       </div>
     </div>
     <details>
       <summary>基本設定を変える（営業・休憩の長さ、合計休憩の上限）</summary>
       <div class="settings">
-        <div class="fld"><label>1営業ブロック（分）</label><input type="number" inputmode="numeric" id="defWork" value="180" min="0" step="5"></div>
-        <div class="fld"><label>1回の休憩（分）</label><input type="number" inputmode="numeric" id="defBreak" value="30" min="0" step="5"></div>
+        <div class="fld"><label>営業ブロックの初期値（分）</label><input type="number" inputmode="numeric" id="defWork" value="180" min="0" step="5"></div>
+        <div class="fld"><label>休憩ブロックの初期値（分）</label><input type="number" inputmode="numeric" id="defBreak" value="30" min="0" step="5"></div>
         <div class="fld"><label>合計休憩の上限（分）</label><input type="number" inputmode="numeric" id="cap" value="210" min="0" step="10"></div>
       </div>
-      <p class="hint">初期値：3時間営業ごとに30分休憩／合計休憩は3時間30分（210分）まで。休憩は各回で個別に変更できます。上限を空きにしたい時は大きめの数字に。</p>
+      <p class="hint">初期値：営業180分・休憩30分／合計休憩は210分（3時間30分）まで。各ブロックの「＋営業」「＋休憩」でその下に挿入できます。</p>
     </details>
   </div>
 
@@ -95,8 +103,7 @@
   </div>
 
   <p class="foot">
-    使い方：休憩場所がなくてずれ込んだ営業ブロックは「実際に休憩を始めた時刻」を入れてください。<br>
-    そのぶん次の営業が自動で短くなり、帰庫時刻は変わりません。<br>
+    ずれ込み：営業ブロックに「実際に休憩を始めた時刻」を入れると、その営業が伸びたぶん次の営業が自動で短くなり、帰庫時刻は変わりません。<br>
     休憩が長引いた回は、その休憩の「分」を直接書き換えればOK（30分より短くも可）。
   </p>
 </div>
@@ -106,16 +113,17 @@ const $=s=>document.querySelector(s);
 const state={
   out:"13:50",
   defWork:180, defBreak:30, cap:210,
-  // blocks: {work: 予定営業(分), brk: 休憩(分), actual: "HH:MM"|null }
-  blocks:[]
+  // segments: {type:'work'|'break', min:分, actual:"HH:MM"|null(workのみ)}
+  segments:[]
 };
-function defaultBlocks(){
-  state.blocks=[];
+function defaultSegments(){
+  state.segments=[];
   for(let i=0;i<5;i++){
-    state.blocks.push({work:state.defWork, brk:state.defBreak, actual:null});
+    state.segments.push({type:'work', min:state.defWork, actual:null});
+    if(i<4) state.segments.push({type:'break', min:state.defBreak});
   }
 }
-defaultBlocks();
+defaultSegments();
 
 function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function fmtClock(baseMin, elapsed){
@@ -145,70 +153,71 @@ function compute(){
   const rows=[]; const notes=[];
   const cap=Math.max(0,state.cap);
 
-  state.blocks.forEach((b,i)=>{
-    // --- 営業 ---
-    const wStart=elapsed;
-    const planned=Math.max(0,b.work);
-    let effPlanned=planned-carry;   // ずれ込み分を差し引いた「本来の」営業
-    let leftover=0;
-    if(effPlanned<0){ leftover=-effPlanned; effPlanned=0; }
-    carry=leftover;
+  state.segments.forEach((s,idx)=>{
+    if(s.type==='work'){
+      const wStart=elapsed;
+      const planned=Math.max(0,s.min);
+      let effPlanned=planned-carry;   // ずれ込み分を差し引いた「本来の」営業
+      let leftover=0;
+      if(effPlanned<0){ leftover=-effPlanned; effPlanned=0; }
+      carry=leftover;
 
-    let workDur, adj=0;
-    const actual=toMin(b.actual);
-    if(actual!==null){
-      // 実際に休憩を始めた時刻 → その時点まで営業
-      let aElapsed=actual-base;
-      while(aElapsed<wStart) aElapsed+=1440;   // 翌日回り込み
-      workDur=aElapsed-wStart;
-      // 本来より長く走った分を次に繰り越し（次の営業が減る）
-      carry+=(workDur-effPlanned);
-    }else{
-      workDur=effPlanned;
-    }
-    adj=workDur-planned;   // 予定3hからのズレ表示用
-
-    rows.push({type:"work",i, start:wStart, dur:workDur, planned, adj});
-    elapsed=wStart+workDur;
-
-    // --- 休憩（最後のブロックの後は帰庫なので休憩なし）---
-    const isLast=i===state.blocks.length-1;
-    if(!isLast){
-      let br=Math.max(0, b.brk||0);   // 各回で自由に設定（30分未満も可）
-      const remain=cap-breakUsed;
-      if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は取れません。`);}
-      else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
-      if(br>0){
-        rows.push({type:"brk",i, start:elapsed, dur:br});
-        breakUsed+=br;
-        elapsed+=br;
+      let workDur;
+      const actual=toMin(s.actual);
+      if(actual!==null){
+        let aElapsed=actual-base;
+        while(aElapsed<wStart) aElapsed+=1440;   // 翌日回り込み
+        workDur=aElapsed-wStart;
+        carry+=(workDur-effPlanned);   // 長く走った分を次の営業へ
+      }else{
+        workDur=effPlanned;
       }
+      rows.push({type:'work', idx, start:wStart, dur:workDur, planned, adj:workDur-planned});
+      elapsed=wStart+workDur;
+    }else{
+      let br=Math.max(0, s.min||0);   // 各回で自由に設定（30分未満も可）
+      const remain=cap-breakUsed;
+      if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は0分になります。`);}
+      else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
+      rows.push({type:'break', idx, start:elapsed, dur:br, set:s.min||0});
+      breakUsed+=br;
+      elapsed+=br;
     }
   });
 
   return {base, rows, kikoElapsed:elapsed, breakUsed, workTotal:elapsed-breakUsed, notes};
 }
 
+function segButtons(idx){
+  return `<div class="seg-btns">
+    <button class="chip w" data-addwork="${idx}" title="下に営業を挿入">＋営業</button>
+    <button class="chip b" data-addbreak="${idx}" title="下に休憩を挿入">＋休憩</button>
+    <button class="del" data-del="${idx}" title="このブロックを削除">🗑</button>
+  </div>`;
+}
+
 function render(){
   const r=compute();
   const S=$("#sched");
-  // 入力中の欄を作り直すとフォーカスが外れる（スマホで1文字ごとに途切れる）ので、
-  // いまの入力位置を覚えておいて、作り直した後に戻す。
+  // 入力中の欄を作り直すとフォーカスが外れる（スマホで途切れる）ので位置を覚えて戻す
   const ae=document.activeElement;
-  let fk=null, fi=null, ss=null, se=null;
-  if(ae && ae.dataset && ae.dataset.i!==undefined){
-    fk=ae.dataset.k; fi=ae.dataset.i;
+  let fk=null, fx=null, ss=null, se=null;
+  if(ae && ae.dataset && ae.dataset.idx!==undefined){
+    fk=ae.dataset.k; fx=ae.dataset.idx;
     try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
   }
   S.innerHTML="";
+
+  let workNo=0, breakNo=0;
   r.rows.forEach(row=>{
-    if(row.type==="work"){
+    if(row.type==='work'){
+      workNo++;
       const el=document.createElement("div");
       el.className="seg work";
       const adjTxt = Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"";
       el.innerHTML=`
         <div class="seg-top">
-          <div><span class="tag work">営業 ${row.i+1}</span></div>
+          <div><span class="tag work">営業 ${workNo}</span></div>
           <div style="text-align:right">
             <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
             <div class="dur">営業 ${fmtDur(row.dur)}${adjTxt}</div>
@@ -217,33 +226,36 @@ function render(){
         <div class="seg-ctrl">
           <div class="fld">
             <label>予定の営業（分）</label>
-            <input type="number" inputmode="numeric" min="0" step="5" value="${row.planned}" data-k="work" data-i="${row.i}">
+            <input type="number" inputmode="numeric" min="0" step="5" value="${state.segments[row.idx].min}" data-k="work" data-idx="${row.idx}">
           </div>
           <div class="fld">
             <label>実際に休憩を始めた時刻</label>
-            <input type="time" value="${state.blocks[row.i].actual||""}" data-k="actual" data-i="${row.i}">
+            <input type="time" value="${state.segments[row.idx].actual||""}" data-k="actual" data-idx="${row.idx}">
             <span class="hint">ずれ込んだ時だけ入力</span>
           </div>
-          <button class="del" title="このブロックを削除" data-del="${row.i}">🗑</button>
+          ${segButtons(row.idx)}
         </div>`;
       S.appendChild(el);
     }else{
+      breakNo++;
       const el=document.createElement("div");
       el.className="seg brk";
+      const shortTxt = row.dur<row.set ? ` <span class="adj">(上限で${fmtDur(row.set)}→${fmtDur(row.dur)})</span>`:"";
       el.innerHTML=`
         <div class="seg-top">
-          <div><span class="tag brk">休憩</span></div>
+          <div><span class="tag brk">休憩 ${breakNo}</span></div>
           <div style="text-align:right">
             <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
-            <div class="dur">休憩 ${fmtDur(row.dur)}</div>
+            <div class="dur">休憩 ${fmtDur(row.dur)}${shortTxt}</div>
           </div>
         </div>
         <div class="seg-ctrl">
           <div class="fld">
             <label>この休憩（分）</label>
-            <input type="number" inputmode="numeric" min="0" step="5" value="${state.blocks[row.i].brk}" data-k="brk" data-i="${row.i}">
+            <input type="number" inputmode="numeric" min="0" step="5" value="${state.segments[row.idx].min}" data-k="brk" data-idx="${row.idx}">
             <span class="hint">長引いた回はここを変更（30分より短くも可）</span>
           </div>
+          ${segButtons(row.idx)}
         </div>`;
       S.appendChild(el);
     }
@@ -258,19 +270,15 @@ function render(){
     </div>`;
   S.appendChild(kiko);
 
-  // 覚えておいた入力欄にフォーカスとカーソルを戻す
+  // フォーカスとカーソルを戻す
   if(fk!==null){
-    const el=S.querySelector(`[data-k="${fk}"][data-i="${fi}"]`);
-    if(el){
-      el.focus();
-      if(ss!==null){ try{ el.setSelectionRange(ss,se); }catch(e){} }
-    }
+    const el=S.querySelector(`[data-k="${fk}"][data-idx="${fx}"]`);
+    if(el){ el.focus(); if(ss!==null){ try{ el.setSelectionRange(ss,se); }catch(e){} } }
   }
 
   // 警告
-  const W=$("#warn");
   const notes=[...new Set(r.notes)];
-  W.innerHTML = notes.length? `<div class="banner">⚠ ${notes.join("<br>⚠ ")}</div>`:"";
+  $("#warn").innerHTML = notes.length? `<div class="banner">⚠ ${notes.join("<br>⚠ ")}</div>`:"";
 
   // サマリー
   $("#summary").innerHTML=`
@@ -285,21 +293,28 @@ $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
 $("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;});
 $("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
-$("#addBlk").addEventListener("click",()=>{state.blocks.push({work:state.defWork,brk:state.defBreak,actual:null});render();});
-$("#reset").addEventListener("click",()=>{defaultBlocks();$("#outTime").value=state.out;render();});
+$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null});render();});
+$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak});render();});
+$("#reset").addEventListener("click",()=>{defaultSegments();$("#outTime").value=state.out;render();});
 
 $("#sched").addEventListener("input",e=>{
-  const i=e.target.dataset.i, k=e.target.dataset.k;
-  if(i===undefined) return;
-  const b=state.blocks[+i];
-  if(k==="work") b.work=+e.target.value||0;
-  else if(k==="brk") b.brk=Math.max(0,+e.target.value||0);
-  else if(k==="actual") b.actual=e.target.value||null;
+  const x=e.target.dataset.idx, k=e.target.dataset.k;
+  if(x===undefined) return;
+  const s=state.segments[+x];
+  if(k==="work") s.min=+e.target.value||0;
+  else if(k==="brk") s.min=Math.max(0,+e.target.value||0);
+  else if(k==="actual") s.actual=e.target.value||null;
   render();
 });
 $("#sched").addEventListener("click",e=>{
-  const d=e.target.dataset.del;
-  if(d!==undefined && state.blocks.length>1){ state.blocks.splice(+d,1); render(); }
+  const t=e.target;
+  if(t.dataset.del!==undefined){
+    if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); }
+  }else if(t.dataset.addwork!==undefined){
+    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null}); render();
+  }else if(t.dataset.addbreak!==undefined){
+    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak}); render();
+  }
 });
 
 render();
