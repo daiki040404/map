@@ -264,6 +264,7 @@ function jpDay(dt){return ['日','月','火','水','木','金','土'][dt.getDay(
 function timeCovers(id,h){const t=store.time[id];if(!t)return true;const f=t.f,e=t.t;if(f===e)return true;return (f<e)?(h>=f&&h<e):(h>=f||h<e);}
 function hasDemand(id,day,h){if(!store.days[day]||!store.days[day][id])return false;return timeCovers(id,h);}
 let selDays=new Set(), selHour=8, showAllNames=false;
+let focusId=null, learnStage=0;
 let testKinds=new Set(['street','route','cross','ramp','building','caution','avoid']);
 
 let mode='learn', view='all', selectedId=null, addVertexMode=false, addBuildingMode=false, addCautionMode=false, addAvoidMode=false, avoidTargetPid=null, addCrossingMode=false, addFacilityMode=false, _selEntry=null;
@@ -361,6 +362,7 @@ function popupHtml(it,num,detail){const t=TYPE[it.type],done=store.learned[it.id
     h+='<div class="pplbl">需要のある時間帯（24h）</div><div class="pptime"><select onchange="setTime(\''+it.id+'\',\'f\',this.value)"><option value="">--</option>'+opt(tw.f,false)+'</select><span>〜</span><select onchange="setTime(\''+it.id+'\',\'t\',this.value)"><option value="">--</option>'+opt(tw.t,true)+'</select></div>';
     h+='<div class="pplbl">写真・動画（現地で撮ると覚えやすい）</div><div class="ppmedia" id="med_'+it.id+'"><span class="muted2">…</span></div><button class="lnk" onclick="addMediaUI(\''+it.id+'\')">＋ 写真/動画を追加</button>';
   }
+  if(mode==='learn'&&detail)h+='<div class="ppbtn"><button onclick="collapsePopup(\''+it.id+'\')">▲ 詳細を閉じる</button></div>';
   return h+'</div>';
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -397,7 +399,10 @@ function render(){
   allVis.forEach((it,i)=>{const num=i+1;it._num=num;
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]})});
     if(showLabel&&(showAllNames||it.type!=='street'))m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});
-    m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id));m.addTo(markerGroup);});
+    if(mode==='learn'){ m.on('click',()=>learnClick(it)); }
+    else { m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id)); }
+    m.addTo(markerGroup);});
+  if(mode==='learn'&&focusId)highlightFocus();
   // vertex handles
   vertexGroup.clearLayers();
   if(editing&&selectedId){const o=cur(); if(o&&o.path){o.path.forEach((p,i)=>{
@@ -478,8 +483,9 @@ window.toggleToday=id=>{if(store.today[id])delete store.today[id];else store.tod
 window.toggleDay=(id,d)=>{if(store.days[d][id])delete store.days[d][id];else store.days[d][id]=1;saveTag();reopenPopup(id);};
 window.setTime=(id,k,v)=>{if(!store.time[id])store.time[id]={f:'',t:''};if(v==='')store.time[id][k]='';else store.time[id][k]=parseInt(v,10);if(store.time[id].f===''&&store.time[id].t==='')delete store.time[id];saveTag();reopenPopup(id);};
 window.editMemo=(id)=>{const c=store.memo[id]||'';const v=prompt('メモ（施設・交差点の覚え書き）',c);if(v!=null){if(v.trim())store.memo[id]=v.trim();else delete store.memo[id];saveTag();reopenPopup(id);}};
-function reopenPopup(id){const it=ITEMS.find(x=>x.id===id);if(!it)return;markerGroup.eachLayer(l=>{const ll=l.getLatLng&&l.getLatLng();if(ll&&Math.abs(ll.lat-it.lat)<1e-9&&Math.abs(ll.lng-it.lon)<1e-9){l.setPopupContent(popupHtml(it,it._num||0,true));setTimeout(()=>refreshPopupMedia(id),0);}});}
-window.expandPopup=(id)=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;markerGroup.eachLayer(l=>{const ll=l.getLatLng&&l.getLatLng();if(ll&&Math.abs(ll.lat-it.lat)<1e-9&&Math.abs(ll.lng-it.lon)<1e-9){l.setPopupContent(popupHtml(it,it._num||0,true));setTimeout(()=>refreshPopupMedia(id),0);}});};
+function reopenPopup(id){const it=ITEMS.find(x=>x.id===id);if(!it)return;
+  if(mode==='learn'){openLearnPopup(it,true);return;}
+  markerGroup.eachLayer(l=>{const ll=l.getLatLng&&l.getLatLng();if(ll&&Math.abs(ll.lat-it.lat)<1e-9&&Math.abs(ll.lng-it.lon)<1e-9){l.setPopupContent(popupHtml(it,it._num||0,true));setTimeout(()=>refreshPopupMedia(id),0);}});}
 
 // ===== building edit =====
 window.renameBld=(sid,idx)=>{const o=DATA.find(x=>x.id===sid);if(!o)return;const p=o.places[idx];const n=prompt('建物・場所の名前',p.name);if(n!=null){p.name=n;const w=prompt('区（任意）',p.ward||'');if(w!=null)p.ward=w;const s=prompt('最寄駅・補足（任意）',p.station||'');if(s!=null)p.station=s;saveData();rebuild();}};
@@ -487,6 +493,7 @@ window.delBld=(sid,idx)=>{const o=DATA.find(x=>x.id===sid);if(!o)return;if(confi
 
 // ===== map click for editing =====
 map.on('click',e=>{
+  if(mode==='learn'){if(focusId){focusId=null;learnStage=0;map.closePopup();render();}return;}
   if(mode!=='edit')return;
   if(addCrossingMode){const n=prompt('交差点の名前（例：呉服橋交差点）');if(n){crossDraft={lon:e.latlng.lng,lat:e.latlng.lat,name:n,editId:null};openRoadPicker([]);}return;}
   if(addFacilityMode){const n=prompt('施設名');if(n){const id=uid('f');DATA.push({id,name:n,kind:'facility',color:'#4f8cff',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🏢「'+n+'」を追加。面する通りは「通りを選ぶ」で設定できます');}return;}
@@ -586,7 +593,7 @@ document.getElementById('eClear').onclick=()=>{if(confirm('登録した通り・
 const bL=document.getElementById('mLearn'),bT=document.getElementById('mTest'),bE=document.getElementById('mEdit');
 function setMode(m){mode=m;bL.classList.toggle('on',m==='learn');bT.classList.toggle('on',m==='test');bE.classList.toggle('on',m==='edit');
   addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addCrossingMode=false;addFacilityMode=false;
-  selectedId=null;
+  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;map.closePopup();
   ['rowView','rowDay','rowDay2','rowLoc','rowKind'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=(m==='edit')?'none':'flex';});
   document.getElementById('rowNames').style.display=(m==='learn')?'flex':'none';
   document.getElementById('rowTest').style.display='flex';
@@ -630,17 +637,31 @@ document.querySelectorAll('.chips button[data-k]').forEach(b=>{b.onclick=()=>{co
 document.getElementById('reset').onclick=()=>{selectedId=null;view='all';document.querySelectorAll('.seg button[data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v==='all'));render();map.setView([35.6852,139.7528],13);};
 
 // ===== 線引きテスト =====
-let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=0, nameReveal=false, revealAll=false;
+let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=-1, nameReveal=false, revealAll=false;
 const dotGroup=L.layerGroup(); let userLine=null, answerLine=null;
 function drawTargets(){let its=ITEMS.filter(x=>(x.type==='street'||x.type==='route'));if(activeTestId){const t=curTest();its=its.filter(x=>t&&t.items.indexOf(x.id)>=0);}return its;}
 function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');}
 function panPoint(it){try{map.panTo([it.lat,it.lon]);}catch(e){}}
+// ===== 学習モードの段階タップ（1:ハイライト 2:名前/メモ 詳細ボタン:詳細） =====
+function highlightFocus(){
+  const it=ITEMS.find(x=>x.id===focusId);let hi=new Set();
+  if(it){ if(it.type==='street'||it.type==='route')hi.add(it.streetId); else if(it.roads&&it.roads.length)it.roads.forEach(r=>hi.add(r)); else hi.add(it.streetId); }
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2||!map.hasLayer(L2))return; L2.setStyle(hi.has(o.id)?{opacity:1,weight:6}:{opacity:.2,weight:3});});
+}
+let _learnPopup=null;
+function openLearnPopup(it,detail){_learnPopup=L.popup({maxWidth:270}).setLatLng([it.lat,it.lon]).setContent(popupHtml(it,it._num||0,detail)).openOn(map);if(detail)setTimeout(()=>refreshPopupMedia(it.id),0);}
+function learnClick(it){
+  if(focusId!==it.id){ focusId=it.id; learnStage=1; map.closePopup(); highlightFocus(); return; }
+  learnStage=2; openLearnPopup(it,false);
+}
+window.expandPopup=(id)=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;learnStage=3;openLearnPopup(it,true);};
+window.collapsePopup=(id)=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;learnStage=2;openLearnPopup(it,false);};
 function renderNameTest(){
   clearDrawLayers();document.getElementById('testBar').classList.add('on');
   markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();
   const qs=ITEMS.filter(itemVisible);
-  if(nameIdx>=qs.length)nameIdx=0;
-  const cur=qs[nameIdx];
+  if(nameIdx>=qs.length)nameIdx=-1;
+  const cur=(nameIdx>=0)?qs[nameIdx]:null;
   let hi=new Set();
   if(cur){ if(cur.type==='street'||cur.type==='route')hi.add(cur.streetId); else if(cur.roads)cur.roads.forEach(r=>hi.add(r)); }
   DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);
@@ -656,15 +677,16 @@ function renderNameTest(){
   const bar=document.getElementById('tbQ');
   if(!qs.length)bar.textContent='問題がありません（テスト・出題種類を確認）';
   else if(revealAll)bar.textContent='全'+qs.length+'問の答えを表示中（紙と照合）';
-  else bar.textContent='問題 '+(nameIdx+1)+' / '+qs.length+(nameReveal&&cur?'　→ '+cur.name:'');
+  else if(!cur)bar.textContent='全'+qs.length+'問／番号をタップして選択（もう1回で答え）';
+  else bar.textContent='問題 '+(nameIdx+1)+' / '+qs.length+(nameReveal?'　→ '+cur.name:'　（もう1回タップで答え）');
   buildList(qs);
   document.getElementById('cAll').textContent=ITEMS.length;
   document.getElementById('cDone').textContent=Object.keys(store.learned).length;
   document.getElementById('cTod').textContent=Object.keys(store.today).length;
 }
 document.getElementById('tbAnswer').onclick=()=>{nameReveal=true;const qs=ITEMS.filter(itemVisible);if(qs[nameIdx])panPoint(qs[nameIdx]);renderNameTest();};
-document.getElementById('tbNext').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx+1)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
-document.getElementById('tbPrev').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx-1+qs.length)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
+document.getElementById('tbNext').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx<0)?0:(nameIdx+1)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
+document.getElementById('tbPrev').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx<0)?0:(nameIdx-1+qs.length)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
 document.getElementById('tbAll').onclick=()=>{revealAll=!revealAll;renderNameTest();toast(revealAll?'全部の答えを表示（紙と照合）':'答えを隠しました');};
 function tapDot(sid,i,p){if(drawResult)return;const key=sid+':'+i;const pos=drawSeq.map(d=>d.key).indexOf(key);if(pos>=0){drawSeq.splice(pos,1);}else{drawSeq.push({key,streetId:sid,idx:i,lat:p[1],lon:p[0]});}renderDrawTest();}
 function eqSeq(a,b){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true;}
@@ -690,7 +712,7 @@ const TK=[['street','通り名'],['route','ルート'],['cross','交差点'],['r
 const tkEl=document.getElementById('tkinds'),tkBtns={};
 TK.forEach(function(p){const b=document.createElement('button');b.textContent=p[1];tkEl.appendChild(b);tkBtns[p[0]]=b;
   b.onclick=()=>{if(testKinds.has(p[0])){testKinds.delete(p[0]);b.classList.add('off');}else{testKinds.add(p[0]);b.classList.remove('off');}render();};});
-document.getElementById('ttName').onclick=()=>{testType='name';document.getElementById('ttName').classList.add('on');document.getElementById('ttDraw').classList.remove('on');drawSeq=[];drawResult=null;nameIdx=0;nameReveal=false;render();};
+document.getElementById('ttName').onclick=()=>{testType='name';document.getElementById('ttName').classList.add('on');document.getElementById('ttDraw').classList.remove('on');drawSeq=[];drawResult=null;nameIdx=-1;nameReveal=false;render();};
 document.getElementById('ttDraw').onclick=()=>{testType='draw';document.getElementById('ttDraw').classList.add('on');document.getElementById('ttName').classList.remove('on');drawIdx=0;drawSeq=[];drawResult=null;render();};
 document.getElementById('dbReset').onclick=()=>{drawSeq=[];drawResult=null;renderDrawTest();};
 document.getElementById('dbCheck').onclick=()=>checkDraw();
