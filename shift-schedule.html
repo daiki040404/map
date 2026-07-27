@@ -23,8 +23,8 @@
   .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
   .fld{display:flex;flex-direction:column;gap:5px;}
   label{font-size:12px;color:var(--sub);font-weight:600;}
-  input[type=time],input[type=number]{font-size:16px;padding:9px 10px;border:1px solid var(--line);
-    border-radius:10px;background:#fff;color:var(--ink);width:100%;}
+  input[type=time],input[type=number],input[type=text],select{font-size:16px;padding:9px 10px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;}
   input[type=number]{width:88px;}
   .out{width:118px;}
   .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;
@@ -34,6 +34,8 @@
   .btn.sec{background:#eef0f4;color:#374151;}
   .btn.mini{padding:7px 11px;font-size:13px;}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+
+  .cardhead{font-size:13px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;}
   .seg.work{background:var(--workbg);border-color:#cfe0ff;}
@@ -62,6 +64,8 @@
   .pill.hi{background:#f3ecff;border-color:#e2d4ff;}
   .banner{background:var(--warnbg);border:1px solid #f6d3b8;color:var(--warn);
     font-size:12.5px;border-radius:10px;padding:9px 11px;margin-bottom:10px;line-height:1.5;}
+  .saved{background:#e7f7f0;border:1px solid #c7ecdd;color:#0f7a52;font-size:12.5px;
+    border-radius:10px;padding:8px 11px;margin-top:8px;display:none;}
   details{margin-top:6px;} summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:600;}
   .settings{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
   .foot{color:var(--sub);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.6;}
@@ -70,7 +74,23 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで、営業と休憩が自動で並びます。時刻がずれても全部まとめて再計算。営業・休憩ブロックはそれぞれ好きな場所に追加・削除できます。休憩がずれ込んだ時は「次の営業を縮めて帰庫時刻は変えない」で調整します。</p>
+  <p class="lead">出庫時刻を入れるだけで、営業と休憩が自動で並びます。入力は自動保存されるので、画面を閉じても次に開いた時に残ります。よく使う組み方は「パターン」として名前をつけて保存できます。</p>
+
+  <!-- パターン保存 -->
+  <div class="card">
+    <p class="cardhead">💾 保存したパターン</p>
+    <div class="row" style="gap:8px">
+      <select id="presetSel" style="flex:1;min-width:150px"><option value="">— パターンを選ぶ —</option></select>
+      <button class="btn sec mini" id="loadPreset">読込</button>
+      <button class="btn sec mini" id="delPreset">削除</button>
+    </div>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <input type="text" id="presetName" placeholder="パターン名（例：所定・公出）" style="flex:1;min-width:150px">
+      <button class="btn mini" id="savePreset">今の設定を保存</button>
+    </div>
+    <div class="saved" id="savedMsg"></div>
+    <p class="hint">入力内容は自動で端末に保存されます。パターンを保存しておけば、いつでも呼び出せます。</p>
+  </div>
 
   <div class="card">
     <div class="row">
@@ -81,7 +101,7 @@
       <div class="btnrow" style="margin-bottom:2px">
         <button class="btn work mini" id="addWork">＋ 営業を追加</button>
         <button class="btn brk mini" id="addBreak">＋ 休憩を追加</button>
-        <button class="btn sec mini" id="reset">リセット</button>
+        <button class="btn sec mini" id="reset">初期状態に戻す</button>
       </div>
     </div>
     <details>
@@ -110,10 +130,12 @@
 
 <script>
 const $=s=>document.querySelector(s);
+const LAST_KEY="taxiShift_last_v1";
+const PRESET_KEY="taxiShift_presets_v1";
+
 const state={
   out:"13:50",
   defWork:180, defBreak:30, cap:210,
-  // segments: {type:'work'|'break', min:分, actual:"HH:MM"|null(workのみ)}
   segments:[]
 };
 function defaultSegments(){
@@ -123,8 +145,45 @@ function defaultSegments(){
     if(i<4) state.segments.push({type:'break', min:state.defBreak});
   }
 }
-defaultSegments();
 
+/* ---- 保存まわり ---- */
+function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function storeSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function snapshot(){ return JSON.parse(JSON.stringify(state)); }
+function applySnapshot(s){
+  if(!s) return false;
+  state.out=s.out??"13:50";
+  state.defWork=s.defWork??180; state.defBreak=s.defBreak??30; state.cap=s.cap??210;
+  state.segments=Array.isArray(s.segments)&&s.segments.length?s.segments:[];
+  if(!state.segments.length) defaultSegments();
+  return true;
+}
+function persistLast(){ storeSet(LAST_KEY, snapshot()); }
+
+function getPresets(){ return storeGet(PRESET_KEY) || {}; }
+function refreshPresetList(sel){
+  const p=getPresets(); const el=$("#presetSel");
+  const cur = sel!==undefined ? sel : el.value;
+  el.innerHTML='<option value="">— パターンを選ぶ —</option>';
+  Object.keys(p).forEach(name=>{
+    const o=document.createElement("option"); o.value=name; o.textContent=name;
+    el.appendChild(o);
+  });
+  if(cur && p[cur]) el.value=cur;
+}
+function toast(msg){
+  const t=$("#savedMsg"); t.textContent="✓ "+msg; t.style.display="block";
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2200);
+}
+
+function syncInputs(){
+  $("#outTime").value=state.out;
+  $("#defWork").value=state.defWork;
+  $("#defBreak").value=state.defBreak;
+  $("#cap").value=state.cap;
+}
+
+/* ---- 時刻ユーティリティ ---- */
 function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function fmtClock(baseMin, elapsed){
   let total=baseMin+elapsed;
@@ -144,47 +203,37 @@ function fmtDur(min){
   return `${s}${m}分`;
 }
 
-// 核となる計算
+/* ---- 計算 ---- */
 function compute(){
   const base=toMin(state.out)??0;
-  let elapsed=0;      // 出庫からの経過分
-  let carry=0;        // 次の営業から差し引く「ずれ込み分」
-  let breakUsed=0;
+  let elapsed=0, carry=0, breakUsed=0;
   const rows=[]; const notes=[];
   const cap=Math.max(0,state.cap);
-
   state.segments.forEach((s,idx)=>{
     if(s.type==='work'){
       const wStart=elapsed;
       const planned=Math.max(0,s.min);
-      let effPlanned=planned-carry;   // ずれ込み分を差し引いた「本来の」営業
-      let leftover=0;
+      let effPlanned=planned-carry; let leftover=0;
       if(effPlanned<0){ leftover=-effPlanned; effPlanned=0; }
       carry=leftover;
-
-      let workDur;
-      const actual=toMin(s.actual);
+      let workDur; const actual=toMin(s.actual);
       if(actual!==null){
         let aElapsed=actual-base;
-        while(aElapsed<wStart) aElapsed+=1440;   // 翌日回り込み
+        while(aElapsed<wStart) aElapsed+=1440;
         workDur=aElapsed-wStart;
-        carry+=(workDur-effPlanned);   // 長く走った分を次の営業へ
-      }else{
-        workDur=effPlanned;
-      }
+        carry+=(workDur-effPlanned);
+      }else{ workDur=effPlanned; }
       rows.push({type:'work', idx, start:wStart, dur:workDur, planned, adj:workDur-planned});
       elapsed=wStart+workDur;
     }else{
-      let br=Math.max(0, s.min||0);   // 各回で自由に設定（30分未満も可）
+      let br=Math.max(0, s.min||0);
       const remain=cap-breakUsed;
       if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は0分になります。`);}
       else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
       rows.push({type:'break', idx, start:elapsed, dur:br, set:s.min||0});
-      breakUsed+=br;
-      elapsed+=br;
+      breakUsed+=br; elapsed+=br;
     }
   });
-
   return {base, rows, kikoElapsed:elapsed, breakUsed, workTotal:elapsed-breakUsed, notes};
 }
 
@@ -199,7 +248,6 @@ function segButtons(idx){
 function render(){
   const r=compute();
   const S=$("#sched");
-  // 入力中の欄を作り直すとフォーカスが外れる（スマホで途切れる）ので位置を覚えて戻す
   const ae=document.activeElement;
   let fk=null, fx=null, ss=null, se=null;
   if(ae && ae.dataset && ae.dataset.idx!==undefined){
@@ -207,7 +255,6 @@ function render(){
     try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
   }
   S.innerHTML="";
-
   let workNo=0, breakNo=0;
   r.rows.forEach(row=>{
     if(row.type==='work'){
@@ -261,7 +308,6 @@ function render(){
     }
   });
 
-  // 帰庫
   const kiko=document.createElement("div");
   kiko.className="seg"; kiko.style.background="#111827"; kiko.style.borderColor="#111827";
   kiko.innerHTML=`<div class="seg-top">
@@ -270,32 +316,34 @@ function render(){
     </div>`;
   S.appendChild(kiko);
 
-  // フォーカスとカーソルを戻す
   if(fk!==null){
     const el=S.querySelector(`[data-k="${fk}"][data-idx="${fx}"]`);
     if(el){ el.focus(); if(ss!==null){ try{ el.setSelectionRange(ss,se); }catch(e){} } }
   }
 
-  // 警告
   const notes=[...new Set(r.notes)];
   $("#warn").innerHTML = notes.length? `<div class="banner">⚠ ${notes.join("<br>⚠ ")}</div>`:"";
 
-  // サマリー
   $("#summary").innerHTML=`
     <div class="pill hi"><div class="k">帰庫時刻</div><div class="v">${fmtClock(r.base,r.kikoElapsed)}</div></div>
     <div class="pill"><div class="k">合計 営業</div><div class="v">${fmtDur(r.workTotal)}</div></div>
     <div class="pill"><div class="k">合計 休憩</div><div class="v">${fmtDur(r.breakUsed)}</div></div>
     <div class="pill"><div class="k">拘束（出庫→帰庫）</div><div class="v">${fmtDur(r.kikoElapsed)}</div></div>`;
+
+  persistLast();   // 変更のたびに自動保存
 }
 
-// イベント
+/* ---- イベント ---- */
 $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
-$("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;});
-$("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);});
+$("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;persistLast();});
+$("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);persistLast();});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
 $("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null});render();});
 $("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak});render();});
-$("#reset").addEventListener("click",()=>{defaultSegments();$("#outTime").value=state.out;render();});
+$("#reset").addEventListener("click",()=>{
+  if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（保存したパターンは消えません）")) return;
+  defaultSegments(); syncInputs(); render();
+});
 
 $("#sched").addEventListener("input",e=>{
   const x=e.target.dataset.idx, k=e.target.dataset.k;
@@ -317,7 +365,46 @@ $("#sched").addEventListener("click",e=>{
   }
 });
 
-render();
+/* ---- パターン保存・読込・削除 ---- */
+$("#savePreset").addEventListener("click",()=>{
+  let name=$("#presetName").value.trim();
+  if(!name){ name=$("#presetSel").value; }
+  if(!name){ alert("パターン名を入力してください（例：所定・公出）"); return; }
+  const p=getPresets();
+  const exists=!!p[name];
+  if(exists && !confirm(`「${name}」を上書き保存しますか？`)) return;
+  p[name]=snapshot();
+  storeSet(PRESET_KEY,p);
+  refreshPresetList(name);
+  $("#presetName").value="";
+  toast(`「${name}」を保存しました`);
+});
+$("#loadPreset").addEventListener("click",()=>{
+  const name=$("#presetSel").value;
+  if(!name){ alert("読み込むパターンを選んでください"); return; }
+  const p=getPresets();
+  if(!p[name]) return;
+  applySnapshot(p[name]);
+  syncInputs(); render();
+  toast(`「${name}」を読み込みました`);
+});
+$("#delPreset").addEventListener("click",()=>{
+  const name=$("#presetSel").value;
+  if(!name){ alert("削除するパターンを選んでください"); return; }
+  if(!confirm(`「${name}」を削除しますか？`)) return;
+  const p=getPresets(); delete p[name]; storeSet(PRESET_KEY,p);
+  refreshPresetList("");
+  toast(`「${name}」を削除しました`);
+});
+
+/* ---- 起動時：前回の状態を復元 ---- */
+(function init(){
+  const last=storeGet(LAST_KEY);
+  if(!applySnapshot(last)){ defaultSegments(); }
+  refreshPresetList();
+  syncInputs();
+  render();
+})();
 </script>
 </body>
 </html>
