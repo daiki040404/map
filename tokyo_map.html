@@ -157,7 +157,7 @@
   <div id="side">
     <header>
       <h1>東京 通りで覚える</h1>
-      <button id="menuToggle">地図を広く</button>
+      <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
     <div class="row"><span class="lbl">モード</span><div class="seg"><button id="mLearn" class="on">学習</button><button id="mTest">テスト</button><button id="mEdit">編集</button></div></div>
@@ -342,9 +342,10 @@ function itemVisible(it){
   if(view==='demand'){if(!selDays.size)return false;let ok=false;selDays.forEach(d=>{if(hasDemand(it.id,d,selHour))ok=true;});if(!ok)return false;}
   return true;
 }
-function popupHtml(it,num){const t=TYPE[it.type],done=store.learned[it.id],tod=store.today[it.id];
+function popupHtml(it,num,detail){const t=TYPE[it.type],done=store.learned[it.id],tod=store.today[it.id];
   let h='<div class="pp"><div class="pptype" style="color:'+colOf(it)+'">'+t.label+'　#'+num+'</div><b>'+it.name+'</b>'+(it.info?'<br><span class="ppi">'+it.info+'</span>':'');
   if(mode==='test')return h+'</div>';
+  if(mode==='learn'&&!detail){var mm0=store.memo[it.id]||'';if(mm0)h+='<div class="ppmemo">📝 '+esc(mm0)+'</div>';h+='<div class="ppbtn"><button onclick="expandPopup(\''+it.id+'\')">詳細・編集</button></div>';return h+'</div>';}
   if(it.roads&&it.roads.length){h+='<div class="pproads">通る通り: '+it.roads.map(id=>{const r=DATA.find(x=>x.id===id);return r?esc(r.name):'?';}).join('、')+'</div>';}
   if(mode==='edit'&&it.placeIdx!=null){
     h+='<div class="ppbtn"><button onclick="renameBld(\''+it.streetId+'\','+it.placeIdx+')">名前変更</button><button onclick="delBld(\''+it.streetId+'\','+it.placeIdx+')">削除</button></div>';
@@ -477,7 +478,8 @@ window.toggleToday=id=>{if(store.today[id])delete store.today[id];else store.tod
 window.toggleDay=(id,d)=>{if(store.days[d][id])delete store.days[d][id];else store.days[d][id]=1;saveTag();reopenPopup(id);};
 window.setTime=(id,k,v)=>{if(!store.time[id])store.time[id]={f:'',t:''};if(v==='')store.time[id][k]='';else store.time[id][k]=parseInt(v,10);if(store.time[id].f===''&&store.time[id].t==='')delete store.time[id];saveTag();reopenPopup(id);};
 window.editMemo=(id)=>{const c=store.memo[id]||'';const v=prompt('メモ（施設・交差点の覚え書き）',c);if(v!=null){if(v.trim())store.memo[id]=v.trim();else delete store.memo[id];saveTag();reopenPopup(id);}};
-function reopenPopup(id){const it=ITEMS.find(x=>x.id===id);if(!it)return;markerGroup.eachLayer(l=>{const ll=l.getLatLng&&l.getLatLng();if(ll&&Math.abs(ll.lat-it.lat)<1e-9&&Math.abs(ll.lng-it.lon)<1e-9){l.setPopupContent(popupHtml(it,it._num||0));setTimeout(()=>refreshPopupMedia(id),0);}});}
+function reopenPopup(id){const it=ITEMS.find(x=>x.id===id);if(!it)return;markerGroup.eachLayer(l=>{const ll=l.getLatLng&&l.getLatLng();if(ll&&Math.abs(ll.lat-it.lat)<1e-9&&Math.abs(ll.lng-it.lon)<1e-9){l.setPopupContent(popupHtml(it,it._num||0,true));setTimeout(()=>refreshPopupMedia(id),0);}});}
+window.expandPopup=(id)=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;markerGroup.eachLayer(l=>{const ll=l.getLatLng&&l.getLatLng();if(ll&&Math.abs(ll.lat-it.lat)<1e-9&&Math.abs(ll.lng-it.lon)<1e-9){l.setPopupContent(popupHtml(it,it._num||0,true));setTimeout(()=>refreshPopupMedia(id),0);}});};
 
 // ===== building edit =====
 window.renameBld=(sid,idx)=>{const o=DATA.find(x=>x.id===sid);if(!o)return;const p=o.places[idx];const n=prompt('建物・場所の名前',p.name);if(n!=null){p.name=n;const w=prompt('区（任意）',p.ward||'');if(w!=null)p.ward=w;const s=prompt('最寄駅・補足（任意）',p.station||'');if(s!=null)p.station=s;saveData();rebuild();}};
@@ -648,7 +650,7 @@ function renderNameTest(){
   qs.forEach((it,i)=>{const num=i+1;it._num=num;const isCur=(i===nameIdx);
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:isCur?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
     if(revealAll||(nameReveal&&isCur))m.bindTooltip(it.name,{permanent:true,direction:'top',className:'nameicon'});
-    m.on('click',()=>{nameIdx=i;nameReveal=false;render();panPoint(it);});
+    m.on('click',()=>{if(nameIdx===i){nameReveal=!nameReveal;}else{nameIdx=i;nameReveal=false;}render();panPoint(it);});
     m.addTo(markerGroup);});
   document.getElementById('tbAll').classList.toggle('on',revealAll);
   const bar=document.getElementById('tbQ');
@@ -725,7 +727,7 @@ document.getElementById('nbAll').onclick=()=>{showAllNames=true;document.getElem
 document.getElementById('eGH').onclick=()=>{if(!confirm('GitHub上の「'+GH_FILE+'」を読み込みます。この端末の内容は置き換わります。よろしい？'))return;toast('GitHubから取得中…',6000);fetch(GH_FILE,{cache:'no-store'}).then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{if(Array.isArray(d)){DATA=d;activeTestId='';selectedId=null;saveData();rebuild();toast('読み込みました（'+d.length+'件）');}else toast('形式が違います');}).catch(()=>toast('取得できず（ファイルが無い/ネット未接続/file://の可能性）',3500));};
 
 const menuToggle=document.getElementById('menuToggle');
-menuToggle.onclick=()=>{const s=document.getElementById('side');const min=s.classList.toggle('min');menuToggle.textContent=min?'メニュー':'地図を広く';setTimeout(()=>map.invalidateSize(),260);};
+menuToggle.onclick=()=>{const s=document.getElementById('side');const min=s.classList.toggle('min');menuToggle.textContent=min?'メニュー':'閉じる';setTimeout(()=>map.invalidateSize(),260);};
 
 document.getElementById('baseToggle').textContent='地図: '+BASES[baseIdx].name;
 if(BASES[baseIdx].layer===null)document.getElementById('map').classList.add('blank');
