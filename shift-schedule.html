@@ -49,6 +49,7 @@
   .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
     padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
   .seg-ctrl .fld label{font-size:11px;}
+  .memo{flex:1 1 100%;}
   .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
   .seg-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;}
   .chip{border:1px solid var(--line);background:#fff;border-radius:999px;
@@ -69,27 +70,38 @@
   details{margin-top:6px;} summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:600;}
   .settings{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
   .foot{color:var(--sub);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.6;}
+  .curflow{font-size:12px;color:var(--sub);margin-top:6px;}
+  .curflow b{color:var(--ink);}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで、営業と休憩が自動で並びます。入力は自動保存されるので、画面を閉じても次に開いた時に残ります。よく使う組み方は「パターン」として名前をつけて保存できます。</p>
+  <p class="lead">出庫時刻を入れるだけで、営業と休憩が自動で並びます。各ブロックにメモを書けて、その日の流れをまるごと保存。カテゴリ（例：13時点呼）で分けて呼び出せます。入力は自動保存され、画面を閉じても残ります。</p>
 
-  <!-- パターン保存 -->
+  <!-- 流れの保存 -->
   <div class="card">
-    <p class="cardhead">💾 保存したパターン</p>
+    <p class="cardhead">💾 その日の流れを保存</p>
     <div class="row" style="gap:8px">
-      <select id="presetSel" style="flex:1;min-width:150px"><option value="">— パターンを選ぶ —</option></select>
+      <select id="presetSel" style="flex:1;min-width:150px"><option value="">— 保存した流れを選ぶ —</option></select>
       <button class="btn sec mini" id="loadPreset">読込</button>
       <button class="btn sec mini" id="delPreset">削除</button>
     </div>
     <div class="row" style="gap:8px;margin-top:10px">
-      <input type="text" id="presetName" placeholder="パターン名（例：所定・公出）" style="flex:1;min-width:150px">
-      <button class="btn mini" id="savePreset">今の設定を保存</button>
+      <div class="fld" style="flex:1;min-width:140px">
+        <label>この流れの名前</label>
+        <input type="text" id="presetName" placeholder="例：通常 / 早め出庫">
+      </div>
+      <div class="fld" style="flex:1;min-width:140px">
+        <label>カテゴリ</label>
+        <input type="text" id="presetCat" list="catList" placeholder="例：13時点呼">
+        <datalist id="catList"></datalist>
+      </div>
+      <button class="btn mini" id="savePreset" style="align-self:flex-end">保存</button>
     </div>
     <div class="saved" id="savedMsg"></div>
-    <p class="hint">入力内容は自動で端末に保存されます。パターンを保存しておけば、いつでも呼び出せます。</p>
+    <p class="curflow" id="curFlow"></p>
+    <p class="hint">名前とカテゴリをつけて保存。プルダウンはカテゴリごとにまとまって表示されます。</p>
   </div>
 
   <div class="card">
@@ -131,49 +143,93 @@
 <script>
 const $=s=>document.querySelector(s);
 const LAST_KEY="taxiShift_last_v1";
-const PRESET_KEY="taxiShift_presets_v1";
+const PRESET_KEY="taxiShift_presets_v2";
+const OLD_PRESET_KEY="taxiShift_presets_v1";
+const SEP="";
 
 const state={
   out:"13:50",
   defWork:180, defBreak:30, cap:210,
+  flowName:"", flowCat:"",
   segments:[]
 };
 function defaultSegments(){
   state.segments=[];
   for(let i=0;i<5;i++){
-    state.segments.push({type:'work', min:state.defWork, actual:null});
-    if(i<4) state.segments.push({type:'break', min:state.defBreak});
+    state.segments.push({type:'work', min:state.defWork, actual:null, memo:""});
+    if(i<4) state.segments.push({type:'break', min:state.defBreak, memo:""});
   }
 }
+
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
 /* ---- 保存まわり ---- */
 function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
 function storeSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-function snapshot(){ return JSON.parse(JSON.stringify(state)); }
+function snapshot(){
+  return {out:state.out, defWork:state.defWork, defBreak:state.defBreak, cap:state.cap,
+          segments:JSON.parse(JSON.stringify(state.segments))};
+}
 function applySnapshot(s){
   if(!s) return false;
   state.out=s.out??"13:50";
   state.defWork=s.defWork??180; state.defBreak=s.defBreak??30; state.cap=s.cap??210;
-  state.segments=Array.isArray(s.segments)&&s.segments.length?s.segments:[];
+  let segs=Array.isArray(s.segments)?s.segments:[];
+  segs=segs.map(x=>({type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||""}));
+  state.segments=segs.length?segs:[];
   if(!state.segments.length) defaultSegments();
   return true;
 }
-function persistLast(){ storeSet(LAST_KEY, snapshot()); }
+function persistLast(){
+  const snap=snapshot(); snap.flowName=state.flowName; snap.flowCat=state.flowCat;
+  storeSet(LAST_KEY, snap);
+}
 
-function getPresets(){ return storeGet(PRESET_KEY) || {}; }
+function getPresets(){
+  let p=storeGet(PRESET_KEY);
+  if(!p){
+    // 旧バージョン（カテゴリ無し）からの引き継ぎ
+    const old=storeGet(OLD_PRESET_KEY);
+    p={};
+    if(old && typeof old==="object"){
+      Object.keys(old).forEach(name=>{ p[""+SEP+name]={cat:"", name:name, data:old[name]}; });
+      storeSet(PRESET_KEY,p);
+    }
+  }
+  return p||{};
+}
 function refreshPresetList(sel){
   const p=getPresets(); const el=$("#presetSel");
   const cur = sel!==undefined ? sel : el.value;
-  el.innerHTML='<option value="">— パターンを選ぶ —</option>';
-  Object.keys(p).forEach(name=>{
-    const o=document.createElement("option"); o.value=name; o.textContent=name;
-    el.appendChild(o);
+  el.innerHTML='<option value="">— 保存した流れを選ぶ —</option>';
+  const groups={};
+  Object.keys(p).forEach(id=>{ const c=p[id].cat||"（カテゴリなし）"; (groups[c]=groups[c]||[]).push(id); });
+  Object.keys(groups).sort().forEach(c=>{
+    const og=document.createElement("optgroup"); og.label=c;
+    groups[c].sort((a,b)=>p[a].name.localeCompare(p[b].name)).forEach(id=>{
+      const o=document.createElement("option"); o.value=id; o.textContent=p[id].name;
+      og.appendChild(o);
+    });
+    el.appendChild(og);
   });
   if(cur && p[cur]) el.value=cur;
+  // カテゴリ候補
+  const dl=$("#catList"); if(dl){
+    dl.innerHTML="";
+    [...new Set(Object.keys(p).map(id=>p[id].cat).filter(Boolean))].sort().forEach(c=>{
+      const o=document.createElement("option"); o.value=c; dl.appendChild(o);
+    });
+  }
 }
 function toast(msg){
   const t=$("#savedMsg"); t.textContent="✓ "+msg; t.style.display="block";
-  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2200);
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2400);
+}
+function updateCurFlow(){
+  const c=$("#curFlow");
+  if(state.flowName||state.flowCat){
+    c.innerHTML=`いま表示中：<b>${esc(state.flowName||"（名前なし）")}</b>`+(state.flowCat?`（${esc(state.flowCat)}）`:"");
+  }else{ c.textContent=""; }
 }
 
 function syncInputs(){
@@ -244,6 +300,12 @@ function segButtons(idx){
     <button class="del" data-del="${idx}" title="このブロックを削除">🗑</button>
   </div>`;
 }
+function memoField(idx, ph){
+  return `<div class="fld memo">
+    <label>メモ</label>
+    <input type="text" value="${esc(state.segments[idx].memo)}" data-k="memo" data-idx="${idx}" placeholder="${ph}">
+  </div>`;
+}
 
 function render(){
   const r=compute();
@@ -281,6 +343,7 @@ function render(){
             <span class="hint">ずれ込んだ時だけ入力</span>
           </div>
           ${segButtons(row.idx)}
+          ${memoField(row.idx,"例：〇〇エリアで流す / 迎車")}
         </div>`;
       S.appendChild(el);
     }else{
@@ -303,6 +366,7 @@ function render(){
             <span class="hint">長引いた回はここを変更（30分より短くも可）</span>
           </div>
           ${segButtons(row.idx)}
+          ${memoField(row.idx,"例：帰庫前 / ガス満タン / 仮眠")}
         </div>`;
       S.appendChild(el);
     }
@@ -330,7 +394,7 @@ function render(){
     <div class="pill"><div class="k">合計 休憩</div><div class="v">${fmtDur(r.breakUsed)}</div></div>
     <div class="pill"><div class="k">拘束（出庫→帰庫）</div><div class="v">${fmtDur(r.kikoElapsed)}</div></div>`;
 
-  persistLast();   // 変更のたびに自動保存
+  persistLast();
 }
 
 /* ---- イベント ---- */
@@ -338,17 +402,18 @@ $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
 $("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;persistLast();});
 $("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);persistLast();});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
-$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null});render();});
-$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak});render();});
+$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null,memo:""});render();});
+$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak,memo:""});render();});
 $("#reset").addEventListener("click",()=>{
-  if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（保存したパターンは消えません）")) return;
-  defaultSegments(); syncInputs(); render();
+  if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（保存した流れは消えません）")) return;
+  state.flowName=""; state.flowCat=""; defaultSegments(); syncInputs(); updateCurFlow(); render();
 });
 
 $("#sched").addEventListener("input",e=>{
   const x=e.target.dataset.idx, k=e.target.dataset.k;
   if(x===undefined) return;
   const s=state.segments[+x];
+  if(k==="memo"){ s.memo=e.target.value; persistLast(); return; }   // メモは再描画不要
   if(k==="work") s.min=+e.target.value||0;
   else if(k==="brk") s.min=Math.max(0,+e.target.value||0);
   else if(k==="actual") s.actual=e.target.value||null;
@@ -359,51 +424,55 @@ $("#sched").addEventListener("click",e=>{
   if(t.dataset.del!==undefined){
     if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); }
   }else if(t.dataset.addwork!==undefined){
-    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null}); render();
+    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null,memo:""}); render();
   }else if(t.dataset.addbreak!==undefined){
-    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak}); render();
+    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak,memo:""}); render();
   }
 });
 
-/* ---- パターン保存・読込・削除 ---- */
+/* ---- 流れの保存・読込・削除 ---- */
 $("#savePreset").addEventListener("click",()=>{
   let name=$("#presetName").value.trim();
-  if(!name){ name=$("#presetSel").value; }
-  if(!name){ alert("パターン名を入力してください（例：所定・公出）"); return; }
+  let cat=$("#presetCat").value.trim();
+  if(!name){ alert("この流れの名前を入力してください（例：通常）"); return; }
+  const id=cat+SEP+name;
   const p=getPresets();
-  const exists=!!p[name];
-  if(exists && !confirm(`「${name}」を上書き保存しますか？`)) return;
-  p[name]=snapshot();
+  if(p[id] && !confirm(`「${cat?cat+"／":""}${name}」を上書き保存しますか？`)) return;
+  p[id]={cat:cat, name:name, data:snapshot()};
   storeSet(PRESET_KEY,p);
-  refreshPresetList(name);
+  state.flowName=name; state.flowCat=cat;
+  refreshPresetList(id); updateCurFlow(); persistLast();
   $("#presetName").value="";
-  toast(`「${name}」を保存しました`);
+  toast(`「${cat?cat+"／":""}${name}」を保存しました`);
 });
 $("#loadPreset").addEventListener("click",()=>{
-  const name=$("#presetSel").value;
-  if(!name){ alert("読み込むパターンを選んでください"); return; }
-  const p=getPresets();
-  if(!p[name]) return;
-  applySnapshot(p[name]);
-  syncInputs(); render();
-  toast(`「${name}」を読み込みました`);
+  const id=$("#presetSel").value;
+  if(!id){ alert("読み込む流れを選んでください"); return; }
+  const p=getPresets(); if(!p[id]) return;
+  applySnapshot(p[id].data);
+  state.flowName=p[id].name; state.flowCat=p[id].cat;
+  $("#presetName").value=p[id].name; $("#presetCat").value=p[id].cat;
+  syncInputs(); updateCurFlow(); render();
+  toast(`「${p[id].cat?p[id].cat+"／":""}${p[id].name}」を読み込みました`);
 });
 $("#delPreset").addEventListener("click",()=>{
-  const name=$("#presetSel").value;
-  if(!name){ alert("削除するパターンを選んでください"); return; }
-  if(!confirm(`「${name}」を削除しますか？`)) return;
-  const p=getPresets(); delete p[name]; storeSet(PRESET_KEY,p);
-  refreshPresetList("");
-  toast(`「${name}」を削除しました`);
+  const id=$("#presetSel").value;
+  if(!id){ alert("削除する流れを選んでください"); return; }
+  const p=getPresets(); if(!p[id]) return;
+  if(!confirm(`「${p[id].cat?p[id].cat+"／":""}${p[id].name}」を削除しますか？`)) return;
+  const label=(p[id].cat?p[id].cat+"／":"")+p[id].name;
+  delete p[id]; storeSet(PRESET_KEY,p);
+  refreshPresetList(""); toast(`「${label}」を削除しました`);
 });
 
 /* ---- 起動時：前回の状態を復元 ---- */
 (function init(){
   const last=storeGet(LAST_KEY);
-  if(!applySnapshot(last)){ defaultSegments(); }
+  if(applySnapshot(last)){ state.flowName=last.flowName||""; state.flowCat=last.flowCat||""; }
+  else { defaultSegments(); }
   refreshPresetList();
-  syncInputs();
-  render();
+  $("#presetName").value=state.flowName; $("#presetCat").value=state.flowCat;
+  syncInputs(); updateCurFlow(); render();
 })();
 </script>
 </body>
