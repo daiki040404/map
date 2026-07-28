@@ -25,7 +25,8 @@
   label{font-size:12px;color:var(--sub);font-weight:600;}
   input[type=time],input[type=number],input[type=text],select{font-size:16px;padding:9px 10px;
     border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;}
-  input[type=number]{width:88px;}
+  input[type=number]{width:96px;}
+  input[type=time]{width:130px;}
   .out{width:118px;}
   .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;
     cursor:pointer;background:var(--accent);color:#fff;}
@@ -49,6 +50,7 @@
   .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
     padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
   .seg-ctrl .fld label{font-size:11px;}
+  .eq{align-self:center;color:var(--sub);font-size:13px;font-weight:800;padding-bottom:9px;}
   .memo{flex:1 1 100%;}
   .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
   .seg-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;}
@@ -72,12 +74,13 @@
   .foot{color:var(--sub);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.6;}
   .curflow{font-size:12px;color:var(--sub);margin-top:6px;}
   .curflow b{color:var(--ink);}
+  .filebtn{display:inline-flex;align-items:center;cursor:pointer;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで、営業と休憩が自動で並びます。各ブロックにメモを書けて、その日の流れをまるごと保存。カテゴリ（例：13時点呼）で分けて呼び出せます。入力は自動保存され、画面を閉じても残ります。</p>
+  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各営業は「分」でも「終了時刻」でも入力でき、片方を入れるともう片方が自動計算。メモも書け、その日の流れをカテゴリ（例：13時点呼）ごとに保存。JSONで書き出せば別の端末（スマホ⇄PC）にも移せます。</p>
 
   <!-- 流れの保存 -->
   <div class="card">
@@ -99,9 +102,16 @@
       </div>
       <button class="btn mini" id="savePreset" style="align-self:flex-end">保存</button>
     </div>
+
+    <div class="row" style="gap:8px;margin-top:12px;border-top:1px dashed var(--line);padding-top:12px">
+      <button class="btn sec mini" id="exportJson">⬆ JSONで書き出し（バックアップ）</button>
+      <label class="btn sec mini filebtn">⬇ JSONを読み込み
+        <input type="file" id="importJson" accept="application/json,.json" style="display:none">
+      </label>
+    </div>
     <div class="saved" id="savedMsg"></div>
     <p class="curflow" id="curFlow"></p>
-    <p class="hint">名前とカテゴリをつけて保存。プルダウンはカテゴリごとにまとまって表示されます。</p>
+    <p class="hint">保存データはこの端末のこのブラウザにだけ残ります。スマホとPCで共有したい時は「書き出し」でファイルを保存→もう片方の端末に送って「読み込み」。</p>
   </div>
 
   <div class="card">
@@ -135,7 +145,8 @@
   </div>
 
   <p class="foot">
-    ずれ込み：営業ブロックに「実際に休憩を始めた時刻」を入れると、その営業が伸びたぶん次の営業が自動で短くなり、帰庫時刻は変わりません。<br>
+    予定の営業は「分」でも「終了時刻」でも入力OK（片方を入れると自動でもう片方に反映）。<br>
+    「実際の営業終了時刻」を入れると、伸びたぶん次の営業が自動で短くなり、帰庫時刻は変わりません。<br>
     休憩が長引いた回は、その休憩の「分」を直接書き換えればOK（30分より短くも可）。
   </p>
 </div>
@@ -145,7 +156,7 @@ const $=s=>document.querySelector(s);
 const LAST_KEY="taxiShift_last_v1";
 const PRESET_KEY="taxiShift_presets_v2";
 const OLD_PRESET_KEY="taxiShift_presets_v1";
-const SEP="";
+const SEP="";
 
 const state={
   out:"13:50",
@@ -162,6 +173,8 @@ function defaultSegments(){
 }
 
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function stamp(){ const d=new Date(); return d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+"_"+pad2(d.getHours())+pad2(d.getMinutes()); }
 
 /* ---- 保存まわり ---- */
 function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
@@ -188,7 +201,6 @@ function persistLast(){
 function getPresets(){
   let p=storeGet(PRESET_KEY);
   if(!p){
-    // 旧バージョン（カテゴリ無し）からの引き継ぎ
     const old=storeGet(OLD_PRESET_KEY);
     p={};
     if(old && typeof old==="object"){
@@ -213,7 +225,6 @@ function refreshPresetList(sel){
     el.appendChild(og);
   });
   if(cur && p[cur]) el.value=cur;
-  // カテゴリ候補
   const dl=$("#catList"); if(dl){
     dl.innerHTML="";
     [...new Set(Object.keys(p).map(id=>p[id].cat).filter(Boolean))].sort().forEach(c=>{
@@ -223,7 +234,7 @@ function refreshPresetList(sel){
 }
 function toast(msg){
   const t=$("#savedMsg"); t.textContent="✓ "+msg; t.style.display="block";
-  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2400);
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2600);
 }
 function updateCurFlow(){
   const c=$("#curFlow");
@@ -231,7 +242,6 @@ function updateCurFlow(){
     c.innerHTML=`いま表示中：<b>${esc(state.flowName||"（名前なし）")}</b>`+(state.flowCat?`（${esc(state.flowCat)}）`:"");
   }else{ c.textContent=""; }
 }
-
 function syncInputs(){
   $("#outTime").value=state.out;
   $("#defWork").value=state.defWork;
@@ -241,14 +251,12 @@ function syncInputs(){
 
 /* ---- 時刻ユーティリティ ---- */
 function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
+function hm(totalMin){ let m=((totalMin%1440)+1440)%1440; return pad2(Math.floor(m/60))+":"+pad2(m%60); }
 function fmtClock(baseMin, elapsed){
   let total=baseMin+elapsed;
   let day=Math.floor(total/1440);
-  let m=((total%1440)+1440)%1440;
-  let hh=String(Math.floor(m/60)).padStart(2,"0");
-  let mm=String(m%60).padStart(2,"0");
   let pre = day<=0?"":(day===1?"翌 ":`+${day}日 `);
-  return pre+hh+":"+mm;
+  return pre+hm(total);
 }
 function fmtDur(min){
   min=Math.round(min);
@@ -279,7 +287,7 @@ function compute(){
         workDur=aElapsed-wStart;
         carry+=(workDur-effPlanned);
       }else{ workDur=effPlanned; }
-      rows.push({type:'work', idx, start:wStart, dur:workDur, planned, adj:workDur-planned});
+      rows.push({type:'work', idx, start:wStart, dur:workDur, planned, hasActual:actual!==null, adj:workDur-planned});
       elapsed=wStart+workDur;
     }else{
       let br=Math.max(0, s.min||0);
@@ -321,9 +329,12 @@ function render(){
   r.rows.forEach(row=>{
     if(row.type==='work'){
       workNo++;
+      const seg=state.segments[row.idx];
       const el=document.createElement("div");
       el.className="seg work";
       const adjTxt = Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"";
+      const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
+      const actualHint = row.hasActual ? `実績 ${fmtDur(row.dur)}` : "ずれ込んだ時だけ入力";
       el.innerHTML=`
         <div class="seg-top">
           <div><span class="tag work">営業 ${workNo}</span></div>
@@ -335,12 +346,18 @@ function render(){
         <div class="seg-ctrl">
           <div class="fld">
             <label>予定の営業（分）</label>
-            <input type="number" inputmode="numeric" min="0" step="5" value="${state.segments[row.idx].min}" data-k="work" data-idx="${row.idx}">
+            <input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="work" data-idx="${row.idx}">
+          </div>
+          <div class="eq">=</div>
+          <div class="fld">
+            <label>予定の終了時刻</label>
+            <input type="time" value="${plannedEnd}" data-k="workend" data-start="${row.start}" data-idx="${row.idx}">
+            <span class="hint">分↔時刻どちらでもOK</span>
           </div>
           <div class="fld">
-            <label>実際に休憩を始めた時刻</label>
-            <input type="time" value="${state.segments[row.idx].actual||""}" data-k="actual" data-idx="${row.idx}">
-            <span class="hint">ずれ込んだ時だけ入力</span>
+            <label>実際の営業終了時刻</label>
+            <input type="time" value="${seg.actual||""}" data-k="actual" data-idx="${row.idx}">
+            <span class="hint">${actualHint}</span>
           </div>
           ${segButtons(row.idx)}
           ${memoField(row.idx,"例：〇〇エリアで流す / 迎車")}
@@ -413,10 +430,19 @@ $("#sched").addEventListener("input",e=>{
   const x=e.target.dataset.idx, k=e.target.dataset.k;
   if(x===undefined) return;
   const s=state.segments[+x];
-  if(k==="memo"){ s.memo=e.target.value; persistLast(); return; }   // メモは再描画不要
-  if(k==="work") s.min=+e.target.value||0;
-  else if(k==="brk") s.min=Math.max(0,+e.target.value||0);
-  else if(k==="actual") s.actual=e.target.value||null;
+  if(k==="memo"){ s.memo=e.target.value; persistLast(); return; }
+  if(k==="work"){ s.min=+e.target.value||0; }
+  else if(k==="brk"){ s.min=Math.max(0,+e.target.value||0); }
+  else if(k==="actual"){ s.actual=e.target.value||null; }
+  else if(k==="workend"){
+    const endClock=toMin(e.target.value);
+    if(endClock===null){ render(); return; }
+    const base=toMin(state.out)||0;
+    const startElapsed=+e.target.dataset.start||0;
+    const startClock=((base+startElapsed)%1440+1440)%1440;
+    let dur=((endClock-startClock)%1440+1440)%1440;
+    s.min=dur;
+  }
   render();
 });
 $("#sched").addEventListener("click",e=>{
@@ -465,7 +491,55 @@ $("#delPreset").addEventListener("click",()=>{
   refreshPresetList(""); toast(`「${label}」を削除しました`);
 });
 
-/* ---- 起動時：前回の状態を復元 ---- */
+/* ---- JSON 書き出し／読み込み ---- */
+$("#exportJson").addEventListener("click",()=>{
+  const data={
+    _app:"taxiShift", version:2, exportedAt:new Date().toISOString(),
+    presets:getPresets(),
+    last:(function(){const s=snapshot();s.flowName=state.flowName;s.flowCat=state.flowCat;return s;})()
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="taxi-shift_"+stamp()+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  toast("JSONを書き出しました（バックアップ）");
+});
+$("#importJson").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      let n=0;
+      if(d && d.presets && typeof d.presets==="object"){
+        const p=getPresets();
+        Object.keys(d.presets).forEach(id=>{ p[id]=d.presets[id]; n++; });
+        storeSet(PRESET_KEY,p); refreshPresetList();
+      }
+      let extra="";
+      if(d && d.last){
+        if(confirm(`パターン${n}件を読み込みました。\n表示中の内容も、このファイルの内容に置き換えますか？`)){
+          applySnapshot(d.last);
+          state.flowName=d.last.flowName||""; state.flowCat=d.last.flowCat||"";
+          $("#presetName").value=state.flowName; $("#presetCat").value=state.flowCat;
+          syncInputs(); updateCurFlow(); render();
+          extra="＋表示中の内容も更新";
+        }
+      }
+      if(n===0 && !(d&&d.last)){ alert("このファイルには読み込めるデータが見つかりませんでした。"); }
+      else { toast(`読み込み完了：パターン${n}件 ${extra}`); }
+    }catch(err){
+      alert("JSONの読み込みに失敗しました。ファイルが壊れていないか確認してください。");
+    }
+    e.target.value="";
+  };
+  rd.readAsText(f);
+});
+
+/* ---- 起動時 ---- */
 (function init(){
   const last=storeGet(LAST_KEY);
   if(applySnapshot(last)){ state.flowName=last.flowName||""; state.flowCat=last.flowCat||""; }
