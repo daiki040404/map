@@ -9,7 +9,7 @@
     --bg:#f5f6f8; --card:#fff; --ink:#1f2430; --sub:#6b7280;
     --line:#e5e7eb; --work:#2563eb; --workbg:#eaf1ff;
     --brk:#0f9d6b; --brkbg:#e7f7f0; --warn:#c2410c; --warnbg:#fff2e8;
-    --accent:#7c3aed;
+    --accent:#7c3aed; --todobg:#f6f2fe;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -44,9 +44,10 @@
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;}
   .seg.work{background:var(--workbg);border-color:#cfe0ff;}
   .seg.brk{background:var(--brkbg);border-color:#c7ecdd;}
+  .seg.todo{background:var(--todobg);border-color:#e2d4ff;}
   .seg-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
   .tag{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
-  .tag.work{background:var(--work);} .tag.brk{background:var(--brk);}
+  .tag.work{background:var(--work);} .tag.brk{background:var(--brk);} .tag.todo{background:var(--accent);}
   .clock{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}
   .dur{font-size:12px;color:var(--sub);margin-top:3px;}
   .adj{color:var(--warn);font-weight:700;}
@@ -61,7 +62,19 @@
     padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#374151;line-height:1;}
   .chip.w{color:var(--work);border-color:#cfe0ff;}
   .chip.b{color:var(--brk);border-color:#c7ecdd;}
-  .del{background:transparent;border:0;color:#9ca3af;font-size:18px;cursor:pointer;line-height:1;padding:0 2px;}
+  .chip.t{color:var(--accent);border-color:#e2d4ff;}
+  .del{background:transparent;border:0;color:#9ca3af;font-size:17px;cursor:pointer;line-height:1;padding:0 2px;}
+
+  .todo-title{font-size:15px;font-weight:700;margin-top:8px;}
+  .tasks-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
+  .tasks-head{font-size:11px;color:var(--sub);font-weight:700;margin-bottom:7px;}
+  .tasks{display:flex;flex-direction:column;gap:7px;}
+  .task{display:flex;align-items:center;gap:9px;}
+  .task input[type=checkbox]{width:21px;height:21px;flex:none;accent-color:var(--accent);}
+  .task-text{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
+  .task.done .task-text{text-decoration:line-through;color:#9ca3af;background:#fafafa;}
+  .task-add{margin-top:2px;}
+  .task-input{width:100%;border:1px dashed #cbb9f0;border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
 
   .summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
   .pill{flex:1;min-width:130px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
@@ -83,7 +96,7 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各営業は「分」でも「終了時刻」でも入力OK。今日の流れメモ＋各ブロックのメモを書け、流れをカテゴリごとに保存・編集できます。JSONで別端末にも移せます。</p>
+  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各ブロックにチェックリストを付けられ、点呼前ルーティン等は自分でタイトルを付けた「やることリスト」を先頭・末尾に追加できます。今日の流れメモや保存・カテゴリ分け・JSON移行も対応。</p>
 
   <!-- 今日の流れメモ -->
   <div class="card">
@@ -140,11 +153,13 @@
         <label>出庫時刻</label>
         <input class="out" type="time" id="outTime" value="13:50">
       </div>
-      <div class="btnrow" style="margin-bottom:2px">
-        <button class="btn work mini" id="addWork">＋ 営業を追加</button>
-        <button class="btn brk mini" id="addBreak">＋ 休憩を追加</button>
-        <button class="btn sec mini" id="reset">初期状態に戻す</button>
-      </div>
+    </div>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn work mini" id="addWork">＋ 営業</button>
+      <button class="btn brk mini" id="addBreak">＋ 休憩</button>
+      <button class="btn mini" id="addTodo">＋ やること(末尾)</button>
+      <button class="btn sec mini" id="addTodoTop">↑ やること(先頭)</button>
+      <button class="btn sec mini" id="reset">初期化</button>
     </div>
     <details>
       <summary>基本設定を変える（営業・休憩の長さ、合計休憩の上限）</summary>
@@ -153,7 +168,7 @@
         <div class="fld"><label>休憩ブロックの初期値（分）</label><input type="number" inputmode="numeric" id="defBreak" value="30" min="0" step="5"></div>
         <div class="fld"><label>合計休憩の上限（分）</label><input type="number" inputmode="numeric" id="cap" value="210" min="0" step="10"></div>
       </div>
-      <p class="hint">初期値：営業180分・休憩30分／合計休憩は210分（3時間30分）まで。各ブロックの「＋営業」「＋休憩」でその下に挿入できます。</p>
+      <p class="hint">各ブロックの「＋営業」「＋休憩」「＋リスト」でその下に挿入できます。</p>
     </details>
   </div>
 
@@ -165,9 +180,8 @@
   </div>
 
   <p class="foot">
-    予定の営業は「分」でも「終了時刻」でも入力OK（片方を入れると自動でもう片方に反映）。<br>
-    「実際の営業終了時刻」を入れると、伸びたぶん次の営業が自動で短くなり、帰庫時刻は変わりません。<br>
-    休憩が長引いた回は、その休憩の「分」を直接書き換えればOK（30分より短くも可）。
+    予定の営業は「分」でも「終了時刻」でも入力OK。「実際の営業終了時刻」を入れると、伸びたぶん次の営業が短くなり帰庫時刻は不変。<br>
+    やることリストは時間に影響しません（チェック用）。各ブロックのチェック項目は入力欄に打ってEnterで追加。
   </p>
 </div>
 
@@ -186,11 +200,12 @@ const state={
   flowName:"", flowCat:"", currentId:null,
   segments:[]
 };
+function normTasks(a){ return Array.isArray(a)?a.map(t=>({text:(t&&t.text)||"",done:!!(t&&t.done)})):[]; }
 function defaultSegments(){
   state.segments=[];
   for(let i=0;i<5;i++){
-    state.segments.push({type:'work', min:state.defWork, actual:null, memo:""});
-    if(i<4) state.segments.push({type:'break', min:state.defBreak, memo:""});
+    state.segments.push({type:'work', min:state.defWork, actual:null, memo:"", tasks:[]});
+    if(i<4) state.segments.push({type:'break', min:state.defBreak, memo:"", tasks:[]});
   }
 }
 function genId(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -211,7 +226,10 @@ function applySnapshot(s){
   state.defWork=s.defWork??180; state.defBreak=s.defBreak??30; state.cap=s.cap??210;
   state.dayMemo=s.dayMemo||"";
   let segs=Array.isArray(s.segments)?s.segments:[];
-  segs=segs.map(x=>({type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||""}));
+  segs=segs.map(x=>{
+    if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks)};
+    return {type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||"", tasks:normTasks(x.tasks)};
+  });
   state.segments=segs.length?segs:[];
   if(!state.segments.length) defaultSegments();
   return true;
@@ -267,7 +285,6 @@ function refreshCatSel(selVal){
   const optNone=document.createElement("option"); optNone.value=""; optNone.textContent="（カテゴリなし）"; sel.appendChild(optNone);
   cats.forEach(c=>{ const o=document.createElement("option"); o.value=c; o.textContent=c; sel.appendChild(o); });
   const optNew=document.createElement("option"); optNew.value=NEWCAT; optNew.textContent="＋ 新しいカテゴリ…"; sel.appendChild(optNew);
-  // 選択値の反映（既存に無ければ「なし」）
   if(want===NEWCAT){ sel.value=NEWCAT; }
   else if(cats.indexOf(want)>=0){ sel.value=want; }
   else { sel.value=""; }
@@ -284,13 +301,10 @@ function effectiveCat(){
   return sel;
 }
 function setCatUI(cat){
-  refreshCatSel(cat);           // 既存カテゴリならそれを選択
+  refreshCatSel(cat);
   if(cat && categories().indexOf(cat)<0){
-    // まだ保存されていない新規カテゴリ → 新規モードに入れて名前を入れておく
     $("#catSel").value=NEWCAT; toggleCatNew(); $("#catNew").value=cat;
-  }else{
-    $("#catNew").value="";
-  }
+  }else{ $("#catNew").value=""; }
 }
 
 function toast(msg){
@@ -301,9 +315,7 @@ function updateCurFlow(){
   const c=$("#curFlow");
   if(state.currentId){
     c.innerHTML=`編集中：<b>${esc(state.flowName||"（名前なし）")}</b>`+(state.flowCat?`（${esc(state.flowCat)}）`:"")+' <span style="color:#0f7a52">● 保存済み</span>';
-  }else{
-    c.innerHTML='編集中：<b>新規（未保存）</b>';
-  }
+  }else{ c.innerHTML='編集中：<b>新規（未保存）</b>'; }
   $("#btnUpdate").disabled = !state.currentId;
 }
 function syncInputs(){
@@ -330,7 +342,7 @@ function fmtDur(min){
   return `${s}${m}分`;
 }
 
-/* ---- 計算 ---- */
+/* ---- 計算（todoは時間に影響しない） ---- */
 function compute(){
   const base=toMin(state.out)??0;
   let elapsed=0, carry=0, breakUsed=0;
@@ -352,13 +364,15 @@ function compute(){
       }else{ workDur=effPlanned; }
       rows.push({type:'work', idx, start:wStart, dur:workDur, planned, hasActual:actual!==null, adj:workDur-planned});
       elapsed=wStart+workDur;
-    }else{
+    }else if(s.type==='break'){
       let br=Math.max(0, s.min||0);
       const remain=cap-breakUsed;
       if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は0分になります。`);}
       else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
       rows.push({type:'break', idx, start:elapsed, dur:br, set:s.min||0});
       breakUsed+=br; elapsed+=br;
+    }else{
+      rows.push({type:'todo', idx});
     }
   });
   return {base, rows, kikoElapsed:elapsed, breakUsed, workTotal:elapsed-breakUsed, notes};
@@ -368,6 +382,7 @@ function segButtons(idx){
   return `<div class="seg-btns">
     <button class="chip w" data-addwork="${idx}" title="下に営業を挿入">＋営業</button>
     <button class="chip b" data-addbreak="${idx}" title="下に休憩を挿入">＋休憩</button>
+    <button class="chip t" data-addtodo="${idx}" title="下にやることリストを挿入">＋リスト</button>
     <button class="del" data-del="${idx}" title="このブロックを削除">🗑</button>
   </div>`;
 }
@@ -377,13 +392,30 @@ function memoField(idx, ph){
     <input type="text" value="${esc(state.segments[idx].memo)}" data-k="memo" data-idx="${idx}" placeholder="${ph}">
   </div>`;
 }
+function taskList(idx){
+  const seg=state.segments[idx];
+  const items=(seg.tasks||[]).map((t,ti)=>`
+    <div class="task ${t.done?'done':''}">
+      <input type="checkbox" data-done data-idx="${idx}" data-ti="${ti}" ${t.done?'checked':''}>
+      <input type="text" class="task-text" value="${esc(t.text)}" data-k="tasktext" data-idx="${idx}" data-ti="${ti}" placeholder="項目">
+      <button class="del" data-deltask data-idx="${idx}" data-ti="${ti}" title="項目を削除">🗑</button>
+    </div>`).join("");
+  return `<div class="tasks-wrap">
+    <div class="tasks-head">✔ チェックリスト</div>
+    <div class="tasks">${items}
+      <div class="task-add">
+        <input type="text" class="task-input" data-addtask data-idx="${idx}" placeholder="＋ 項目を入力してEnter">
+      </div>
+    </div>
+  </div>`;
+}
 
 function render(){
   const r=compute();
   const S=$("#sched");
   const ae=document.activeElement;
   let fk=null, fx=null, ss=null, se=null;
-  if(ae && ae.dataset && ae.dataset.idx!==undefined){
+  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['work','brk','actual','workend'].indexOf(ae.dataset.k)>=0){
     fk=ae.dataset.k; fx=ae.dataset.idx;
     try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
   }
@@ -393,8 +425,7 @@ function render(){
     if(row.type==='work'){
       workNo++;
       const seg=state.segments[row.idx];
-      const el=document.createElement("div");
-      el.className="seg work";
+      const el=document.createElement("div"); el.className="seg work";
       const adjTxt = Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"";
       const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
       const actualHint = row.hasActual ? `実績 ${fmtDur(row.dur)}` : "ずれ込んだ時だけ入力";
@@ -424,12 +455,12 @@ function render(){
           </div>
           ${segButtons(row.idx)}
           ${memoField(row.idx,"例：〇〇エリアで流す / 迎車")}
-        </div>`;
+        </div>
+        ${taskList(row.idx)}`;
       S.appendChild(el);
-    }else{
+    }else if(row.type==='break'){
       breakNo++;
-      const el=document.createElement("div");
-      el.className="seg brk";
+      const el=document.createElement("div"); el.className="seg brk";
       const shortTxt = row.dur<row.set ? ` <span class="adj">(上限で${fmtDur(row.set)}→${fmtDur(row.dur)})</span>`:"";
       el.innerHTML=`
         <div class="seg-top">
@@ -447,7 +478,19 @@ function render(){
           </div>
           ${segButtons(row.idx)}
           ${memoField(row.idx,"例：帰庫前 / ガス満タン / 仮眠")}
-        </div>`;
+        </div>
+        ${taskList(row.idx)}`;
+      S.appendChild(el);
+    }else{
+      const seg=state.segments[row.idx];
+      const el=document.createElement("div"); el.className="seg todo";
+      el.innerHTML=`
+        <div class="seg-top">
+          <div><span class="tag todo">やること</span></div>
+          ${segButtons(row.idx)}
+        </div>
+        <input type="text" class="todo-title" value="${esc(seg.title)}" data-k="title" data-idx="${row.idx}" placeholder="タイトル（例：点呼前ルーティン / 仕事前勉強）">
+        ${taskList(row.idx)}`;
       S.appendChild(el);
     }
   });
@@ -483,8 +526,10 @@ $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
 $("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;persistLast();});
 $("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);persistLast();});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
-$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null,memo:""});render();});
-$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak,memo:""});render();});
+$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null,memo:"",tasks:[]});render();});
+$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak,memo:"",tasks:[]});render();});
+$("#addTodo").addEventListener("click",()=>{state.segments.push({type:'todo',title:"",tasks:[]});render();});
+$("#addTodoTop").addEventListener("click",()=>{state.segments.unshift({type:'todo',title:"",tasks:[]});render();});
 $("#reset").addEventListener("click",()=>{
   if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（保存した流れは消えません）")) return;
   state.flowName=""; state.flowCat=""; state.currentId=null; state.dayMemo="";
@@ -492,32 +537,59 @@ $("#reset").addEventListener("click",()=>{
 });
 
 $("#sched").addEventListener("input",e=>{
-  const x=e.target.dataset.idx, k=e.target.dataset.k;
+  const t=e.target; const x=t.dataset.idx, k=t.dataset.k;
   if(x===undefined) return;
+  if(k===undefined) return;   // 項目追加の入力欄など（再描画しない）
   const s=state.segments[+x];
-  if(k==="memo"){ s.memo=e.target.value; persistLast(); return; }
-  if(k==="work"){ s.min=+e.target.value||0; }
-  else if(k==="brk"){ s.min=Math.max(0,+e.target.value||0); }
-  else if(k==="actual"){ s.actual=e.target.value||null; }
+  if(k==="memo"){ s.memo=t.value; persistLast(); return; }
+  if(k==="title"){ s.title=t.value; persistLast(); return; }
+  if(k==="tasktext"){ const ti=+t.dataset.ti; if(s.tasks&&s.tasks[ti]){ s.tasks[ti].text=t.value; persistLast(); } return; }
+  if(k==="work"){ s.min=+t.value||0; }
+  else if(k==="brk"){ s.min=Math.max(0,+t.value||0); }
+  else if(k==="actual"){ s.actual=t.value||null; }
   else if(k==="workend"){
-    const endClock=toMin(e.target.value);
+    const endClock=toMin(t.value);
     if(endClock===null){ render(); return; }
     const base=toMin(state.out)||0;
-    const startElapsed=+e.target.dataset.start||0;
+    const startElapsed=+t.dataset.start||0;
     const startClock=((base+startElapsed)%1440+1440)%1440;
-    let dur=((endClock-startClock)%1440+1440)%1440;
-    s.min=dur;
+    s.min=((endClock-startClock)%1440+1440)%1440;
   }
   render();
+});
+$("#sched").addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.done!==undefined){
+    const idx=+t.dataset.idx, ti=+t.dataset.ti;
+    const s=state.segments[idx];
+    if(s&&s.tasks&&s.tasks[ti]){ s.tasks[ti].done=t.checked; }
+    const row=t.closest(".task"); if(row) row.classList.toggle("done",t.checked);
+    persistLast();
+  }
+});
+$("#sched").addEventListener("keydown",e=>{
+  if(e.key==="Enter" && e.target.dataset.addtask!==undefined){
+    e.preventDefault();
+    const idx=+e.target.dataset.idx; const val=e.target.value.trim();
+    if(!val) return;
+    const s=state.segments[idx]; s.tasks=s.tasks||[]; s.tasks.push({text:val,done:false});
+    render();
+    const inp=$("#sched").querySelector(`[data-addtask][data-idx="${idx}"]`); if(inp) inp.focus();
+  }
 });
 $("#sched").addEventListener("click",e=>{
   const t=e.target;
   if(t.dataset.del!==undefined){
     if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); }
+  }else if(t.dataset.deltask!==undefined){
+    const idx=+t.dataset.idx, ti=+t.dataset.ti;
+    if(state.segments[idx]&&state.segments[idx].tasks){ state.segments[idx].tasks.splice(ti,1); render(); }
   }else if(t.dataset.addwork!==undefined){
-    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null,memo:""}); render();
+    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null,memo:"",tasks:[]}); render();
   }else if(t.dataset.addbreak!==undefined){
-    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak,memo:""}); render();
+    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak,memo:"",tasks:[]}); render();
+  }else if(t.dataset.addtodo!==undefined){
+    state.segments.splice(+t.dataset.addtodo+1,0,{type:'todo',title:"",tasks:[]}); render();
   }
 });
 
@@ -596,10 +668,10 @@ $("#importJson").addEventListener("change",e=>{
       let n=0;
       if(d && d.presets && typeof d.presets==="object"){
         const p=getPresets();
-        const byKey={}; Object.values(p).forEach(x=>{ byKey[(x.cat||"")+" "+x.name]=x.id; });
+        const byKey={}; Object.values(p).forEach(x=>{ byKey[(x.cat||"")+" "+x.name]=x.id; });
         Object.keys(d.presets).forEach(k=>{
           const v=d.presets[k]||{}; const cat=v.cat||""; const name=v.name||k; const data=v.data||v;
-          const kk=cat+" "+name;
+          const kk=cat+" "+name;
           const id=byKey[kk] || (v.id && !p[v.id] ? v.id : genId());
           p[id]={id, cat, name, data}; byKey[kk]=id; n++;
         });
