@@ -9,7 +9,7 @@
     --bg:#f5f6f8; --card:#fff; --ink:#1f2430; --sub:#6b7280;
     --line:#e5e7eb; --work:#2563eb; --workbg:#eaf1ff;
     --brk:#0f9d6b; --brkbg:#e7f7f0; --warn:#c2410c; --warnbg:#fff2e8;
-    --accent:#7c3aed; --todobg:#f6f2fe;
+    --accent:#7c3aed; --todobg:#f6f2fe; --done:#16a34a;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -41,11 +41,15 @@
 
   .cardhead{font-size:13px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
 
-  .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;}
+  .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;scroll-margin-top:10px;}
   .seg.work{background:var(--workbg);border-color:#cfe0ff;}
   .seg.brk{background:var(--brkbg);border-color:#c7ecdd;}
   .seg.todo{background:var(--todobg);border-color:#e2d4ff;}
-  .seg-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+  .seg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .seg-head-left{display:flex;align-items:center;gap:9px;}
+  .blockdone{width:22px;height:22px;flex:none;accent-color:var(--done);cursor:pointer;}
+  .seg.collapsed{opacity:.5;}
+  .seg.collapsed .seg-ctrl,.seg.collapsed .tasks-wrap,.seg.collapsed .todo-title{display:none;}
   .tag{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
   .tag.work{background:var(--work);} .tag.brk{background:var(--brk);} .tag.todo{background:var(--accent);}
   .clock{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;}
@@ -96,7 +100,7 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各ブロックにチェックリストを付けられ、点呼前ルーティン等は自分でタイトルを付けた「やることリスト」を先頭・末尾に追加できます。今日の流れメモや保存・カテゴリ分け・JSON移行も対応。</p>
+  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各ブロックにチェックリスト＋「完了」チェック。完了ブロックは畳まれ、次に開くと未完了の位置まで自動でスクロールします。点呼前ルーティン等は自分でタイトルを付けた「やること」を先頭・末尾に追加できます。</p>
 
   <!-- 今日の流れメモ -->
   <div class="card">
@@ -159,6 +163,7 @@
       <button class="btn brk mini" id="addBreak">＋ 休憩</button>
       <button class="btn mini" id="addTodo">＋ やること(末尾)</button>
       <button class="btn sec mini" id="addTodoTop">↑ やること(先頭)</button>
+      <button class="btn sec mini" id="jumpTodo">↧ 未完了へ</button>
       <button class="btn sec mini" id="reset">初期化</button>
     </div>
     <details>
@@ -180,8 +185,8 @@
   </div>
 
   <p class="foot">
-    予定の営業は「分」でも「終了時刻」でも入力OK。「実際の営業終了時刻」を入れると、伸びたぶん次の営業が短くなり帰庫時刻は不変。<br>
-    やることリストは時間に影響しません（チェック用）。各ブロックのチェック項目は入力欄に打ってEnterで追加。
+    左上のチェックでそのブロックを「完了」に（畳まれます）。次に開くと未完了の位置まで自動スクロール。「↧ 未完了へ」でいつでもジャンプ。<br>
+    やることリストは時間に影響しません。各ブロックのチェック項目は入力してEnterで追加。
   </p>
 </div>
 
@@ -204,8 +209,8 @@ function normTasks(a){ return Array.isArray(a)?a.map(t=>({text:(t&&t.text)||"",d
 function defaultSegments(){
   state.segments=[];
   for(let i=0;i<5;i++){
-    state.segments.push({type:'work', min:state.defWork, actual:null, memo:"", tasks:[]});
-    if(i<4) state.segments.push({type:'break', min:state.defBreak, memo:"", tasks:[]});
+    state.segments.push({type:'work', min:state.defWork, actual:null, memo:"", tasks:[], done:false});
+    if(i<4) state.segments.push({type:'break', min:state.defBreak, memo:"", tasks:[], done:false});
   }
 }
 function genId(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -227,8 +232,8 @@ function applySnapshot(s){
   state.dayMemo=s.dayMemo||"";
   let segs=Array.isArray(s.segments)?s.segments:[];
   segs=segs.map(x=>{
-    if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks)};
-    return {type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||"", tasks:normTasks(x.tasks)};
+    if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks), done:!!x.done};
+    return {type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done};
   });
   state.segments=segs.length?segs:[];
   if(!state.segments.length) defaultSegments();
@@ -386,6 +391,9 @@ function segButtons(idx){
     <button class="del" data-del="${idx}" title="このブロックを削除">🗑</button>
   </div>`;
 }
+function doneBox(idx){
+  return `<input type="checkbox" class="blockdone" data-blockdone data-idx="${idx}" ${state.segments[idx].done?'checked':''} title="このブロックを完了にする">`;
+}
 function memoField(idx, ph){
   return `<div class="fld memo">
     <label>メモ</label>
@@ -425,13 +433,13 @@ function render(){
     if(row.type==='work'){
       workNo++;
       const seg=state.segments[row.idx];
-      const el=document.createElement("div"); el.className="seg work";
+      const el=document.createElement("div"); el.className="seg work"+(seg.done?" collapsed":"");
       const adjTxt = Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"";
       const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
       const actualHint = row.hasActual ? `実績 ${fmtDur(row.dur)}` : "ずれ込んだ時だけ入力";
       el.innerHTML=`
         <div class="seg-top">
-          <div><span class="tag work">営業 ${workNo}</span></div>
+          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag work">営業 ${workNo}</span></div>
           <div style="text-align:right">
             <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
             <div class="dur">営業 ${fmtDur(row.dur)}${adjTxt}</div>
@@ -460,11 +468,12 @@ function render(){
       S.appendChild(el);
     }else if(row.type==='break'){
       breakNo++;
-      const el=document.createElement("div"); el.className="seg brk";
+      const seg=state.segments[row.idx];
+      const el=document.createElement("div"); el.className="seg brk"+(seg.done?" collapsed":"");
       const shortTxt = row.dur<row.set ? ` <span class="adj">(上限で${fmtDur(row.set)}→${fmtDur(row.dur)})</span>`:"";
       el.innerHTML=`
         <div class="seg-top">
-          <div><span class="tag brk">休憩 ${breakNo}</span></div>
+          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag brk">休憩 ${breakNo}</span></div>
           <div style="text-align:right">
             <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
             <div class="dur">休憩 ${fmtDur(row.dur)}${shortTxt}</div>
@@ -473,7 +482,7 @@ function render(){
         <div class="seg-ctrl">
           <div class="fld">
             <label>この休憩（分）</label>
-            <input type="number" inputmode="numeric" min="0" step="5" value="${state.segments[row.idx].min}" data-k="brk" data-idx="${row.idx}">
+            <input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="brk" data-idx="${row.idx}">
             <span class="hint">長引いた回はここを変更（30分より短くも可）</span>
           </div>
           ${segButtons(row.idx)}
@@ -483,10 +492,10 @@ function render(){
       S.appendChild(el);
     }else{
       const seg=state.segments[row.idx];
-      const el=document.createElement("div"); el.className="seg todo";
+      const el=document.createElement("div"); el.className="seg todo"+(seg.done?" collapsed":"");
       el.innerHTML=`
         <div class="seg-top">
-          <div><span class="tag todo">やること</span></div>
+          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag todo">やること</span></div>
           ${segButtons(row.idx)}
         </div>
         <input type="text" class="todo-title" value="${esc(seg.title)}" data-k="title" data-idx="${row.idx}" placeholder="タイトル（例：点呼前ルーティン / 仕事前勉強）">
@@ -496,7 +505,7 @@ function render(){
   });
 
   const kiko=document.createElement("div");
-  kiko.className="seg"; kiko.style.background="#111827"; kiko.style.borderColor="#111827";
+  kiko.className="seg kiko"; kiko.style.background="#111827"; kiko.style.borderColor="#111827";
   kiko.innerHTML=`<div class="seg-top">
       <div><span class="tag" style="background:#fff;color:#111827">帰庫</span></div>
       <div class="clock" style="color:#fff">${fmtClock(r.base,r.kikoElapsed)}</div>
@@ -520,16 +529,29 @@ function render(){
   persistLast();
 }
 
+/* 最初の未完了ブロックへスクロール */
+function scrollToFirstIncomplete(force){
+  const anyDone=state.segments.some(s=>s.done);
+  if(!force && !anyDone) return;
+  const allDone=state.segments.length>0 && state.segments.every(s=>s.done);
+  const S=$("#sched");
+  const segs=[...S.querySelectorAll(".seg")];
+  let target=segs.find(el=>!el.classList.contains("collapsed") && !el.classList.contains("kiko"));
+  if(!target && allDone) target=S.querySelector(".seg.kiko");
+  if(target) target.scrollIntoView({block:"start"});
+}
+
 /* ---- 入力イベント ---- */
 $("#dayMemo").addEventListener("input",e=>{state.dayMemo=e.target.value;persistLast();});
 $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
 $("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;persistLast();});
 $("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);persistLast();});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
-$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null,memo:"",tasks:[]});render();});
-$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak,memo:"",tasks:[]});render();});
-$("#addTodo").addEventListener("click",()=>{state.segments.push({type:'todo',title:"",tasks:[]});render();});
-$("#addTodoTop").addEventListener("click",()=>{state.segments.unshift({type:'todo',title:"",tasks:[]});render();});
+$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null,memo:"",tasks:[],done:false});render();});
+$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak,memo:"",tasks:[],done:false});render();});
+$("#addTodo").addEventListener("click",()=>{state.segments.push({type:'todo',title:"",tasks:[],done:false});render();});
+$("#addTodoTop").addEventListener("click",()=>{state.segments.unshift({type:'todo',title:"",tasks:[],done:false});render();});
+$("#jumpTodo").addEventListener("click",()=>scrollToFirstIncomplete(true));
 $("#reset").addEventListener("click",()=>{
   if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（保存した流れは消えません）")) return;
   state.flowName=""; state.flowCat=""; state.currentId=null; state.dayMemo="";
@@ -559,6 +581,12 @@ $("#sched").addEventListener("input",e=>{
 });
 $("#sched").addEventListener("change",e=>{
   const t=e.target;
+  if(t.dataset.blockdone!==undefined){
+    const idx=+t.dataset.idx;
+    if(state.segments[idx]){ state.segments[idx].done=t.checked; }
+    render();
+    return;
+  }
   if(t.dataset.done!==undefined){
     const idx=+t.dataset.idx, ti=+t.dataset.ti;
     const s=state.segments[idx];
@@ -585,11 +613,11 @@ $("#sched").addEventListener("click",e=>{
     const idx=+t.dataset.idx, ti=+t.dataset.ti;
     if(state.segments[idx]&&state.segments[idx].tasks){ state.segments[idx].tasks.splice(ti,1); render(); }
   }else if(t.dataset.addwork!==undefined){
-    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null,memo:"",tasks:[]}); render();
+    state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null,memo:"",tasks:[],done:false}); render();
   }else if(t.dataset.addbreak!==undefined){
-    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak,memo:"",tasks:[]}); render();
+    state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak,memo:"",tasks:[],done:false}); render();
   }else if(t.dataset.addtodo!==undefined){
-    state.segments.splice(+t.dataset.addtodo+1,0,{type:'todo',title:"",tasks:[]}); render();
+    state.segments.splice(+t.dataset.addtodo+1,0,{type:'todo',title:"",tasks:[],done:false}); render();
   }
 });
 
@@ -631,6 +659,7 @@ $("#loadPreset").addEventListener("click",()=>{
   state.currentId=id; state.flowName=p[id].name; state.flowCat=p[id].cat||"";
   $("#presetName").value=p[id].name; setCatUI(p[id].cat||"");
   syncInputs(); updateCurFlow(); render();
+  scrollToFirstIncomplete(false);
   toast(`「${p[id].cat?p[id].cat+"／":""}${p[id].name}」を読み込みました`);
 });
 $("#delPreset").addEventListener("click",()=>{
@@ -703,6 +732,7 @@ $("#importJson").addEventListener("change",e=>{
   refreshPresetList(state.currentId||"");
   $("#presetName").value=state.flowName; setCatUI(state.flowCat);
   syncInputs(); updateCurFlow(); render();
+  setTimeout(()=>scrollToFirstIncomplete(false),60);
 })();
 </script>
 </body>
