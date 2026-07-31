@@ -22,11 +22,11 @@
   #drawBar .db2{display:flex;gap:8px}
   #drawBar button{padding:9px 13px;border-radius:8px;border:1px solid #3a4353;background:#1a2230;color:#dbeafe;font-size:13px;cursor:pointer}
   #dbCheck{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
-  #testBar,#pickBar{position:absolute;left:0;right:0;bottom:0;z-index:1100;background:rgba(17,19,25,.95);color:#fff;padding:10px 12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #333}
-  #testBar.on,#pickBar.on{display:flex}
-  #testBar #tbQ,#pickBar #pbQ{font-weight:700;font-size:16px;flex:1;min-width:120px}
-  #testBar .tb2,#pickBar .tb2{display:flex;gap:8px}
-  #testBar button,#pickBar button{padding:10px 15px;border-radius:8px;border:1px solid #3a4353;background:#1a2230;color:#dbeafe;font-size:14px;cursor:pointer}
+  #testBar,#pickBar,#relBar{position:absolute;left:0;right:0;bottom:0;z-index:1100;background:rgba(17,19,25,.95);color:#fff;padding:10px 12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #333}
+  #testBar.on,#pickBar.on,#relBar.on{display:flex}
+  #testBar #tbQ,#pickBar #pbQ,#relBar #rbQ{font-weight:700;font-size:16px;flex:1;min-width:120px}
+  #testBar .tb2,#pickBar .tb2,#relBar .tb2{display:flex;gap:8px}
+  #testBar button,#pickBar button,#relBar button{padding:10px 15px;border-radius:8px;border:1px solid #3a4353;background:#1a2230;color:#dbeafe;font-size:14px;cursor:pointer}
   #tbAnswer,#pbAdd{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
   .curq .mk{box-shadow:0 0 0 4px #facc15,0 1px 4px rgba(0,0,0,.55)}
   header{padding:11px 14px;border-bottom:1px solid var(--line);position:relative}
@@ -195,7 +195,7 @@
     </div>
 
     <div class="row" id="rowTest"><span class="lbl">テスト</span><select id="testSel"></select><button id="tPick" class="dbtn">項目を選ぶ</button><button id="tPickMap" class="dbtn">🗺 地図で追加</button><button id="tNew" class="dbtn">＋新規</button><button id="tRename" class="dbtn">名前</button><button id="tDel" class="dbtn">削除</button></div>
-    <div class="row" id="rowTestType" style="display:none"><span class="lbl">出題</span><div class="seg"><button id="ttName" class="on">名前あて</button><button id="ttDraw">線を引く</button></div></div>
+    <div class="row" id="rowTestType" style="display:none"><span class="lbl">出題</span><div class="seg"><button id="ttName" class="on">名前あて</button><button id="ttRel">関連</button><button id="ttDraw">線を引く</button></div></div>
     <div class="row" id="rowTestKind" style="display:none"><span class="lbl">出題種類</span><div class="chips" id="tkinds"></div></div>
     <div class="row" id="rowView"><span class="lbl">表示</span><div class="seg"><button data-v="all" class="on">すべて</button><button data-v="unlearned">未習</button><button data-v="learned">覚えた</button><button data-v="today">今日</button></div></div>
     <div class="row" id="rowNames"><span class="lbl">名前</span><div class="seg"><button id="nbNum" class="on">番号のみ</button><button id="nbAll">名前を全部表示</button></div></div>
@@ -209,7 +209,7 @@
     <div class="list" id="list"></div>
     </div>
   </div>
-  <div id="map"><button id="baseToggle">地図: 通常</button><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図で通りをタップ</span><div class="tb2"><button id="pbAdd">追加</button><button id="pbClear">選び直す</button><button id="pbDone">完了</button></div></div><div id="toast"></div></div>
+  <div id="map"><button id="baseToggle">地図: 通常</button><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図で通りをタップ</span><div class="tb2"><button id="pbAdd">追加</button><button id="pbClear">選び直す</button><button id="pbDone">完了</button></div></div><div id="relBar"><span id="rbQ">関連</span><div class="tb2"><button id="rbPrev">前へ</button><button id="rbAll">全答え</button><button id="rbNext">次へ</button></div></div><div id="toast"></div></div>
 </div>
 <input type="file" id="medFile" accept="image/*,video/*" multiple style="display:none"/>
 <input type="file" id="eBackFile" accept=".json,application/json" style="display:none"/>
@@ -382,6 +382,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function render(){
   _scope=scopeSet();
   if(mode==='test'&&pickMode){renderPickMode();return;}
+  if(mode==='test'&&testType==='related'){renderRelatedTest();return;}
   if(mode==='test'&&testType==='draw'){renderDrawTest();return;}
   if(mode==='test'&&testType==='name'){renderNameTest();return;}
   clearDrawLayers();
@@ -630,7 +631,7 @@ document.getElementById('eClear').onclick=()=>{if(confirm('登録した通り・
 const bL=document.getElementById('mLearn'),bT=document.getElementById('mTest'),bE=document.getElementById('mEdit');
 function setMode(m){mode=m;bL.classList.toggle('on',m==='learn');bT.classList.toggle('on',m==='test');bE.classList.toggle('on',m==='edit');
   addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addCrossingMode=false;addFacilityMode=false;addRampMode=false;
-  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;map.closePopup();
+  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;relatedIdx=0;relRevealed=new Set();relAll=false;map.closePopup();
   ['rowView','rowDay','rowDay2','rowLoc','rowKind'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=(m==='edit')?'none':'flex';});
   document.getElementById('rowNames').style.display=(m==='learn')?'flex':'none';
   document.getElementById('rowTest').style.display='flex';
@@ -675,9 +676,10 @@ document.getElementById('reset').onclick=()=>{selectedId=null;view='all';documen
 
 // ===== 線引きテスト =====
 let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=-1, nameReveal=false, revealAll=false, pickMode=false, pickSel=null;
+let relatedIdx=0, relAll=false, relRevealed=new Set();
 const dotGroup=L.layerGroup(); let userLine=null, answerLine=null;
 function drawTargets(){let its=ITEMS.filter(x=>(x.type==='street'||x.type==='route'));if(activeTestId){const t=curTest();its=its.filter(x=>t&&t.items.indexOf(x.id)>=0);}return its;}
-function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');const pb=document.getElementById('pickBar');if(pb&&!pickMode)pb.classList.remove('on');}
+function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');document.getElementById('relBar').classList.remove('on');const pb=document.getElementById('pickBar');if(pb&&!pickMode)pb.classList.remove('on');}
 function panPoint(it){try{map.panTo([it.lat,it.lon]);}catch(e){}}
 // ===== 学習モードの段階タップ（1:ハイライト 2:名前/メモ 詳細ボタン:詳細） =====
 function highlightFocus(){
@@ -745,6 +747,38 @@ function renderPickMode(){
   else if(pickSel){const o=DATA.find(x=>x.id===pickSel);const inT=t.items.indexOf('L:'+pickSel)>=0;bar.textContent=(inT?'✓ 追加済み：':'合ってる？→追加：')+'『'+o.name+'』';}
   else bar.textContent='「'+t.name+'」に追加：地図で通りをタップ（緑=追加済み）';}
 document.getElementById('tPickMap').onclick=()=>{const t=curTest();if(!t){toast('先に「＋新規」でテストを作って選んでね');return;}pickMode=true;pickSel=null;render();};
+// ===== 関連（施設・出入口）テスト =====
+function childrenOf(p){return ITEMS.filter(it=>{
+  if(it.type==='street'||it.type==='route')return false;
+  if(!testKinds.has(it.type))return false;
+  if(it.placeIdx!=null&&it.streetId===p.id)return true;
+  if(it.roads&&it.roads.indexOf(p.id)>=0)return true;
+  if(it.type==='ramp'&&it.expwy===p.id)return true;
+  return false;});}
+function renderRelatedTest(){
+  clearDrawLayers();document.getElementById('relBar').classList.add('on');
+  markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();dotGroup.clearLayers();
+  const parents=DATA.filter(o=>(o.kind==='street'||o.kind==='route'||o.kind==='expressway')&&o.path&&o.path.length&&(!_scope||_scope.has(o.id))&&childrenOf(o).length);
+  DATA.forEach(o=>{const L=lineLayers[o.id];if(L)map.removeLayer(L);});
+  if(!parents.length){document.getElementById('rbQ').textContent='関連項目のある通り/首都高がありません';buildList(ITEMS.filter(()=>false));return;}
+  if(relatedIdx>=parents.length||relatedIdx<0)relatedIdx=0;
+  const P=parents[relatedIdx],kids=childrenOf(P);
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;if(_scope&&!_scope.has(o.id))return;L2.setStyle(o.id===P.id?{opacity:1,weight:6}:{opacity:.12,weight:3}).addTo(map);});
+  kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);
+    const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]})});
+    if(rev)m.bindTooltip(c.name+((c.type==='ramp'&&c.dir)?'（'+c.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
+    m.on('click',()=>{if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);renderRelatedTest();});
+    m.addTo(markerGroup);});
+  const isExp=P.kind==='expressway';
+  document.getElementById('rbQ').textContent='('+(relatedIdx+1)+'/'+parents.length+') '+P.name+' の'+(isExp?'出入口':'施設・交差点')+'（'+kids.length+'）'+(relAll?' ／答え表示':' ／タップで名前');
+  document.getElementById('rbAll').classList.toggle('on',relAll);
+  buildList(kids);
+}
+function relParents(){return DATA.filter(o=>(o.kind==='street'||o.kind==='route'||o.kind==='expressway')&&o.path&&o.path.length&&(!_scope||_scope.has(o.id))&&childrenOf(o).length);}
+document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relAll=false;render();};
+document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderRelatedTest();};
+document.getElementById('rbNext').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
+document.getElementById('rbPrev').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx-1+ps.length)%ps.length;relRevealed=new Set();relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
 document.getElementById('pbAdd').onclick=()=>{const t=curTest();if(!t||!pickSel)return;const id='L:'+pickSel;if(t.items.indexOf(id)<0){t.items.push(id);saveTag();refreshTestSel();toast('『'+(DATA.find(x=>x.id===pickSel)||{}).name+'』を追加');}else toast('もう追加済みです');pickSel=null;renderPickMode();};
 document.getElementById('pbClear').onclick=()=>{pickSel=null;renderPickMode();};
 document.getElementById('pbDone').onclick=()=>{pickMode=false;pickSel=null;render();};
@@ -752,7 +786,7 @@ function tapDot(sid,i,p){if(drawResult)return;const key=sid+':'+i;const pos=draw
 function eqSeq(a,b){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true;}
 function checkDraw(){const targets=drawTargets();if(!targets.length)return;const target=targets[drawIdx%targets.length];const o=DATA.find(x=>x.id===target.streetId);if(!o)return;const correct=o.path.map((_,i)=>o.id+':'+i);const user=drawSeq.map(d=>d.key);drawResult=(eqSeq(user,correct)||eqSeq(user,correct.slice().reverse()))?'ok':'ng';renderDrawTest();toast(drawResult==='ok'?'正解！':'不正解。緑の点線が正しい線です');}
 function renderDrawTest(){
-  document.getElementById('drawBar').classList.add('on');document.getElementById('testBar').classList.remove('on');
+  document.getElementById('drawBar').classList.add('on');document.getElementById('testBar').classList.remove('on');document.getElementById('relBar').classList.remove('on');
   Object.values(lineLayers).forEach(l=>map.removeLayer(l));markerGroup.clearLayers();vertexGroup.clearLayers();connGroup.clearLayers();
   dotGroup.clearLayers();dotGroup.addTo(map);
   if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}
@@ -772,8 +806,8 @@ const TK=[['street','通り名'],['route','ルート'],['cross','交差点'],['r
 const tkEl=document.getElementById('tkinds'),tkBtns={};
 TK.forEach(function(p){const b=document.createElement('button');b.textContent=p[1];tkEl.appendChild(b);tkBtns[p[0]]=b;
   b.onclick=()=>{if(testKinds.has(p[0])){testKinds.delete(p[0]);b.classList.add('off');}else{testKinds.add(p[0]);b.classList.remove('off');}render();};});
-document.getElementById('ttName').onclick=()=>{testType='name';document.getElementById('ttName').classList.add('on');document.getElementById('ttDraw').classList.remove('on');drawSeq=[];drawResult=null;nameIdx=-1;nameReveal=false;render();};
-document.getElementById('ttDraw').onclick=()=>{testType='draw';document.getElementById('ttDraw').classList.add('on');document.getElementById('ttName').classList.remove('on');drawIdx=0;drawSeq=[];drawResult=null;render();};
+document.getElementById('ttName').onclick=()=>{testType='name';document.getElementById('ttName').classList.add('on');document.getElementById('ttDraw').classList.remove('on');document.getElementById('ttRel').classList.remove('on');drawSeq=[];drawResult=null;nameIdx=-1;nameReveal=false;render();};
+document.getElementById('ttDraw').onclick=()=>{testType='draw';document.getElementById('ttDraw').classList.add('on');document.getElementById('ttName').classList.remove('on');document.getElementById('ttRel').classList.remove('on');drawIdx=0;drawSeq=[];drawResult=null;render();};
 document.getElementById('dbReset').onclick=()=>{drawSeq=[];drawResult=null;renderDrawTest();};
 document.getElementById('dbCheck').onclick=()=>checkDraw();
 document.getElementById('dbNext').onclick=()=>{drawIdx++;drawSeq=[];drawResult=null;renderDrawTest();};
