@@ -172,6 +172,7 @@
       <div id="eCross" style="display:none">
         <div class="eb"><input id="ecName" placeholder="名前"/><button id="ecRename">名前</button></div>
         <div class="eb" id="ecDirRow" style="display:none"><button data-d="内回り">内回り</button><button data-d="外回り">外回り</button><button data-d="フルランプ">フルランプ</button></div>
+        <div class="eb" id="ecExpwyRow" style="display:none"><button id="ecExpwy">🛣 所属する首都高を選ぶ</button></div>
         <div class="eb"><button id="ecRoads">通りを選ぶ</button><button id="ecDel" class="warn">削除</button></div>
         <p class="hint" id="ecHint">選ぶと、関連する通りが線で強調表示されます。</p>
       </div>
@@ -238,7 +239,7 @@ try{const s=localStorage.getItem(LS_TAG);if(s){const o=JSON.parse(s);store.learn
 let activeTestId='';
 function curTest(){return store.tests.find(t=>t.id===activeTestId);}
 let _scope=null;
-function scopeSet(){const t=curTest();if(!activeTestId||!t)return null;const s=new Set();t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(it)s.add(it.streetId);});return s;}
+function scopeSet(){const t=curTest();if(!activeTestId||!t||!t.items.length)return null;const s=new Set();t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(it)s.add(it.streetId);});return s;}
 const DAYS=['月','火','水','木','金','土','日','祝'];DAYS.forEach(d=>{if(!store.days[d])store.days[d]={};});
 function saveTag(){try{localStorage.setItem(LS_TAG,JSON.stringify(store));}catch(e){}syncPush();}
 // ===== media (画像・動画) in IndexedDB =====
@@ -316,7 +317,7 @@ function buildItems(){
   DATA.forEach(o=>{
     if(o.kind==='crossing'){ if(o.lon!=null&&o.lat!=null) ITEMS.push({id:'C:'+o.id,type:'cross',name:o.name,info:'交差点'+((o.roads&&o.roads.length)?'（通り'+o.roads.length+'本）':''),lat:o.lat,lon:o.lon,color:'#f59e0b',streetId:o.id,streetKind:'crossing',roads:o.roads||[],pid:o.id}); return; }
     if(o.kind==='facility'){ if(o.lon!=null&&o.lat!=null) ITEMS.push({id:'F:'+o.id,type:'building',name:o.name,info:'施設'+((o.roads&&o.roads.length)?'（面する通り'+o.roads.length+'）':''),lat:o.lat,lon:o.lon,color:'#4f8cff',streetId:o.id,streetKind:'facility',roads:o.roads||[],pid:o.id}); return; }
-    if(o.kind==='ramp'){ if(o.lon!=null&&o.lat!=null) ITEMS.push({id:'R:'+o.id,type:'ramp',name:o.name,info:(o.dir||'フルランプ')+((o.roads&&o.roads.length)?'／つながる通り'+o.roads.length:''),lat:o.lat,lon:o.lon,color:'#10b981',streetId:o.id,streetKind:'ramp',roads:o.roads||[],pid:o.id,dir:o.dir||'フルランプ',expwy:o.expwy}); return; }
+    if(o.kind==='ramp'){ if(o.lon!=null&&o.lat!=null){const en=o.expwy?((DATA.find(x=>x.id===o.expwy)||{}).name||''):''; ITEMS.push({id:'R:'+o.id,type:'ramp',name:o.name,info:(o.dir||'フルランプ')+(en?'／'+en:'')+((o.roads&&o.roads.length)?'／つながる通り'+o.roads.length:''),lat:o.lat,lon:o.lon,color:'#10b981',streetId:o.id,streetKind:'ramp',roads:o.roads||[],pid:o.id,dir:o.dir||'フルランプ',expwy:o.expwy});} return; }
     if(o.path&&o.path.length){const mid=o.path[Math.floor(o.path.length/2)];
       const lt=(o.kind==='route')?'route':'street';const linfo=(o.kind==='route')?'ルート':((o.kind==='expressway'?'首都高':'通り・路線')+' の名前');
       ITEMS.push({id:'L:'+o.id,type:lt,name:o.name,info:linfo,lat:mid[1],lon:mid[0],color:o.color,streetId:o.id,streetKind:o.kind});}
@@ -342,8 +343,8 @@ function itemVisible(it){
       const isRoadName=(it.type==='street'||it.type==='route')&&roads.indexOf(it.streetId)>=0;
       if(it.streetId!==selectedId&&!isRoadName)return false;
     } else {
-      // 通り選択中：その通りの項目＋その通りに紐づく交差点・施設・出入口も表示
-      const linked=(it.roads&&it.roads.indexOf(selectedId)>=0);
+      // 通り/首都高 選択中：その項目＋紐づく交差点・施設・出入口も表示
+      const linked=(it.roads&&it.roads.indexOf(selectedId)>=0)||(it.type==='ramp'&&it.expwy===selectedId);
       if(it.streetId!==selectedId&&!linked)return false;
     }
   }
@@ -508,7 +509,7 @@ map.on('click',e=>{
   if(mode!=='edit')return;
   if(addCrossingMode){const n=prompt('交差点の名前（例：呉服橋交差点）');if(n){crossDraft={lon:e.latlng.lng,lat:e.latlng.lat,name:n,editId:null};openRoadPicker([]);}return;}
   if(addFacilityMode){const n=prompt('施設名');if(n){const id=uid('f');DATA.push({id,name:n,kind:'facility',color:'#4f8cff',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🏢「'+n+'」を追加。面する通りは「通りを選ぶ」で設定できます');}return;}
-  if(addRampMode){const n=prompt('高速出入口の名前（例：霞が関入口）');if(n){const id=uid('r');DATA.push({id,name:n,kind:'ramp',color:'#10b981',dir:'フルランプ',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🟢「'+n+'」を追加。方向と「つながる通りを選ぶ」を設定してね');}return;}
+  if(addRampMode){const n=prompt('高速出入口の名前（例：霞が関入口）');if(n){const id=uid('r');DATA.push({id,name:n,kind:'ramp',color:'#10b981',dir:'フルランプ',lon:e.latlng.lng,lat:e.latlng.lat,roads:[],expwy:rampExpwyTarget||null});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🟢「'+n+'」を追加'+(rampExpwyTarget?'（首都高に紐付け済み）':'。首都高と通りを設定してね'));}return;}
   if(!selectedId)return;const o=cur();if(!o)return;
   if(addVertexMode){o.path.push([e.latlng.lng,e.latlng.lat]);saveData();buildLineLayers();buildItems();render();toast('点を追加（'+o.path.length+'）');}
   else if(addBuildingMode){const n=prompt('施設名');if(n){o.places.push({id:newPid(),name:n,lon:e.latlng.lng,lat:e.latlng.lat});saveData();rebuild();toast('「'+n+'」を追加。タップで通り表示・メモ・写真');}}
@@ -517,7 +518,7 @@ map.on('click',e=>{
 });
 window.startAvoid=(sid,pid)=>{selectedId=sid;addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=true;avoidTargetPid=pid;map.closePopup();updateEditorPanel();toast('地図で回避ポイントの位置をクリック（この注意点に関連付きます）');};
 // ===== crossing (交差点) =====
-let crossDraft=null;
+let crossDraft=null, rampExpwyTarget=null, expwyPickFor=null;
 function openRoadPicker(preselect){const list=document.getElementById('cmList');list.innerHTML='';
   const roads=DATA.filter(o=>o.kind==='street'||o.kind==='route');
   if(!roads.length){list.innerHTML='<p class="hint">先に通りかルートを1本以上作ってください。</p>';}
@@ -528,15 +529,27 @@ function openRoadPicker(preselect){const list=document.getElementById('cmList');
     row.appendChild(cb);row.appendChild(ic);row.appendChild(sp);list.appendChild(row);});
   const sb=document.getElementById('cmSearch');sb.value='';sb.oninput=()=>{const q=sb.value.trim().toLowerCase();Array.prototype.slice.call(list.children).forEach(el=>{if(el.tagName==='LABEL')el.style.display=(!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none';});};
   document.getElementById('crossModal').classList.add('on');}
-document.getElementById('cmCancel').onclick=()=>{document.getElementById('crossModal').classList.remove('on');crossDraft=null;};
-document.getElementById('cmOk').onclick=()=>{const ids=Array.prototype.slice.call(document.querySelectorAll('#cmList input:checked')).map(c=>c.value);
+document.getElementById('cmCancel').onclick=()=>{document.getElementById('crossModal').classList.remove('on');crossDraft=null;expwyPickFor=null;document.getElementById('cmTitle').textContent='通る通りを選択';};
+function openExpwyPicker(rid,current){const list=document.getElementById('cmList');list.innerHTML='';document.getElementById('cmTitle').textContent='所属する首都高を選択';
+  const exps=DATA.filter(o=>o.kind==='expressway');
+  if(!exps.length)list.innerHTML='<p class="hint">先に「＋高速を作る」で首都高を作ってください。</p>';
+  exps.forEach(o=>{const row=document.createElement('label');row.className='cmrow';row.dataset.name=o.name;
+    const cb=document.createElement('input');cb.type='radio';cb.name='expwypick';cb.value=o.id;if(current===o.id)cb.checked=true;
+    const ic=document.createElement('i');ic.style.background=o.color||'#888';const sp=document.createElement('span');sp.textContent=o.name;
+    row.appendChild(cb);row.appendChild(ic);row.appendChild(sp);list.appendChild(row);});
+  crossDraft=null;expwyPickFor=rid;const sb=document.getElementById('cmSearch');sb.value='';sb.oninput=()=>{const q=sb.value.trim().toLowerCase();Array.prototype.slice.call(list.children).forEach(el=>{if(el.tagName==='LABEL')el.style.display=(!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none';});};
+  document.getElementById('crossModal').classList.add('on');}
+document.getElementById('ecExpwy').onclick=()=>{const o=cur();if(!o||o.kind!=='ramp')return;openExpwyPicker(o.id,o.expwy);};
+document.getElementById('cmOk').onclick=()=>{
+  if(expwyPickFor){const o=DATA.find(x=>x.id===expwyPickFor);const chk=document.querySelector('#cmList input:checked');if(o)o.expwy=chk?chk.value:null;expwyPickFor=null;document.getElementById('cmTitle').textContent='通る通りを選択';saveData();rebuild();document.getElementById('crossModal').classList.remove('on');toast('首都高を設定しました');return;}
+  const ids=Array.prototype.slice.call(document.querySelectorAll('#cmList input:checked')).map(c=>c.value);
   if(crossDraft){ if(crossDraft.editId){const o=DATA.find(x=>x.id===crossDraft.editId);if(o){o.roads=ids;if(crossDraft.name)o.name=crossDraft.name;}}
     else{const id=uid('x');DATA.push({id,name:crossDraft.name,kind:'crossing',color:'#f59e0b',lon:crossDraft.lon,lat:crossDraft.lat,roads:ids});selectedId=id;activeTestId='';refreshTestSel();}
     saveData();rebuild();toast('交差点を保存（通り'+ids.length+'本）');}
   document.getElementById('crossModal').classList.remove('on');crossDraft=null;};
 document.getElementById('eAddCross').onclick=()=>{addCrossingMode=!addCrossingMode;if(addCrossingMode){addVertexMode=false;addBuildingMode=false;addFacilityMode=false;toast('地図で交差点の位置をクリック→通る通りを選択');}updateEditorPanel();};
 document.getElementById('eAddFacility').onclick=()=>{addFacilityMode=!addFacilityMode;if(addFacilityMode){addVertexMode=false;addBuildingMode=false;addCrossingMode=false;addRampMode=false;toast('地図で施設の位置をクリック→施設名を入力');}updateEditorPanel();};
-document.getElementById('eAddRamp').onclick=()=>{addRampMode=!addRampMode;if(addRampMode){addVertexMode=false;addBuildingMode=false;addCrossingMode=false;addFacilityMode=false;toast('地図で出入口の位置をクリック→名前を入力');}updateEditorPanel();};
+document.getElementById('eAddRamp').onclick=()=>{addRampMode=!addRampMode;if(addRampMode){addVertexMode=false;addBuildingMode=false;addCrossingMode=false;addFacilityMode=false;rampExpwyTarget=(cur()&&cur().kind==='expressway')?selectedId:null;toast(rampExpwyTarget?'この首都高に紐づく出入口を地図でクリック':'地図で出入口の位置をクリック（首都高はあとで選べる）');}updateEditorPanel();};
 document.querySelectorAll('#ecDirRow button[data-d]').forEach(b=>{b.onclick=()=>{const o=cur();if(!o)return;o.dir=b.dataset.d;saveData();rebuild();updateEditorPanel();toast('方向: '+b.dataset.d);};});
 document.getElementById('ecRename').onclick=()=>{const o=cur();if(!o)return;const v=document.getElementById('ecName').value.trim();if(v){o.name=v;saveData();rebuild();toast('名前を保存');}};
 document.getElementById('ecRoads').onclick=()=>{const o=cur();if(!o||(o.kind!=='crossing'&&o.kind!=='facility'&&o.kind!=='ramp'))return;crossDraft={editId:o.id,name:o.name};openRoadPicker(o.roads||[]);};
@@ -558,6 +571,7 @@ function updateEditorPanel(){
     document.getElementById('ecDel').textContent=lbl+'を削除';
     document.getElementById('ecHint').textContent=lbl+'を選ぶと、関連する通りが線で強調表示されます。';
     const dr=document.getElementById('ecDirRow');dr.style.display=(k==='ramp')?'flex':'none';
+    document.getElementById('ecExpwyRow').style.display=(k==='ramp')?'flex':'none';
     if(k==='ramp')document.querySelectorAll('#ecDirRow button[data-d]').forEach(b=>b.classList.toggle('on',(o.dir||'フルランプ')===b.dataset.d));}
   if(o&&!isCross){document.getElementById('eName').value=o.name;
     document.getElementById('eAddPt').classList.toggle('on',addVertexMode);
