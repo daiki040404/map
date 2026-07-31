@@ -108,7 +108,7 @@
   #medOverlay .ovmedia{max-width:94vw;max-height:94vh;object-fit:contain}
   #crossModal,#testModal{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:3200;display:none;align-items:center;justify-content:center}
   #crossModal.on,#testModal.on{display:flex}
-  #tmSearch{width:100%;background:#0f1620;border:1px solid #34506e;color:#fff;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px}
+  #tmSearch,#cmSearch{width:100%;background:#0f1620;border:1px solid #34506e;color:#fff;border-radius:8px;padding:9px 11px;font-size:14px;margin-bottom:8px}
   #tmList{overflow-y:auto;flex:1;margin-bottom:12px}
   .tmgrp{font-size:11px;color:var(--sub);margin:8px 2px 3px}
   #testSel{background:#12151b;border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:6px;font-size:13px;max-width:120px}
@@ -212,7 +212,7 @@
 <input type="file" id="eBackFile" accept=".json,application/json" style="display:none"/>
 <input type="file" id="eMergeFile" accept=".json,application/json" multiple style="display:none"/>
 <div id="medOverlay"></div>
-<div id="crossModal"><div class="cmbox"><h3 id="cmTitle">通る通りを選択</h3><div id="cmList"></div><div class="cmbtn"><button id="cmCancel">キャンセル</button><button id="cmOk">決定</button></div></div></div>
+<div id="crossModal"><div class="cmbox"><h3 id="cmTitle">通る通りを選択</h3><input id="cmSearch" placeholder="🔍 通り名で絞り込み"/><div id="cmList"></div><div class="cmbtn"><button id="cmCancel">キャンセル</button><button id="cmOk">決定</button></div></div></div>
 <div id="testModal"><div class="cmbox"><h3 id="tmTitle">テストに入れる項目を選択</h3><input id="tmSearch" placeholder="🔍 名前で絞り込み"/><div id="tmList"></div><div class="cmbtn"><button id="tmCancel">キャンセル</button><button id="tmOk">決定</button></div></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -510,11 +510,12 @@ let crossDraft=null;
 function openRoadPicker(preselect){const list=document.getElementById('cmList');list.innerHTML='';
   const roads=DATA.filter(o=>o.kind==='street'||o.kind==='route');
   if(!roads.length){list.innerHTML='<p class="hint">先に通りかルートを1本以上作ってください。</p>';}
-  roads.forEach(o=>{const row=document.createElement('label');row.className='cmrow';
+  roads.forEach(o=>{const row=document.createElement('label');row.className='cmrow';row.dataset.name=o.name;
     const cb=document.createElement('input');cb.type='checkbox';cb.value=o.id;if(preselect&&preselect.indexOf(o.id)>=0)cb.checked=true;
     const ic=document.createElement('i');ic.style.background=o.color||'#888';
     const sp=document.createElement('span');sp.textContent=o.name+(o.kind==='route'?'（ルート）':'');
     row.appendChild(cb);row.appendChild(ic);row.appendChild(sp);list.appendChild(row);});
+  const sb=document.getElementById('cmSearch');sb.value='';sb.oninput=()=>{const q=sb.value.trim().toLowerCase();Array.prototype.slice.call(list.children).forEach(el=>{if(el.tagName==='LABEL')el.style.display=(!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none';});};
   document.getElementById('crossModal').classList.add('on');}
 document.getElementById('cmCancel').onclick=()=>{document.getElementById('crossModal').classList.remove('on');crossDraft=null;};
 document.getElementById('cmOk').onclick=()=>{const ids=Array.prototype.slice.call(document.querySelectorAll('#cmList input:checked')).map(c=>c.value);
