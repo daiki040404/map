@@ -239,7 +239,7 @@ try{const s=localStorage.getItem(LS_TAG);if(s){const o=JSON.parse(s);store.learn
 let activeTestId='';
 function curTest(){return store.tests.find(t=>t.id===activeTestId);}
 let _scope=null;
-function scopeSet(){const t=curTest();if(!activeTestId||!t||!t.items.length)return null;const s=new Set();t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(it)s.add(it.streetId);});return s;}
+function scopeSet(){const t=curTest();if(!activeTestId||!t||!t.items.length)return null;const s=new Set();t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;s.add(it.streetId);if(it.expwy)s.add(it.expwy);if(it.roads)it.roads.forEach(r=>s.add(r));});return s;}
 const DAYS=['月','火','水','木','金','土','日','祝'];DAYS.forEach(d=>{if(!store.days[d])store.days[d]={};});
 function saveTag(){try{localStorage.setItem(LS_TAG,JSON.stringify(store));}catch(e){}syncPush();}
 // ===== media (画像・動画) in IndexedDB =====
@@ -682,8 +682,9 @@ function panPoint(it){try{map.panTo([it.lat,it.lon]);}catch(e){}}
 // ===== 学習モードの段階タップ（1:ハイライト 2:名前/メモ 詳細ボタン:詳細） =====
 function highlightFocus(){
   const it=ITEMS.find(x=>x.id===focusId);let hi=new Set();
-  if(it){ if(it.type==='street'||it.type==='route')hi.add(it.streetId); else if(it.roads&&it.roads.length)it.roads.forEach(r=>hi.add(r)); else hi.add(it.streetId); }
-  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2||!map.hasLayer(L2))return; L2.setStyle(hi.has(o.id)?{opacity:1,weight:6}:{opacity:.2,weight:3});});
+  if(it){ if(it.type==='street'||it.type==='route')hi.add(it.streetId);
+    else { if(it.expwy)hi.add(it.expwy); if(it.roads&&it.roads.length)it.roads.forEach(r=>hi.add(r)); if(!hi.size)hi.add(it.streetId); } }
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2||!map.hasLayer(L2))return; L2.setStyle(hi.has(o.id)?{opacity:1,weight:6}:{opacity:.4,weight:3});});
 }
 let _learnPopup=null;
 function openLearnPopup(it,detail){_learnPopup=L.popup({maxWidth:270}).setLatLng([it.lat,it.lon]).setContent(popupHtml(it,it._num||0,detail)).openOn(map);if(detail)setTimeout(()=>refreshPopupMedia(it.id),0);}
@@ -699,12 +700,15 @@ function renderNameTest(){
   const qs=ITEMS.filter(itemVisible);
   if(nameIdx>=qs.length)nameIdx=-1;
   const cur=(nameIdx>=0)?qs[nameIdx]:null;
+  const ctx=new Set();
+  qs.forEach(q=>{ if(q.type==='street'||q.type==='route')ctx.add(q.streetId); else { if(q.expwy)ctx.add(q.expwy); if(q.roads)q.roads.forEach(r=>ctx.add(r)); } });
   let hi=new Set();
-  if(cur){ if(cur.type==='street'||cur.type==='route')hi.add(cur.streetId); else if(cur.roads)cur.roads.forEach(r=>hi.add(r)); }
+  if(cur){ if(cur.type==='street'||cur.type==='route')hi.add(cur.streetId); else { if(cur.expwy)hi.add(cur.expwy); if(cur.roads)cur.roads.forEach(r=>hi.add(r)); } }
   DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);
     if(_scope&&!_scope.has(o.id))return;
     if(hi.has(o.id))L2.setStyle({opacity:1,weight:6}).addTo(map);
-    else L2.setStyle({opacity:hi.size?.1:.35,weight:3}).addTo(map);});
+    else if(ctx.has(o.id))L2.setStyle({opacity:.55,weight:4}).addTo(map);
+    else L2.setStyle({opacity:.12,weight:3}).addTo(map);});
   qs.forEach((it,i)=>{const num=i+1;it._num=num;const isCur=(i===nameIdx);
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:isCur?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
     if(revealAll||(nameReveal&&isCur))m.bindTooltip(it.name,{permanent:true,direction:'top',className:'nameicon'});
