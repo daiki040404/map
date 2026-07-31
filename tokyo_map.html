@@ -22,12 +22,12 @@
   #drawBar .db2{display:flex;gap:8px}
   #drawBar button{padding:9px 13px;border-radius:8px;border:1px solid #3a4353;background:#1a2230;color:#dbeafe;font-size:13px;cursor:pointer}
   #dbCheck{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
-  #testBar{position:absolute;left:0;right:0;bottom:0;z-index:1100;background:rgba(17,19,25,.95);color:#fff;padding:10px 12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #333}
-  #testBar.on{display:flex}
-  #testBar #tbQ{font-weight:700;font-size:16px;flex:1;min-width:120px}
-  #testBar .tb2{display:flex;gap:8px}
-  #testBar button{padding:10px 15px;border-radius:8px;border:1px solid #3a4353;background:#1a2230;color:#dbeafe;font-size:14px;cursor:pointer}
-  #tbAnswer{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
+  #testBar,#pickBar{position:absolute;left:0;right:0;bottom:0;z-index:1100;background:rgba(17,19,25,.95);color:#fff;padding:10px 12px;display:none;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid #333}
+  #testBar.on,#pickBar.on{display:flex}
+  #testBar #tbQ,#pickBar #pbQ{font-weight:700;font-size:16px;flex:1;min-width:120px}
+  #testBar .tb2,#pickBar .tb2{display:flex;gap:8px}
+  #testBar button,#pickBar button{padding:10px 15px;border-radius:8px;border:1px solid #3a4353;background:#1a2230;color:#dbeafe;font-size:14px;cursor:pointer}
+  #tbAnswer,#pbAdd{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
   .curq .mk{box-shadow:0 0 0 4px #facc15,0 1px 4px rgba(0,0,0,.55)}
   header{padding:11px 14px;border-bottom:1px solid var(--line);position:relative}
   header h1{font-size:15px;margin:0 0 3px}
@@ -167,10 +167,11 @@
     <div class="row" id="rowAuth"><span class="lbl">同期</span><span id="authStatus" style="font-size:12px;color:var(--sub);flex:1">ローカル保存のみ</span><button id="authBtn" class="dbtn">ログイン</button></div>
     <div id="editor">
       <h3>編集モード</h3>
-      <div class="eb"><button id="eNew">＋ 通りを作る</button><button id="eNewRoute">＋ ルートを作る</button></div>
-      <div class="eb"><button id="eAddCross">➕ 交差点を追加</button><button id="eAddFacility">🏢 施設を追加</button></div>
+      <div class="eb"><button id="eNew">＋ 通りを作る</button><button id="eNewRoute">＋ ルートを作る</button><button id="eNewExp">＋ 高速を作る</button></div>
+      <div class="eb"><button id="eAddCross">➕ 交差点を追加</button><button id="eAddFacility">🏢 施設を追加</button><button id="eAddRamp">🟢 出入口を追加</button></div>
       <div id="eCross" style="display:none">
         <div class="eb"><input id="ecName" placeholder="名前"/><button id="ecRename">名前</button></div>
+        <div class="eb" id="ecDirRow" style="display:none"><button data-d="内回り">内回り</button><button data-d="外回り">外回り</button><button data-d="フルランプ">フルランプ</button></div>
         <div class="eb"><button id="ecRoads">通りを選ぶ</button><button id="ecDel" class="warn">削除</button></div>
         <p class="hint" id="ecHint">選ぶと、関連する通りが線で強調表示されます。</p>
       </div>
@@ -192,7 +193,7 @@
       <input type="file" id="eFile" accept=".json,application/json" style="display:none"/>
     </div>
 
-    <div class="row" id="rowTest"><span class="lbl">テスト</span><select id="testSel"></select><button id="tPick" class="dbtn">項目を選ぶ</button><button id="tNew" class="dbtn">＋新規</button><button id="tRename" class="dbtn">名前</button><button id="tDel" class="dbtn">削除</button></div>
+    <div class="row" id="rowTest"><span class="lbl">テスト</span><select id="testSel"></select><button id="tPick" class="dbtn">項目を選ぶ</button><button id="tPickMap" class="dbtn">🗺 地図で追加</button><button id="tNew" class="dbtn">＋新規</button><button id="tRename" class="dbtn">名前</button><button id="tDel" class="dbtn">削除</button></div>
     <div class="row" id="rowTestType" style="display:none"><span class="lbl">出題</span><div class="seg"><button id="ttName" class="on">名前あて</button><button id="ttDraw">線を引く</button></div></div>
     <div class="row" id="rowTestKind" style="display:none"><span class="lbl">出題種類</span><div class="chips" id="tkinds"></div></div>
     <div class="row" id="rowView"><span class="lbl">表示</span><div class="seg"><button data-v="all" class="on">すべて</button><button data-v="unlearned">未習</button><button data-v="learned">覚えた</button><button data-v="today">今日</button></div></div>
@@ -200,14 +201,14 @@
     <div class="row" id="rowDay"><span class="lbl">需要曜日</span><div class="chips" id="dDays"></div></div>
     <div class="row" id="rowDay2"><span class="lbl">時刻</span><select id="dHour"></select><button id="dShow" class="dbtn">表示</button><button id="dNow" class="dbtn now">今</button><button id="dClear" class="dbtn">解除</button></div>
     <div class="row" id="rowLoc"><span class="lbl">現在地</span><button id="qLocate" class="dbtn">📍 現在地を表示</button></div>
-    <div class="row" id="rowKind"><span class="lbl">種類</span><div class="chips"><button data-k="street">通り</button><button data-k="route">ルート</button><button data-k="crossing">交差点</button><button data-k="facility">施設</button><button data-k="expressway">首都高</button><button data-k="ward">区域</button><button id="reset">全体表示</button></div></div>
+    <div class="row" id="rowKind"><span class="lbl">種類</span><div class="chips"><button data-k="street">通り</button><button data-k="route">ルート</button><button data-k="crossing">交差点</button><button data-k="facility">施設</button><button data-k="expressway">首都高</button><button data-k="ramp">出入口</button><button data-k="ward">区域</button><button id="reset">全体表示</button></div></div>
     <div class="counts"><span>全 <b id="cAll">0</b></span><span>覚えた <b id="cDone">0</b></span><span>今日 <b id="cTod">0</b></span></div>
     <div class="row" id="rowSearch"><input id="searchBox" placeholder="🔍 名前で検索（通り・交差点・施設…）"/></div>
     <div class="legend"><span><i class="lg tag"></i>通り名</span><span><i class="lg route"></i>ルート</span><span><i class="lg diamond"></i>交差点</span><span><i class="lg hex"></i>高速出入口</span><span><i class="lg circle"></i>建物</span><span><i class="lg warn"></i>注意</span><span><i class="lg sq"></i>回避</span></div>
     <div class="list" id="list"></div>
     </div>
   </div>
-  <div id="map"><button id="baseToggle">地図: 通常</button><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="toast"></div></div>
+  <div id="map"><button id="baseToggle">地図: 通常</button><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図で通りをタップ</span><div class="tb2"><button id="pbAdd">追加</button><button id="pbClear">選び直す</button><button id="pbDone">完了</button></div></div><div id="toast"></div></div>
 </div>
 <input type="file" id="medFile" accept="image/*,video/*" multiple style="display:none"/>
 <input type="file" id="eBackFile" accept=".json,application/json" style="display:none"/>
@@ -275,11 +276,11 @@ let selDays=new Set(), selHour=8, showAllNames=false;
 let focusId=null, learnStage=0;
 let testKinds=new Set(['street','route','cross','ramp','building','caution','avoid']);
 
-let mode='learn', view='all', selectedId=null, addVertexMode=false, addBuildingMode=false, addCautionMode=false, addAvoidMode=false, avoidTargetPid=null, addCrossingMode=false, addFacilityMode=false, _selEntry=null;
+let mode='learn', view='all', selectedId=null, addVertexMode=false, addBuildingMode=false, addCautionMode=false, addAvoidMode=false, avoidTargetPid=null, addCrossingMode=false, addFacilityMode=false, addRampMode=false, _selEntry=null;
 let _pidc=0; function newPid(){_pidc++;return 'p'+Date.now().toString(36)+_pidc.toString(36);}
 let _uidc=0; function uid(p){_uidc++;return p+Date.now().toString(36)+_uidc.toString(36);}
-const visibleKinds=new Set(['street','route','crossing','facility','expressway','ward']);
-const kindLabel={street:'通り・路線',route:'ルート',crossing:'交差点',facility:'施設',expressway:'首都高',ward:'区域ランドマーク'};
+const visibleKinds=new Set(['street','route','crossing','facility','expressway','ramp','ward']);
+const kindLabel={street:'通り・路線',route:'ルート',crossing:'交差点',facility:'施設',expressway:'首都高',ramp:'高速出入口',ward:'区域ランドマーク'};
 const PALETTE=['#C2410C','#2563eb','#16a34a','#9333ea','#db2777','#ca8a04','#0891b2','#dc2626','#65a30d','#e11d48'];
 const TYPE={street:{shape:'tag',label:'通り名'},route:{shape:'tag',label:'ルート'},cross:{shape:'diamond',color:'#f59e0b',label:'交差点'},ramp:{shape:'hex',color:'#10b981',label:'高速出入口'},building:{shape:'circle',color:'#4f8cff',label:'建物・ランドマーク'},caution:{shape:'warn',color:'#f97316',label:'注意ポイント'},avoid:{shape:'sq',color:'#0ea5e9',label:'回避ポイント'}};
 
@@ -307,7 +308,7 @@ function toast(m,ms){const t=document.getElementById('toast');t.textContent=m;t.
 
 function buildLineLayers(){
   Object.values(lineLayers).forEach(l=>map.removeLayer(l));lineLayers={};
-  DATA.forEach(o=>{ if(o.path&&o.path.length>=2){ const opt={color:o.color||'#888',weight:4,opacity:.85}; if(o.kind==='route'){opt.dashArray='7,7';opt.weight=5;} lineLayers[o.id]=L.polyline(o.path.map(p=>[p[1],p[0]]),opt); }});
+  DATA.forEach(o=>{ if(o.path&&o.path.length>=2){ const opt={color:o.color||'#888',weight:4,opacity:.85}; if(o.kind==='route'){opt.dashArray='7,7';opt.weight=5;} if(o.kind==='expressway'){opt.dashArray='2,6';opt.weight=5;} lineLayers[o.id]=L.polyline(o.path.map(p=>[p[1],p[0]]),opt); }});
 }
 let ITEMS=[];
 function buildItems(){
@@ -315,6 +316,7 @@ function buildItems(){
   DATA.forEach(o=>{
     if(o.kind==='crossing'){ if(o.lon!=null&&o.lat!=null) ITEMS.push({id:'C:'+o.id,type:'cross',name:o.name,info:'交差点'+((o.roads&&o.roads.length)?'（通り'+o.roads.length+'本）':''),lat:o.lat,lon:o.lon,color:'#f59e0b',streetId:o.id,streetKind:'crossing',roads:o.roads||[],pid:o.id}); return; }
     if(o.kind==='facility'){ if(o.lon!=null&&o.lat!=null) ITEMS.push({id:'F:'+o.id,type:'building',name:o.name,info:'施設'+((o.roads&&o.roads.length)?'（面する通り'+o.roads.length+'）':''),lat:o.lat,lon:o.lon,color:'#4f8cff',streetId:o.id,streetKind:'facility',roads:o.roads||[],pid:o.id}); return; }
+    if(o.kind==='ramp'){ if(o.lon!=null&&o.lat!=null) ITEMS.push({id:'R:'+o.id,type:'ramp',name:o.name,info:(o.dir||'フルランプ')+((o.roads&&o.roads.length)?'／つながる通り'+o.roads.length:''),lat:o.lat,lon:o.lon,color:'#10b981',streetId:o.id,streetKind:'ramp',roads:o.roads||[],pid:o.id,dir:o.dir||'フルランプ',expwy:o.expwy}); return; }
     if(o.path&&o.path.length){const mid=o.path[Math.floor(o.path.length/2)];
       const lt=(o.kind==='route')?'route':'street';const linfo=(o.kind==='route')?'ルート':((o.kind==='expressway'?'首都高':'通り・路線')+' の名前');
       ITEMS.push({id:'L:'+o.id,type:lt,name:o.name,info:linfo,lat:mid[1],lon:mid[0],color:o.color,streetId:o.id,streetKind:o.kind});}
@@ -335,12 +337,12 @@ function itemVisible(it){
   if(mode==='test'&&activeTestId){const t=curTest();return !!(t&&t.items.indexOf(it.id)>=0);}
   if(!visibleKinds.has(it.streetKind))return false;
   if(selectedId){
-    if(_selEntry&&(_selEntry.kind==='crossing'||_selEntry.kind==='facility')){
+    if(_selEntry&&(_selEntry.kind==='crossing'||_selEntry.kind==='facility'||_selEntry.kind==='ramp')){
       const roads=_selEntry.roads||[];
       const isRoadName=(it.type==='street'||it.type==='route')&&roads.indexOf(it.streetId)>=0;
       if(it.streetId!==selectedId&&!isRoadName)return false;
     } else {
-      // 通り選択中：その通りの項目＋その通りに紐づく交差点・施設も表示
+      // 通り選択中：その通りの項目＋その通りに紐づく交差点・施設・出入口も表示
       const linked=(it.roads&&it.roads.indexOf(selectedId)>=0);
       if(it.streetId!==selectedId&&!linked)return false;
     }
@@ -378,13 +380,14 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 // ===== render =====
 function render(){
   _scope=scopeSet();
+  if(mode==='test'&&pickMode){renderPickMode();return;}
   if(mode==='test'&&testType==='draw'){renderDrawTest();return;}
   if(mode==='test'&&testType==='name'){renderNameTest();return;}
   clearDrawLayers();
   const anySel=selectedId!=null, editing=mode==='edit';
   _selEntry=anySel?DATA.find(o=>o.id===selectedId):null;
-  const activeRoads=_selEntry?((_selEntry.kind==='crossing'||_selEntry.kind==='facility')?new Set(_selEntry.roads||[]):new Set([selectedId])):null;
-  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;
+  const activeRoads=_selEntry?((_selEntry.kind==='crossing'||_selEntry.kind==='facility'||_selEntry.kind==='ramp')?new Set(_selEntry.roads||[]):new Set([selectedId])):null;
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;L2.off('click');
     if(_scope&&!_scope.has(o.id)){map.removeLayer(L2);return;}
     let show=false,opacity=.85,weight=4;
     if(editing){ show=true; if(!anySel){opacity=.85;weight=4;} else if(o.id===selectedId){opacity=1;weight=6;} else {opacity=.4;weight=3;} }
@@ -452,7 +455,7 @@ function buildList(vis){
   }
   const groupsView=(mode==='edit')||(view==='all'&&!selectedId);
   if(groupsView){
-    ['street','route','crossing','facility','expressway','ward'].forEach(k=>{
+    ['street','route','crossing','facility','expressway','ramp','ward'].forEach(k=>{
       let entries=DATA.filter(o=>o.kind===k); if(_scope)entries=entries.filter(o=>_scope.has(o.id)); if(!entries.length)return;
       if(mode!=='edit'&&!visibleKinds.has(k))return;
       const g=document.createElement('div');g.className='grp';g.textContent=kindLabel[k]+' ('+entries.length+')';listEl.appendChild(g);
@@ -475,11 +478,11 @@ function buildList(vis){
 }
 function panToEntry(id){const o=DATA.find(x=>x.id===id);if(!o)return;
   if(lineLayers[id]){try{map.fitBounds(lineLayers[id].getBounds(),{padding:[40,40]});}catch(e){}}
-  else if((o.kind==='crossing'||o.kind==='facility')&&o.roads&&o.roads.length){const bs=[];o.roads.forEach(rid=>{if(lineLayers[rid])bs.push(lineLayers[rid].getBounds());});if(bs.length){let b=bs[0];bs.slice(1).forEach(x=>b=b.extend(x));try{map.fitBounds(b,{padding:[50,50]});}catch(e){}}else if(o.lon!=null)map.setView([o.lat,o.lon],16);}
+  else if((o.kind==='crossing'||o.kind==='facility'||o.kind==='ramp')&&o.roads&&o.roads.length){const bs=[];o.roads.forEach(rid=>{if(lineLayers[rid])bs.push(lineLayers[rid].getBounds());});if(bs.length){let b=bs[0];bs.slice(1).forEach(x=>b=b.extend(x));try{map.fitBounds(b,{padding:[50,50]});}catch(e){}}else if(o.lon!=null)map.setView([o.lat,o.lon],16);}
   else if(o.lon!=null){map.setView([o.lat,o.lon],16);}
 }
 function selectStreet(id){
-  if(addVertexMode||addBuildingMode||addCautionMode||addAvoidMode){addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;}
+  if(addVertexMode||addBuildingMode||addCautionMode||addAvoidMode||addRampMode){addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addRampMode=false;}
   selectedId=(selectedId===id?null:id);render();
   if(selectedId)panToEntry(selectedId);
 }
@@ -505,6 +508,7 @@ map.on('click',e=>{
   if(mode!=='edit')return;
   if(addCrossingMode){const n=prompt('交差点の名前（例：呉服橋交差点）');if(n){crossDraft={lon:e.latlng.lng,lat:e.latlng.lat,name:n,editId:null};openRoadPicker([]);}return;}
   if(addFacilityMode){const n=prompt('施設名');if(n){const id=uid('f');DATA.push({id,name:n,kind:'facility',color:'#4f8cff',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🏢「'+n+'」を追加。面する通りは「通りを選ぶ」で設定できます');}return;}
+  if(addRampMode){const n=prompt('高速出入口の名前（例：霞が関入口）');if(n){const id=uid('r');DATA.push({id,name:n,kind:'ramp',color:'#10b981',dir:'フルランプ',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🟢「'+n+'」を追加。方向と「つながる通りを選ぶ」を設定してね');}return;}
   if(!selectedId)return;const o=cur();if(!o)return;
   if(addVertexMode){o.path.push([e.latlng.lng,e.latlng.lat]);saveData();buildLineLayers();buildItems();render();toast('点を追加（'+o.path.length+'）');}
   else if(addBuildingMode){const n=prompt('施設名');if(n){o.places.push({id:newPid(),name:n,lon:e.latlng.lng,lat:e.latlng.lat});saveData();rebuild();toast('「'+n+'」を追加。タップで通り表示・メモ・写真');}}
@@ -531,21 +535,30 @@ document.getElementById('cmOk').onclick=()=>{const ids=Array.prototype.slice.cal
     saveData();rebuild();toast('交差点を保存（通り'+ids.length+'本）');}
   document.getElementById('crossModal').classList.remove('on');crossDraft=null;};
 document.getElementById('eAddCross').onclick=()=>{addCrossingMode=!addCrossingMode;if(addCrossingMode){addVertexMode=false;addBuildingMode=false;addFacilityMode=false;toast('地図で交差点の位置をクリック→通る通りを選択');}updateEditorPanel();};
-document.getElementById('eAddFacility').onclick=()=>{addFacilityMode=!addFacilityMode;if(addFacilityMode){addVertexMode=false;addBuildingMode=false;addCrossingMode=false;toast('地図で施設の位置をクリック→施設名を入力');}updateEditorPanel();};
+document.getElementById('eAddFacility').onclick=()=>{addFacilityMode=!addFacilityMode;if(addFacilityMode){addVertexMode=false;addBuildingMode=false;addCrossingMode=false;addRampMode=false;toast('地図で施設の位置をクリック→施設名を入力');}updateEditorPanel();};
+document.getElementById('eAddRamp').onclick=()=>{addRampMode=!addRampMode;if(addRampMode){addVertexMode=false;addBuildingMode=false;addCrossingMode=false;addFacilityMode=false;toast('地図で出入口の位置をクリック→名前を入力');}updateEditorPanel();};
+document.querySelectorAll('#ecDirRow button[data-d]').forEach(b=>{b.onclick=()=>{const o=cur();if(!o)return;o.dir=b.dataset.d;saveData();rebuild();updateEditorPanel();toast('方向: '+b.dataset.d);};});
 document.getElementById('ecRename').onclick=()=>{const o=cur();if(!o)return;const v=document.getElementById('ecName').value.trim();if(v){o.name=v;saveData();rebuild();toast('名前を保存');}};
-document.getElementById('ecRoads').onclick=()=>{const o=cur();if(!o||(o.kind!=='crossing'&&o.kind!=='facility'))return;crossDraft={editId:o.id,name:o.name};openRoadPicker(o.roads||[]);};
+document.getElementById('ecRoads').onclick=()=>{const o=cur();if(!o||(o.kind!=='crossing'&&o.kind!=='facility'&&o.kind!=='ramp'))return;crossDraft={editId:o.id,name:o.name};openRoadPicker(o.roads||[]);};
 document.getElementById('ecDel').onclick=()=>{const o=cur();if(o&&confirm('「'+o.name+'」を削除する？')){DATA=DATA.filter(x=>x.id!==o.id);selectedId=null;saveData();rebuild();}};
 
 // ===== editor panel =====
 function updateEditorPanel(){
   document.getElementById('editor').classList.toggle('on',mode==='edit');
   const o=(mode==='edit')?cur():null;
-  const isCross=o&&(o.kind==='crossing'||o.kind==='facility');
+  const isCross=o&&(o.kind==='crossing'||o.kind==='facility'||o.kind==='ramp');
   document.getElementById('eSel').style.display=(o&&!isCross)?'block':'none';
   document.getElementById('eCross').style.display=isCross?'block':'none';
   document.getElementById('eAddCross').classList.toggle('on',addCrossingMode);
   document.getElementById('eAddFacility').classList.toggle('on',addFacilityMode);
-  if(isCross){const fac=o.kind==='facility';document.getElementById('ecName').placeholder=fac?'施設名':'交差点名';document.getElementById('ecRoads').textContent=fac?'面する通りを選ぶ':'通る通りを選ぶ';document.getElementById('ecDel').textContent=fac?'施設を削除':'交差点を削除';document.getElementById('ecHint').textContent=(fac?'施設':'交差点')+'を選ぶと、関連する通りが線で強調表示されます。';}
+  document.getElementById('eAddRamp').classList.toggle('on',addRampMode);
+  if(isCross){const k=o.kind;const lbl=k==='facility'?'施設':(k==='ramp'?'出入口':'交差点');
+    document.getElementById('ecName').placeholder=lbl+'名';
+    document.getElementById('ecRoads').textContent=(k==='crossing'?'通る通りを選ぶ':'つながる通りを選ぶ');
+    document.getElementById('ecDel').textContent=lbl+'を削除';
+    document.getElementById('ecHint').textContent=lbl+'を選ぶと、関連する通りが線で強調表示されます。';
+    const dr=document.getElementById('ecDirRow');dr.style.display=(k==='ramp')?'flex':'none';
+    if(k==='ramp')document.querySelectorAll('#ecDirRow button[data-d]').forEach(b=>b.classList.toggle('on',(o.dir||'フルランプ')===b.dataset.d));}
   if(o&&!isCross){document.getElementById('eName').value=o.name;
     document.getElementById('eAddPt').classList.toggle('on',addVertexMode);
     document.getElementById('eAddBld').classList.toggle('on',addBuildingMode);
@@ -554,9 +567,10 @@ function updateEditorPanel(){
   }
   if(isCross){document.getElementById('ecName').value=o.name;}
 }
-function createLine(kind){const label=kind==='route'?'ルート':'通り';const n=prompt('新しい'+label+'の名前（例：'+(kind==='route'?'自宅→東京駅':'外堀通り')+'）');if(!n)return;const id=uid('u');DATA.push({id,name:n,color:PALETTE[DATA.length%PALETTE.length],kind,path:[],places:[]});selectedId=id;addVertexMode=true;addBuildingMode=false;activeTestId='';refreshTestSel();saveData();rebuild();toast('「'+n+'」を作成。地図をクリックして線を引こう');}
+function createLine(kind){const label=kind==='route'?'ルート':(kind==='expressway'?'高速':'通り');const n=prompt('新しい'+label+'の名前（例：'+(kind==='route'?'自宅→東京駅':(kind==='expressway'?'首都高速都心環状線':'外堀通り'))+'）');if(!n)return;const id=uid('u');DATA.push({id,name:n,color:PALETTE[DATA.length%PALETTE.length],kind,path:[],places:[]});selectedId=id;addVertexMode=true;addBuildingMode=false;activeTestId='';refreshTestSel();saveData();rebuild();toast('「'+n+'」を作成。地図をクリックして線を引こう');}
 document.getElementById('eNew').onclick=()=>createLine('street');
 document.getElementById('eNewRoute').onclick=()=>createLine('route');
+document.getElementById('eNewExp').onclick=()=>createLine('expressway');
 document.getElementById('eRename').onclick=()=>{const o=cur();if(!o)return;const v=document.getElementById('eName').value.trim();if(v){o.name=v;saveData();rebuild();toast('名前を保存');}};
 document.getElementById('eAddPt').onclick=()=>{addVertexMode=!addVertexMode;if(addVertexMode){addBuildingMode=false;addCautionMode=false;}updateEditorPanel();};
 document.getElementById('eAddBld').onclick=()=>{addBuildingMode=!addBuildingMode;if(addBuildingMode){addVertexMode=false;addCautionMode=false;}updateEditorPanel();};
@@ -601,8 +615,8 @@ document.getElementById('eClear').onclick=()=>{if(confirm('登録した通り・
 // ===== mode / view controls =====
 const bL=document.getElementById('mLearn'),bT=document.getElementById('mTest'),bE=document.getElementById('mEdit');
 function setMode(m){mode=m;bL.classList.toggle('on',m==='learn');bT.classList.toggle('on',m==='test');bE.classList.toggle('on',m==='edit');
-  addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addCrossingMode=false;addFacilityMode=false;
-  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;map.closePopup();
+  addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addCrossingMode=false;addFacilityMode=false;addRampMode=false;
+  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;map.closePopup();
   ['rowView','rowDay','rowDay2','rowLoc','rowKind'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=(m==='edit')?'none':'flex';});
   document.getElementById('rowNames').style.display=(m==='learn')?'flex':'none';
   document.getElementById('rowTest').style.display='flex';
@@ -646,10 +660,10 @@ document.querySelectorAll('.chips button[data-k]').forEach(b=>{b.onclick=()=>{co
 document.getElementById('reset').onclick=()=>{selectedId=null;view='all';document.querySelectorAll('.seg button[data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v==='all'));render();map.setView([35.6852,139.7528],13);};
 
 // ===== 線引きテスト =====
-let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=-1, nameReveal=false, revealAll=false;
+let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=-1, nameReveal=false, revealAll=false, pickMode=false, pickSel=null;
 const dotGroup=L.layerGroup(); let userLine=null, answerLine=null;
 function drawTargets(){let its=ITEMS.filter(x=>(x.type==='street'||x.type==='route'));if(activeTestId){const t=curTest();its=its.filter(x=>t&&t.items.indexOf(x.id)>=0);}return its;}
-function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');}
+function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');const pb=document.getElementById('pickBar');if(pb&&!pickMode)pb.classList.remove('on');}
 function panPoint(it){try{map.panTo([it.lat,it.lon]);}catch(e){}}
 // ===== 学習モードの段階タップ（1:ハイライト 2:名前/メモ 詳細ボタン:詳細） =====
 function highlightFocus(){
@@ -697,6 +711,25 @@ document.getElementById('tbAnswer').onclick=()=>{nameReveal=true;const qs=ITEMS.
 document.getElementById('tbNext').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx<0)?0:(nameIdx+1)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
 document.getElementById('tbPrev').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx<0)?0:(nameIdx-1+qs.length)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
 document.getElementById('tbAll').onclick=()=>{revealAll=!revealAll;renderNameTest();toast(revealAll?'全部の答えを表示（紙と照合）':'答えを隠しました');};
+// ===== 地図で選んでテストに追加 =====
+function renderPickMode(){
+  clearDrawLayers();document.getElementById('pickBar').classList.add('on');
+  markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();dotGroup.clearLayers();
+  const t=curTest();
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);
+    if(!(o.kind==='street'||o.kind==='route'||o.kind==='expressway'))return;
+    const inTest=t&&t.items.indexOf('L:'+o.id)>=0;
+    let col=o.color||'#888',w=3,op=.5;
+    if(pickSel===o.id){col='#eab308';w=8;op=1;}else if(inTest){col='#16a34a';w=5;op=.95;}
+    L2.setStyle({color:col,weight:w,opacity:op});L2.off('click');L2.on('click',()=>{pickSel=(pickSel===o.id?null:o.id);renderPickMode();});L2.addTo(map);});
+  const bar=document.getElementById('pbQ');
+  if(!t){bar.textContent='テストを選んでね';}
+  else if(pickSel){const o=DATA.find(x=>x.id===pickSel);const inT=t.items.indexOf('L:'+pickSel)>=0;bar.textContent=(inT?'✓ 追加済み：':'合ってる？→追加：')+'『'+o.name+'』';}
+  else bar.textContent='「'+t.name+'」に追加：地図で通りをタップ（緑=追加済み）';}
+document.getElementById('tPickMap').onclick=()=>{const t=curTest();if(!t){toast('先に「＋新規」でテストを作って選んでね');return;}pickMode=true;pickSel=null;render();};
+document.getElementById('pbAdd').onclick=()=>{const t=curTest();if(!t||!pickSel)return;const id='L:'+pickSel;if(t.items.indexOf(id)<0){t.items.push(id);saveTag();refreshTestSel();toast('『'+(DATA.find(x=>x.id===pickSel)||{}).name+'』を追加');}else toast('もう追加済みです');pickSel=null;renderPickMode();};
+document.getElementById('pbClear').onclick=()=>{pickSel=null;renderPickMode();};
+document.getElementById('pbDone').onclick=()=>{pickMode=false;pickSel=null;render();};
 function tapDot(sid,i,p){if(drawResult)return;const key=sid+':'+i;const pos=drawSeq.map(d=>d.key).indexOf(key);if(pos>=0){drawSeq.splice(pos,1);}else{drawSeq.push({key,streetId:sid,idx:i,lat:p[1],lon:p[0]});}renderDrawTest();}
 function eqSeq(a,b){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true;}
 function checkDraw(){const targets=drawTargets();if(!targets.length)return;const target=targets[drawIdx%targets.length];const o=DATA.find(x=>x.id===target.streetId);if(!o)return;const correct=o.path.map((_,i)=>o.id+':'+i);const user=drawSeq.map(d=>d.key);drawResult=(eqSeq(user,correct)||eqSeq(user,correct.slice().reverse()))?'ok':'ng';renderDrawTest();toast(drawResult==='ok'?'正解！':'不正解。緑の点線が正しい線です');}
