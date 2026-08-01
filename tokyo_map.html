@@ -276,7 +276,7 @@ function jpDay(dt){return ['日','月','火','水','木','金','土'][dt.getDay(
 function timeCovers(id,h){const t=store.time[id];if(!t)return true;const f=t.f,e=t.t;if(f===e)return true;return (f<e)?(h>=f&&h<e):(h>=f||h<e);}
 function hasDemand(id,day,h){if(!store.days[day]||!store.days[day][id])return false;return timeCovers(id,h);}
 let selDays=new Set(), selHour=8, showAllNames=false;
-let focusId=null, learnStage=0;
+let focusId=null, learnStage=0, learnRevealed=new Set();
 let testKinds=new Set(['street','route','cross','ramp','building','caution','avoid']);
 
 let mode='learn', view='all', selectedId=null, addVertexMode=false, addBuildingMode=false, addCautionMode=false, addAvoidMode=false, avoidTargetPid=null, addCrossingMode=false, addFacilityMode=false, addRampMode=false, _selEntry=null;
@@ -416,15 +416,19 @@ function render(){
   const allVis=vis.concat(extra);
   // connectors avoid -> caution
   allVis.filter(x=>x.type==='avoid'&&x.avoidFor).forEach(a=>{const c=ITEMS.find(x=>x.type==='caution'&&x.pid===a.avoidFor&&x.streetId===a.streetId);if(c)L.polyline([[a.lat,a.lon],[c.lat,c.lon]],{color:'#0ea5e9',weight:3,dashArray:'3,7',opacity:.9}).addTo(connGroup);});
-  const showLabel=(mode==='learn'&&(showAllNames||anySel||view!=='all'))||editing;
   allVis.forEach((it,i)=>{const num=i+1;it._num=num;
+    if(mode==='learn'){
+      const rev=showAllNames||learnRevealed.has(it.id);
+      const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:(!rev&&focusId===it.id)?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:(focusId===it.id)?1000:0});
+      if(rev)m.bindTooltip(it.name+((it.type==='ramp'&&it.dir)?'（'+it.dir+'）':''),{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});
+      m.on('click',()=>learnClick(it));
+      m.addTo(markerGroup);return;
+    }
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]})});
-    if(showLabel&&(showAllNames||editing||it.type!=='street'))m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});
-    if(mode==='learn'){ m.on('click',()=>learnClick(it)); }
-    else if(editing){ if(it.placeIdx!=null){m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id));} else {m.on('click',()=>selectStreet(it.streetId));} }
+    if(editing)m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});
+    if(editing){ if(it.placeIdx!=null){m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id));} else {m.on('click',()=>selectStreet(it.streetId));} }
     else { m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id)); }
     m.addTo(markerGroup);});
-  if(mode==='learn'&&focusId)highlightFocus();
   // vertex handles
   vertexGroup.clearLayers();
   if(editing&&selectedId){const o=cur(); if(o&&o.path){o.path.forEach((p,i)=>{
@@ -494,6 +498,7 @@ function panToEntry(id){const o=DATA.find(x=>x.id===id);if(!o)return;
 }
 function selectStreet(id){
   if(addVertexMode||addBuildingMode||addCautionMode||addAvoidMode||addRampMode){addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addRampMode=false;}
+  learnRevealed=new Set();focusId=null;
   selectedId=(selectedId===id?null:id);render();
   if(selectedId)panToEntry(selectedId);
 }
@@ -515,7 +520,7 @@ window.delBld=(sid,idx)=>{const o=DATA.find(x=>x.id===sid);if(!o)return;if(confi
 
 // ===== map click for editing =====
 map.on('click',e=>{
-  if(mode==='learn'){if(focusId){focusId=null;learnStage=0;map.closePopup();render();}return;}
+  if(mode==='learn'){if(focusId){focusId=null;map.closePopup();render();}return;}
   if(mode!=='edit')return;
   if(addCrossingMode){const n=prompt('交差点の名前（例：呉服橋交差点）');if(n){crossDraft={lon:e.latlng.lng,lat:e.latlng.lat,name:n,editId:null};openRoadPicker([]);}return;}
   if(addFacilityMode){const n=prompt('施設名');if(n){const id=uid('f');DATA.push({id,name:n,kind:'facility',color:'#4f8cff',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🏢「'+n+'」を追加。面する通りは「通りを選ぶ」で設定できます');}return;}
@@ -640,7 +645,7 @@ document.getElementById('eClear').onclick=()=>{if(confirm('登録した通り・
 const bL=document.getElementById('mLearn'),bT=document.getElementById('mTest'),bE=document.getElementById('mEdit');
 function setMode(m){mode=m;bL.classList.toggle('on',m==='learn');bT.classList.toggle('on',m==='test');bE.classList.toggle('on',m==='edit');
   addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addCrossingMode=false;addFacilityMode=false;addRampMode=false;
-  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;map.closePopup();
+  selectedId=null;focusId=null;learnStage=0;learnRevealed=new Set();nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;map.closePopup();
   ['rowView','rowDay','rowDay2','rowLoc'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=(m==='edit')?'none':'flex';});
   document.getElementById('rowKind').style.display='flex';
   document.getElementById('rowNames').style.display=(m==='learn')?'flex':'none';
@@ -701,8 +706,9 @@ function highlightFocus(){
 let _learnPopup=null;
 function openLearnPopup(it,detail){_learnPopup=L.popup({maxWidth:270}).setLatLng([it.lat,it.lon]).setContent(popupHtml(it,it._num||0,detail)).openOn(map);if(detail)setTimeout(()=>refreshPopupMedia(it.id),0);}
 function learnClick(it){
-  if(focusId!==it.id){ focusId=it.id; learnStage=1; map.closePopup(); highlightFocus(); return; }
-  learnStage=2; openLearnPopup(it,false);
+  if(learnRevealed.has(it.id)){ learnRevealed.delete(it.id); focusId=null; map.closePopup(); render(); return; }
+  if(focusId===it.id){ learnRevealed.add(it.id); render(); openLearnPopup(it,false); return; }
+  focusId=it.id; map.closePopup(); render();
 }
 window.expandPopup=(id)=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;learnStage=3;openLearnPopup(it,true);};
 window.collapsePopup=(id)=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;learnStage=2;openLearnPopup(it,false);};
@@ -871,7 +877,7 @@ document.getElementById('tmCancel').onclick=()=>document.getElementById('testMod
 document.getElementById('tmOk').onclick=()=>{const t=curTest();if(t){t.items=Array.prototype.slice.call(document.querySelectorAll('#tmList input:checked')).map(c=>c.value);saveTag();refreshTestSel();render();toast(t.name+'：'+t.items.length+'問に設定');}document.getElementById('testModal').classList.remove('on');};
 
 document.getElementById('searchBox').oninput=function(){searchQ=this.value;render();};
-document.getElementById('nbNum').onclick=()=>{showAllNames=false;document.getElementById('nbNum').classList.add('on');document.getElementById('nbAll').classList.remove('on');render();};
+document.getElementById('nbNum').onclick=()=>{showAllNames=false;focusId=null;learnRevealed=new Set();document.getElementById('nbNum').classList.add('on');document.getElementById('nbAll').classList.remove('on');render();};
 document.getElementById('nbAll').onclick=()=>{showAllNames=true;document.getElementById('nbAll').classList.add('on');document.getElementById('nbNum').classList.remove('on');render();};
 
 document.getElementById('eGH').onclick=()=>{if(!confirm('GitHub上の「'+GH_FILE+'」を読み込みます。この端末の内容は置き換わります。よろしい？'))return;toast('GitHubから取得中…',6000);fetch(GH_FILE,{cache:'no-store'}).then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{if(Array.isArray(d)){DATA=d;activeTestId='';selectedId=null;saveData();rebuild();toast('読み込みました（'+d.length+'件）');}else toast('形式が違います');}).catch(()=>toast('取得できず（ファイルが無い/ネット未接続/file://の可能性）',3500));};
