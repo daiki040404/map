@@ -159,7 +159,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v16</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v17</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -785,9 +785,9 @@ function childrenOf(p){const t=curTest();const inTest=!!(t&&t.items.length);retu
   if(it.type==='street'||it.type==='route')return false;
   if(!testKinds.has(it.type))return false;
   if(inTest&&t.items.indexOf(it.id)<0)return false;
+  if(it.type==='ramp')return it.expwy===p.id; // 出入口は所属する首都高の子だけ（つながる通りの子にはしない）
   if(it.placeIdx!=null&&it.streetId===p.id)return true;
   if(it.roads&&it.roads.indexOf(p.id)>=0)return true;
-  if(it.type==='ramp'&&it.expwy===p.id)return true;
   return false;});}
 function renderRelatedTest(){
   clearDrawLayers();document.getElementById('relBar').classList.add('on');
