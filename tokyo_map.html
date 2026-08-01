@@ -183,6 +183,7 @@
         <div class="eb"><button id="eAddPt">📍 点を追加</button><button id="eUndoPt">↩ 最後の点を消す</button></div>
         <div class="eb"><button id="eRoute">🛣 打った点を道路に沿わせる</button></div>
         <div class="eb"><button id="eAddBld">🏢 建物を追加</button><button id="eAddCaution">⚠️ 注意点を追加</button></div>
+        <div class="eb" id="eLinkRow" style="display:none"><button id="eLinkRamps">🔗 この首都高に出入口を紐付け</button></div>
         <div class="eb"><button id="eDel" class="warn">この通りを削除</button></div>
         <p class="hint" id="eHint">左のリストで通りを選ぶと編集できます。</p>
       </div>
@@ -533,7 +534,7 @@ map.on('click',e=>{
 });
 window.startAvoid=(sid,pid)=>{selectedId=sid;addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=true;avoidTargetPid=pid;map.closePopup();updateEditorPanel();toast('地図で回避ポイントの位置をクリック（この注意点に関連付きます）');};
 // ===== crossing (交差点) =====
-let crossDraft=null, rampExpwyTarget=null, expwyPickFor=null;
+let crossDraft=null, rampExpwyTarget=null, expwyPickFor=null, linkRampsFor=null;
 function openRoadPicker(preselect){const list=document.getElementById('cmList');list.innerHTML='';
   const roads=DATA.filter(o=>o.kind==='street'||o.kind==='route');
   if(!roads.length){list.innerHTML='<p class="hint">先に通りかルートを1本以上作ってください。</p>';}
@@ -544,7 +545,7 @@ function openRoadPicker(preselect){const list=document.getElementById('cmList');
     row.appendChild(cb);row.appendChild(ic);row.appendChild(sp);list.appendChild(row);});
   const sb=document.getElementById('cmSearch');sb.value='';sb.oninput=()=>{const q=sb.value.trim().toLowerCase();Array.prototype.slice.call(list.children).forEach(el=>{if(el.tagName==='LABEL')el.style.display=(!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none';});};
   document.getElementById('crossModal').classList.add('on');}
-document.getElementById('cmCancel').onclick=()=>{document.getElementById('crossModal').classList.remove('on');crossDraft=null;expwyPickFor=null;document.getElementById('cmTitle').textContent='通る通りを選択';};
+document.getElementById('cmCancel').onclick=()=>{document.getElementById('crossModal').classList.remove('on');crossDraft=null;expwyPickFor=null;linkRampsFor=null;document.getElementById('cmTitle').textContent='通る通りを選択';};
 function openExpwyPicker(rid,current){const list=document.getElementById('cmList');list.innerHTML='';document.getElementById('cmTitle').textContent='所属する首都高を選択';
   const exps=DATA.filter(o=>o.kind==='expressway');
   if(!exps.length)list.innerHTML='<p class="hint">先に「＋高速を作る」で首都高を作ってください。</p>';
@@ -555,7 +556,21 @@ function openExpwyPicker(rid,current){const list=document.getElementById('cmList
   crossDraft=null;expwyPickFor=rid;const sb=document.getElementById('cmSearch');sb.value='';sb.oninput=()=>{const q=sb.value.trim().toLowerCase();Array.prototype.slice.call(list.children).forEach(el=>{if(el.tagName==='LABEL')el.style.display=(!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none';});};
   document.getElementById('crossModal').classList.add('on');}
 document.getElementById('ecExpwy').onclick=()=>{const o=cur();if(!o||o.kind!=='ramp')return;openExpwyPicker(o.id,o.expwy);};
+function openRampLinkPicker(expId){const list=document.getElementById('cmList');list.innerHTML='';document.getElementById('cmTitle').textContent='この首都高に紐付ける出入口を選択';
+  const ramps=DATA.filter(o=>o.kind==='ramp');
+  if(!ramps.length)list.innerHTML='<p class="hint">先に「🟢出入口を追加」で出入口を作ってください。</p>';
+  ramps.forEach(o=>{const row=document.createElement('label');row.className='cmrow';row.dataset.name=o.name;
+    const cb=document.createElement('input');cb.type='checkbox';cb.value=o.id;if(o.expwy===expId)cb.checked=true;
+    const ic=document.createElement('i');ic.style.background='#10b981';const sp=document.createElement('span');sp.textContent=o.name+(o.dir?'（'+o.dir+'）':'');
+    row.appendChild(cb);row.appendChild(ic);row.appendChild(sp);list.appendChild(row);});
+  crossDraft=null;expwyPickFor=null;linkRampsFor=expId;
+  const sb=document.getElementById('cmSearch');sb.value='';sb.oninput=()=>{const q=sb.value.trim().toLowerCase();Array.prototype.slice.call(list.children).forEach(el=>{if(el.tagName==='LABEL')el.style.display=(!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0)?'':'none';});};
+  document.getElementById('crossModal').classList.add('on');}
+document.getElementById('eLinkRamps').onclick=()=>{const o=cur();if(!o||o.kind!=='expressway')return;openRampLinkPicker(o.id);};
 document.getElementById('cmOk').onclick=()=>{
+  if(linkRampsFor){const checked=new Set(Array.prototype.slice.call(document.querySelectorAll('#cmList input:checked')).map(c=>c.value));
+    DATA.filter(o=>o.kind==='ramp').forEach(o=>{if(checked.has(o.id))o.expwy=linkRampsFor;else if(o.expwy===linkRampsFor)o.expwy=null;});
+    linkRampsFor=null;document.getElementById('cmTitle').textContent='通る通りを選択';saveData();rebuild();document.getElementById('crossModal').classList.remove('on');toast('出入口を紐付けました');return;}
   if(expwyPickFor){const o=DATA.find(x=>x.id===expwyPickFor);const chk=document.querySelector('#cmList input:checked');if(o)o.expwy=chk?chk.value:null;expwyPickFor=null;document.getElementById('cmTitle').textContent='通る通りを選択';saveData();rebuild();document.getElementById('crossModal').classList.remove('on');toast('首都高を設定しました');return;}
   const ids=Array.prototype.slice.call(document.querySelectorAll('#cmList input:checked')).map(c=>c.value);
   if(crossDraft){ if(crossDraft.editId){const o=DATA.find(x=>x.id===crossDraft.editId);if(o){o.roads=ids;if(crossDraft.name)o.name=crossDraft.name;}}
@@ -589,6 +604,7 @@ function updateEditorPanel(){
     document.getElementById('ecExpwyRow').style.display=(k==='ramp')?'flex':'none';
     if(k==='ramp')document.querySelectorAll('#ecDirRow button[data-d]').forEach(b=>b.classList.toggle('on',(o.dir||'フルランプ')===b.dataset.d));}
   if(o&&!isCross){document.getElementById('eName').value=o.name;
+    document.getElementById('eLinkRow').style.display=(o.kind==='expressway')?'flex':'none';
     document.getElementById('eAddPt').classList.toggle('on',addVertexMode);
     document.getElementById('eAddBld').classList.toggle('on',addBuildingMode);
     document.getElementById('eAddCaution').classList.toggle('on',addCautionMode);
@@ -805,7 +821,7 @@ function renderRelatedTest(){
 function relParents(){const t=curTest();const inTest=!!(t&&t.items.length);let cand;
   if(inTest){const pset=new Set();t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;
     if(it.type==='street'||it.type==='route')pset.add(it.streetId);
-    else if(it.type==='ramp'&&it.expwy)pset.add(it.expwy);
+    else if(it.type==='ramp'){if(it.expwy)pset.add(it.expwy);}
     else if(it.placeIdx!=null)pset.add(it.streetId);
     else if(it.roads&&it.roads.length)it.roads.forEach(r=>pset.add(r));});
     cand=DATA.filter(o=>pset.has(o.id));}
