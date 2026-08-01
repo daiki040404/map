@@ -79,6 +79,7 @@
   .mini{border:none;background:transparent;cursor:pointer;font-size:14px;padding:2px 3px;border-radius:5px;line-height:1}
   .mini.on-done{color:#22c55e}.mini.on-tod{color:#eab308}.mini.off{color:#4a4f5a}
   .cnt{font-size:10px;color:var(--sub)}
+  .catl{font-size:10px;color:var(--sub);background:#232833;padding:1px 6px;border-radius:5px;margin-right:3px;white-space:nowrap}
   .mkwrap{position:relative;width:26px;height:26px}
   .mk{width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:12px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.55)}
   .mk-circle{border-radius:50%}.mk-diamond{border-radius:4px;transform:rotate(45deg)}.mk-diamond .mkn{transform:rotate(-45deg)}
@@ -459,7 +460,7 @@ function buildList(vis){
   if(mode==='test'&&testType==='name'){
     const g=document.createElement('div');g.className='grp';g.textContent='解答用紙（'+vis.length+'問）'+(revealAll?' ／ 答え表示中':' ／ 番号だけ');listEl.appendChild(g);
     vis.forEach(it=>{const el=document.createElement('div');el.className='item'+((it._num-1)===nameIdx?' sel':'');
-      el.innerHTML='<span class="tico '+TYPE[it.type].shape+'" style="background:'+colOf(it)+'"></span><span class="iname">'+it._num+'. '+(revealAll?it.name:'—')+'</span>';
+      el.innerHTML='<span class="tico '+TYPE[it.type].shape+'" style="background:'+colOf(it)+'"></span><span class="iname">'+it._num+'. <span class="catl">'+TYPE[it.type].label+'</span>'+(revealAll?' '+it.name:'')+'</span>';
       el.onclick=()=>{nameIdx=it._num-1;nameReveal=false;renderNameTest();panPoint(it);};listEl.appendChild(el);});
     return;
   }
@@ -758,9 +759,10 @@ function renderPickMode(){
   else bar.textContent='「'+t.name+'」に追加：地図で通りをタップ（緑=追加済み）';}
 document.getElementById('tPickMap').onclick=()=>{const t=curTest();if(!t){toast('先に「＋新規」でテストを作って選んでね');return;}pickMode=true;pickSel=null;render();};
 // ===== 関連（施設・出入口）テスト =====
-function childrenOf(p){return ITEMS.filter(it=>{
+function childrenOf(p){const t=curTest();const inTest=!!(t&&t.items.length);return ITEMS.filter(it=>{
   if(it.type==='street'||it.type==='route')return false;
   if(!testKinds.has(it.type))return false;
+  if(inTest&&t.items.indexOf(it.id)<0)return false;
   if(it.placeIdx!=null&&it.streetId===p.id)return true;
   if(it.roads&&it.roads.indexOf(p.id)>=0)return true;
   if(it.type==='ramp'&&it.expwy===p.id)return true;
@@ -768,7 +770,7 @@ function childrenOf(p){return ITEMS.filter(it=>{
 function renderRelatedTest(){
   clearDrawLayers();document.getElementById('relBar').classList.add('on');
   markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();dotGroup.clearLayers();
-  const parents=DATA.filter(o=>(o.kind==='street'||o.kind==='route'||o.kind==='expressway')&&o.path&&o.path.length&&(!_scope||_scope.has(o.id))&&childrenOf(o).length);
+  const parents=relParents();
   DATA.forEach(o=>{const L=lineLayers[o.id];if(L)map.removeLayer(L);});
   if(!parents.length){document.getElementById('rbQ').textContent='関連項目のある通り/首都高がありません';buildList(ITEMS.filter(()=>false));return;}
   if(relatedIdx>=parents.length||relatedIdx<0)relatedIdx=0;
@@ -794,7 +796,15 @@ function renderRelatedTest(){
   document.getElementById('rbAll').classList.toggle('on',relAll);
   buildList(kids);
 }
-function relParents(){return DATA.filter(o=>(o.kind==='street'||o.kind==='route'||o.kind==='expressway')&&o.path&&o.path.length&&(!_scope||_scope.has(o.id))&&childrenOf(o).length);}
+function relParents(){const t=curTest();const inTest=!!(t&&t.items.length);let cand;
+  if(inTest){const pset=new Set();t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;
+    if(it.type==='street'||it.type==='route')pset.add(it.streetId);
+    else if(it.type==='ramp'&&it.expwy)pset.add(it.expwy);
+    else if(it.placeIdx!=null)pset.add(it.streetId);
+    else if(it.roads&&it.roads.length)it.roads.forEach(r=>pset.add(r));});
+    cand=DATA.filter(o=>pset.has(o.id));}
+  else cand=DATA.slice();
+  return cand.filter(o=>(o.kind==='street'||o.kind==='route'||o.kind==='expressway')&&o.path&&o.path.length&&childrenOf(o).length);}
 document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
 document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderRelatedTest();};
 document.getElementById('rbNext').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
