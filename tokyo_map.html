@@ -159,7 +159,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v18</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v19</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -747,7 +747,6 @@ function renderNameTest(){
   qs.forEach((it,i)=>{const num=i+1;it._num=num;const isCur=(i===nameIdx);
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:isCur?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
     if(revealAll||(nameReveal&&isCur))m.bindTooltip(it.name+((it.type==='ramp'&&it.dir)?'（'+it.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
-    else if(it.type==='ramp'&&it.dir)m.bindTooltip(it.dir,{permanent:true,direction:'top',className:'nameicon dirtip'});
     m.on('click',()=>{if(nameIdx===i){nameReveal=!nameReveal;}else{nameIdx=i;nameReveal=false;}render();panPoint(it);});
     m.addTo(markerGroup);});
   document.getElementById('tbAll').classList.toggle('on',revealAll);
@@ -811,7 +810,6 @@ function renderRelatedTest(){
   kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const foc=(relFocus===c.id);
     const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(foc&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:foc?1000:0});
     if(rev)m.bindTooltip(c.name+((c.type==='ramp'&&c.dir)?'（'+c.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
-    else if(c.type==='ramp'&&c.dir)m.bindTooltip(c.dir,{permanent:true,direction:'top',className:'nameicon dirtip'});
     m.on('click',()=>{if(relFocus===c.id){if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);}else{relFocus=c.id;}renderRelatedTest();});
     m.addTo(markerGroup);});
   const isExp=P.kind==='expressway';
@@ -857,7 +855,6 @@ function renderRampTest(){
   kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const foc=(relFocus===c.id);
     const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(foc&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:foc?1000:0});
     if(rev)m.bindTooltip(c.name+(c.dir?'（'+c.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
-    else if(c.dir)m.bindTooltip(c.dir,{permanent:true,direction:'top',className:'nameicon dirtip'});
     m.on('click',()=>{if(relFocus===c.id){if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);}else{relFocus=c.id;}renderRampTest();});
     m.addTo(markerGroup);});
   document.getElementById('rbQ').textContent='('+(relatedIdx+1)+'/'+parents.length+') '+P.name+' の出入口（'+kids.length+'）'+(relAll?' ／答え表示':' ／タップで注目→もう1回で名前+内外+通り');
