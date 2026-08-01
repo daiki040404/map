@@ -768,7 +768,16 @@ function renderRelatedTest(){
   if(!parents.length){document.getElementById('rbQ').textContent='関連項目のある通り/首都高がありません';buildList(ITEMS.filter(()=>false));return;}
   if(relatedIdx>=parents.length||relatedIdx<0)relatedIdx=0;
   const P=parents[relatedIdx],kids=childrenOf(P);
-  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;if(_scope&&!_scope.has(o.id))return;L2.setStyle(o.id===P.id?{opacity:1,weight:6}:{opacity:.12,weight:3}).addTo(map);});
+  // 答えを開いた項目につながる通りだけ強調＋通り名表示（普段は通りは出さない）
+  const showRoads=new Set();
+  kids.forEach(c=>{ if((relAll||relRevealed.has(c.id))&&c.roads)c.roads.forEach(r=>showRoads.add(r)); });
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);if(_scope&&!_scope.has(o.id))return;
+    if(o.id===P.id)L2.setStyle({opacity:1,weight:6}).addTo(map);
+    else if(showRoads.has(o.id))L2.setStyle({opacity:.95,weight:5}).addTo(map);
+    else L2.setStyle({opacity:.1,weight:3}).addTo(map);});
+  ITEMS.filter(it=>(it.type==='street'||it.type==='route')&&showRoads.has(it.streetId)).forEach(it=>{
+    const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:'<div class="mkwrap"><div class="mk mk-tag" style="background:'+colOf(it)+'">通</div></div>',iconSize:[26,26],iconAnchor:[13,13]})});
+    m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});m.addTo(markerGroup);});
   kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);
     const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]})});
     if(rev)m.bindTooltip(c.name+((c.type==='ramp'&&c.dir)?'（'+c.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
