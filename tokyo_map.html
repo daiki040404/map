@@ -334,7 +334,10 @@ function shapeHtml(it,num){const t=TYPE[it.type],col=colOf(it);const done=store.
   return '<div class="mkwrap"><div class="mk mk-'+t.shape+'" style="background:'+col+'"><span class="mkn">'+num+'</span></div>'+b+'</div>';}
 function itemVisible(it){
   if(_scope&&!_scope.has(it.streetId))return false;
-  if(mode==='edit') return it.streetId===selectedId;
+  if(mode==='edit'){
+    if(selectedId)return it.streetId===selectedId||(it.roads&&it.roads.indexOf(selectedId)>=0)||(it.type==='ramp'&&it.expwy===selectedId);
+    return visibleKinds.has(it.streetKind);
+  }
   if(mode==='test'&&!testKinds.has(it.type))return false;
   if(mode==='test'&&activeTestId){const t=curTest();return !!(t&&t.items.indexOf(it.id)>=0);}
   if(!visibleKinds.has(it.streetKind))return false;
@@ -412,11 +415,12 @@ function render(){
   const allVis=vis.concat(extra);
   // connectors avoid -> caution
   allVis.filter(x=>x.type==='avoid'&&x.avoidFor).forEach(a=>{const c=ITEMS.find(x=>x.type==='caution'&&x.pid===a.avoidFor&&x.streetId===a.streetId);if(c)L.polyline([[a.lat,a.lon],[c.lat,c.lon]],{color:'#0ea5e9',weight:3,dashArray:'3,7',opacity:.9}).addTo(connGroup);});
-  const showLabel=(mode==='learn'&&(showAllNames||anySel||view!=='all'))||(editing&&(anySel||view!=='all'));
+  const showLabel=(mode==='learn'&&(showAllNames||anySel||view!=='all'))||editing;
   allVis.forEach((it,i)=>{const num=i+1;it._num=num;
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]})});
-    if(showLabel&&(showAllNames||it.type!=='street'))m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});
+    if(showLabel&&(showAllNames||editing||it.type!=='street'))m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});
     if(mode==='learn'){ m.on('click',()=>learnClick(it)); }
+    else if(editing){ if(it.placeIdx!=null){m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id));} else {m.on('click',()=>selectStreet(it.streetId));} }
     else { m.bindPopup(popupHtml(it,num));m.on('popupopen',()=>refreshPopupMedia(it.id)); }
     m.addTo(markerGroup);});
   if(mode==='learn'&&focusId)highlightFocus();
@@ -635,8 +639,9 @@ document.getElementById('eClear').onclick=()=>{if(confirm('登録した通り・
 const bL=document.getElementById('mLearn'),bT=document.getElementById('mTest'),bE=document.getElementById('mEdit');
 function setMode(m){mode=m;bL.classList.toggle('on',m==='learn');bT.classList.toggle('on',m==='test');bE.classList.toggle('on',m==='edit');
   addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=false;avoidTargetPid=null;addCrossingMode=false;addFacilityMode=false;addRampMode=false;
-  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;relatedIdx=0;relRevealed=new Set();relAll=false;map.closePopup();
-  ['rowView','rowDay','rowDay2','rowLoc','rowKind'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=(m==='edit')?'none':'flex';});
+  selectedId=null;focusId=null;learnStage=0;nameIdx=-1;nameReveal=false;pickMode=false;pickSel=null;relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;map.closePopup();
+  ['rowView','rowDay','rowDay2','rowLoc'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=(m==='edit')?'none':'flex';});
+  document.getElementById('rowKind').style.display='flex';
   document.getElementById('rowNames').style.display=(m==='learn')?'flex':'none';
   document.getElementById('rowTest').style.display='flex';
   document.getElementById('rowTestType').style.display=(m==='test')?'flex':'none';
@@ -680,7 +685,7 @@ document.getElementById('reset').onclick=()=>{selectedId=null;view='all';documen
 
 // ===== 線引きテスト =====
 let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=-1, nameReveal=false, revealAll=false, pickMode=false, pickSel=null;
-let relatedIdx=0, relAll=false, relRevealed=new Set();
+let relatedIdx=0, relAll=false, relRevealed=new Set(), relFocus=null;
 const dotGroup=L.layerGroup(); let userLine=null, answerLine=null;
 function drawTargets(){let its=ITEMS.filter(x=>(x.type==='street'||x.type==='route'));if(activeTestId){const t=curTest();its=its.filter(x=>t&&t.items.indexOf(x.id)>=0);}return its;}
 function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');document.getElementById('relBar').classList.remove('on');const pb=document.getElementById('pickBar');if(pb&&!pickMode)pb.classList.remove('on');}
@@ -769,31 +774,31 @@ function renderRelatedTest(){
   if(relatedIdx>=parents.length||relatedIdx<0)relatedIdx=0;
   const P=parents[relatedIdx],kids=childrenOf(P);
   // 答えを開いた項目につながる通りだけ強調＋通り名表示（普段は通りは出さない）
+  // 答え（2回目タップ）を開いた出入口のつながる通りだけ、線＋通り名を表示
   const showRoads=new Set();
   kids.forEach(c=>{ if((relAll||relRevealed.has(c.id))&&c.roads)c.roads.forEach(r=>showRoads.add(r)); });
   DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);if(_scope&&!_scope.has(o.id))return;
     if(o.id===P.id)L2.setStyle({opacity:1,weight:6}).addTo(map);
-    else if(showRoads.has(o.id))L2.setStyle({opacity:.95,weight:5}).addTo(map);
-    else L2.setStyle({opacity:.1,weight:3}).addTo(map);});
+    else if(showRoads.has(o.id))L2.setStyle({opacity:.95,weight:5}).addTo(map);});
   ITEMS.filter(it=>(it.type==='street'||it.type==='route')&&showRoads.has(it.streetId)).forEach(it=>{
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:'<div class="mkwrap"><div class="mk mk-tag" style="background:'+colOf(it)+'">通</div></div>',iconSize:[26,26],iconAnchor:[13,13]})});
     m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});m.addTo(markerGroup);});
-  kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);
-    const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]})});
+  kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const foc=(relFocus===c.id);
+    const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(foc&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:foc?1000:0});
     if(rev)m.bindTooltip(c.name+((c.type==='ramp'&&c.dir)?'（'+c.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
     else if(c.type==='ramp'&&c.dir)m.bindTooltip(c.dir,{permanent:true,direction:'top',className:'nameicon dirtip'});
-    m.on('click',()=>{if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);renderRelatedTest();});
+    m.on('click',()=>{if(relFocus===c.id){if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);}else{relFocus=c.id;}renderRelatedTest();});
     m.addTo(markerGroup);});
   const isExp=P.kind==='expressway';
-  document.getElementById('rbQ').textContent='('+(relatedIdx+1)+'/'+parents.length+') '+P.name+' の'+(isExp?'出入口':'施設・交差点')+'（'+kids.length+'）'+(relAll?' ／答え表示':' ／タップで名前');
+  document.getElementById('rbQ').textContent='('+(relatedIdx+1)+'/'+parents.length+') '+P.name+' の'+(isExp?'出入口':'施設・交差点')+'（'+kids.length+'）'+(relAll?' ／答え表示':' ／タップで注目→もう1回で名前+通り');
   document.getElementById('rbAll').classList.toggle('on',relAll);
   buildList(kids);
 }
 function relParents(){return DATA.filter(o=>(o.kind==='street'||o.kind==='route'||o.kind==='expressway')&&o.path&&o.path.length&&(!_scope||_scope.has(o.id))&&childrenOf(o).length);}
-document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relAll=false;render();};
+document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
 document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderRelatedTest();};
-document.getElementById('rbNext').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
-document.getElementById('rbPrev').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx-1+ps.length)%ps.length;relRevealed=new Set();relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
+document.getElementById('rbNext').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
+document.getElementById('rbPrev').onclick=()=>{const ps=relParents();if(!ps.length)return;relatedIdx=(relatedIdx-1+ps.length)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelatedTest();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
 document.getElementById('pbAdd').onclick=()=>{const t=curTest();if(!t||!pickSel)return;const id='L:'+pickSel;if(t.items.indexOf(id)<0){t.items.push(id);saveTag();refreshTestSel();toast('『'+(DATA.find(x=>x.id===pickSel)||{}).name+'』を追加');}else toast('もう追加済みです');pickSel=null;renderPickMode();};
 document.getElementById('pbClear').onclick=()=>{pickSel=null;renderPickMode();};
 document.getElementById('pbDone').onclick=()=>{pickMode=false;pickSel=null;render();};
