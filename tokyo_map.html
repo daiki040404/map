@@ -90,6 +90,7 @@
   .bdg.done{right:-7px;background:#16a34a;color:#fff}.bdg.tod{left:-7px;background:#eab308;color:#111}
   .vhandle{width:16px;height:16px;background:#fff;border:2px solid #2563eb;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.5);cursor:move;display:flex;align-items:center;justify-content:center;font-size:9px;color:#2563eb;font-weight:700}
   .nameicon{white-space:nowrap;background:rgba(17,19,25,.92);color:#fff;padding:2px 6px;border-radius:6px;font-size:11px;border:1px solid #333}
+  .nameicon.dirtip{background:rgba(16,163,74,.92);border-color:#10b981;font-size:10px}
   .pp{min-width:150px}.pptype{font-size:11px;font-weight:700;margin-bottom:2px}.ppi{color:#666;font-size:12px}
   .ppbtn{display:flex;gap:6px;margin-top:8px}.ppbtn button{flex:1;padding:6px 4px;border:1px solid #ccc;background:#f5f5f5;border-radius:7px;font-size:12px;cursor:pointer}
   .pplbl{font-size:11px;color:#888;margin:8px 0 3px}
@@ -339,9 +340,12 @@ function itemVisible(it){
   if(!visibleKinds.has(it.streetKind))return false;
   if(selectedId){
     if(_selEntry&&(_selEntry.kind==='crossing'||_selEntry.kind==='facility'||_selEntry.kind==='ramp')){
-      const roads=_selEntry.roads||[];
-      const isRoadName=(it.type==='street'||it.type==='route')&&roads.indexOf(it.streetId)>=0;
-      if(it.streetId!==selectedId&&!isRoadName)return false;
+      const roads=_selEntry.roads||[];const expwy=_selEntry.expwy;
+      if(it.streetId===selectedId)return true; // 選択中それ自身
+      if((it.type==='street'||it.type==='route')&&roads.indexOf(it.streetId)>=0)return true; // つながる通り名
+      if(it.roads&&it.roads.some(r=>roads.indexOf(r)>=0))return true; // 同じ通りに紐づく兄弟（他の交差点・施設・出入口）
+      if(it.type==='ramp'&&expwy&&it.expwy===expwy)return true; // 同じ首都高の他の出入口
+      return false;
     } else {
       // 通り/首都高 選択中：その項目＋紐づく交差点・施設・出入口も表示
       const linked=(it.roads&&it.roads.indexOf(selectedId)>=0)||(it.type==='ramp'&&it.expwy===selectedId);
@@ -713,7 +717,8 @@ function renderNameTest(){
     else L2.setStyle({opacity:.12,weight:3}).addTo(map);});
   qs.forEach((it,i)=>{const num=i+1;it._num=num;const isCur=(i===nameIdx);
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:isCur?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
-    if(revealAll||(nameReveal&&isCur))m.bindTooltip(it.name,{permanent:true,direction:'top',className:'nameicon'});
+    if(revealAll||(nameReveal&&isCur))m.bindTooltip(it.name+((it.type==='ramp'&&it.dir)?'（'+it.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
+    else if(it.type==='ramp'&&it.dir)m.bindTooltip(it.dir,{permanent:true,direction:'top',className:'nameicon dirtip'});
     m.on('click',()=>{if(nameIdx===i){nameReveal=!nameReveal;}else{nameIdx=i;nameReveal=false;}render();panPoint(it);});
     m.addTo(markerGroup);});
   document.getElementById('tbAll').classList.toggle('on',revealAll);
@@ -767,6 +772,7 @@ function renderRelatedTest(){
   kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);
     const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]})});
     if(rev)m.bindTooltip(c.name+((c.type==='ramp'&&c.dir)?'（'+c.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
+    else if(c.type==='ramp'&&c.dir)m.bindTooltip(c.dir,{permanent:true,direction:'top',className:'nameicon dirtip'});
     m.on('click',()=>{if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);renderRelatedTest();});
     m.addTo(markerGroup);});
   const isExp=P.kind==='expressway';
