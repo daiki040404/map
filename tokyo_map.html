@@ -162,7 +162,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v23</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v24</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -202,7 +202,7 @@
     </div>
 
     <div class="row" id="rowTest"><span class="lbl">テスト</span><select id="testSel"></select><button id="tPick" class="dbtn">項目を選ぶ</button><button id="tPickMap" class="dbtn">🗺 地図で追加</button><button id="tNew" class="dbtn">＋新規</button><button id="tRename" class="dbtn">名前</button><button id="tDel" class="dbtn">削除</button></div>
-    <div class="row" id="rowTestType" style="display:none"><span class="lbl">出題</span><div class="seg"><button id="ttName" class="on">名前あて</button><button id="ttRel">関連</button><button id="ttRamp">出入口</button><button id="ttDraw">線を引く</button></div></div>
+    <div class="row" id="rowTestType" style="display:none"><span class="lbl">出題</span><div class="seg"><button id="ttName" class="on">名前あて</button><button id="ttRel">関連</button><button id="ttRamp">出入口</button><button id="ttStn">駅名</button><button id="ttDraw">線を引く</button></div></div>
     <div class="row" id="rowView"><span class="lbl">表示</span><div class="seg"><button data-v="all" class="on">すべて</button><button data-v="unlearned">未習</button><button data-v="learned">覚えた</button><button data-v="today">今日</button></div></div>
     <div class="row" id="rowNames"><span class="lbl">名前</span><div class="seg"><button id="nbNum" class="on">番号のみ</button><button id="nbAll">名前を全部表示</button></div></div>
     <div class="row" id="rowDay"><span class="lbl">需要曜日</span><div class="chips" id="dDays"></div></div>
@@ -414,6 +414,7 @@ function render(){
   if(mode==='test'&&pickMode){renderPickMode();return;}
   if(mode==='test'&&testType==='related'){renderRelatedTest();return;}
   if(mode==='test'&&testType==='ramp'){renderRampTest();return;}
+  if(mode==='test'&&testType==='station'){renderStationTest();return;}
   if(mode==='test'&&testType==='draw'){renderDrawTest();return;}
   if(mode==='test'&&testType==='name'){renderNameTest();return;}
   clearDrawLayers();
@@ -485,10 +486,16 @@ function buildList(vis){
     return;
   }
   if(mode==='test'&&testType==='name'){
-    const g=document.createElement('div');g.className='grp';g.textContent='解答用紙（'+vis.length+'問）'+(revealAll?' ／ 答え表示中':' ／ 番号だけ');listEl.appendChild(g);
-    vis.forEach(it=>{const el=document.createElement('div');el.className='item'+((it._num-1)===nameIdx?' sel':'');
-      el.innerHTML='<span class="tico '+TYPE[it.type].shape+'" style="background:'+colOf(it)+'"></span><span class="iname">'+it._num+'. <span class="catl">'+TYPE[it.type].label+'</span>'+(revealAll?' '+it.name:'')+'</span>';
-      el.onclick=()=>{nameIdx=it._num-1;nameReveal=false;renderNameTest();panPoint(it);};listEl.appendChild(el);});
+    const g0=document.createElement('div');g0.className='grp';g0.textContent='解答用紙（'+vis.length+'問）'+(revealAll?' ／答え表示中':' ／番号だけ');listEl.appendChild(g0);
+    const addItem=(it)=>{const el=document.createElement('div');el.className='item'+((it._num-1)===nameIdx?' sel':'');
+      el.innerHTML='<span class="tico '+TYPE[it.type].shape+'" style="background:'+colOf(it)+'"></span><span class="iname">'+it._num+'.'+(revealAll?' '+it.name:'')+'</span>';
+      el.onclick=()=>{nameIdx=it._num-1;nameReveal=false;renderNameTest();panPoint(it);};listEl.appendChild(el);};
+    // カテゴリごとにまとめて見出しをつける（学習モードと同じ感覚）
+    const order=['street','route','cross','building','ramp','station','caution','avoid'];
+    order.forEach(tp=>{const arr=vis.filter(it=>it.type===tp);if(!arr.length)return;
+      const gh=document.createElement('div');gh.className='grp';gh.textContent=TYPE[tp].label+'（'+arr.length+'）';listEl.appendChild(gh);
+      arr.forEach(addItem);});
+    vis.filter(it=>order.indexOf(it.type)<0).forEach(addItem);
     return;
   }
   const groupsView=(mode==='edit')||(view==='all'&&!selectedId);
@@ -933,10 +940,40 @@ function renderRampTest(){
   document.getElementById('rbAll').classList.toggle('on',relAll);
   buildList(kids);
 }
-function relParentsCur(){return testType==='ramp'?rampParents():relParents();}
-function renderRelCur(){return testType==='ramp'?renderRampTest():renderRelatedTest();}
-document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw','ttRamp'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
-document.getElementById('ttRamp').onclick=()=>{testType='ramp';['ttName','ttDraw','ttRel'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRamp').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
+// ===== 駅名テスト（鉄道を選ぶ→その駅を全部出題。個別に項目追加不要） =====
+function stationChildrenAll(P){return ITEMS.filter(it=>it.type==='station'&&it.line===P.id);}
+function stationParents(){const t=curTest();const inTest=!!(t&&t.items.length);
+  const rails=DATA.filter(o=>o.kind==='railway'&&o.path&&o.path.length&&ITEMS.some(it=>it.type==='station'&&it.line===o.id));
+  if(!inTest)return rails;
+  const allow=new Set();
+  t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;
+    if(it.type==='station'&&it.line)allow.add(it.line);
+    else if((it.type==='street'||it.type==='route')&&it.streetKind==='railway')allow.add(it.streetId);});
+  return rails.filter(o=>allow.has(o.id));}
+function renderStationTest(){
+  clearDrawLayers();document.getElementById('relBar').classList.add('on');
+  markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();dotGroup.clearLayers();
+  const parents=stationParents();
+  DATA.forEach(o=>{const L=lineLayers[o.id];if(L)map.removeLayer(L);});
+  if(!parents.length){document.getElementById('rbQ').textContent='駅のある鉄道がありません（鉄道を作り、駅を紐付けてね）';buildList(ITEMS.filter(()=>false));return;}
+  if(relatedIdx>=parents.length||relatedIdx<0)relatedIdx=0;
+  const P=parents[relatedIdx],kids=stationChildrenAll(P);
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);
+    if(o.id===P.id)L2.setStyle({opacity:1,weight:6}).addTo(map);});
+  kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const foc=(relFocus===c.id);
+    const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(foc&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:foc?1000:0});
+    if(rev)m.bindTooltip(c.name,{permanent:true,direction:'top',className:'nameicon'});
+    m.on('click',()=>{if(relFocus===c.id){if(relRevealed.has(c.id))relRevealed.delete(c.id);else relRevealed.add(c.id);}else{relFocus=c.id;}renderStationTest();});
+    m.addTo(markerGroup);});
+  document.getElementById('rbQ').textContent='('+(relatedIdx+1)+'/'+parents.length+') '+P.name+' の駅（'+kids.length+'）'+(relAll?' ／答え表示':' ／タップで注目→もう1回で駅名');
+  document.getElementById('rbAll').classList.toggle('on',relAll);
+  buildList(kids);
+}
+function relParentsCur(){return testType==='ramp'?rampParents():(testType==='station'?stationParents():relParents());}
+function renderRelCur(){return testType==='ramp'?renderRampTest():(testType==='station'?renderStationTest():renderRelatedTest());}
+document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw','ttRamp','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
+document.getElementById('ttRamp').onclick=()=>{testType='ramp';['ttName','ttDraw','ttRel','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRamp').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
+document.getElementById('ttStn').onclick=()=>{testType='station';['ttName','ttDraw','ttRel','ttRamp'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttStn').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
 document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderRelCur();};
 document.getElementById('rbNext').onclick=()=>{const ps=relParentsCur();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelCur();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
 document.getElementById('rbPrev').onclick=()=>{const ps=relParentsCur();if(!ps.length)return;relatedIdx=(relatedIdx-1+ps.length)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelCur();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
@@ -962,8 +999,8 @@ function renderDrawTest(){
   document.getElementById('drawQ').textContent=(drawResult?(drawResult==='ok'?'⭕ 正解！ ':'❌ 不正解 ')+'／':'引いてください：')+target.name;
 }
 // 出題種類フィルタ
-document.getElementById('ttName').onclick=()=>{testType='name';document.getElementById('ttName').classList.add('on');['ttDraw','ttRel','ttRamp'].forEach(id=>document.getElementById(id).classList.remove('on'));drawSeq=[];drawResult=null;nameIdx=-1;nameReveal=false;render();};
-document.getElementById('ttDraw').onclick=()=>{testType='draw';document.getElementById('ttDraw').classList.add('on');['ttName','ttRel','ttRamp'].forEach(id=>document.getElementById(id).classList.remove('on'));drawIdx=0;drawSeq=[];drawResult=null;render();};
+document.getElementById('ttName').onclick=()=>{testType='name';document.getElementById('ttName').classList.add('on');['ttDraw','ttRel','ttRamp','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));drawSeq=[];drawResult=null;nameIdx=-1;nameReveal=false;render();};
+document.getElementById('ttDraw').onclick=()=>{testType='draw';document.getElementById('ttDraw').classList.add('on');['ttName','ttRel','ttRamp','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));drawIdx=0;drawSeq=[];drawResult=null;render();};
 document.getElementById('dbReset').onclick=()=>{drawSeq=[];drawResult=null;renderDrawTest();};
 document.getElementById('dbCheck').onclick=()=>checkDraw();
 document.getElementById('dbNext').onclick=()=>{drawIdx++;drawSeq=[];drawResult=null;renderDrawTest();};
