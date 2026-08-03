@@ -162,7 +162,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v21</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v22</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -216,14 +216,14 @@
     <div class="list" id="list"></div>
     </div>
   </div>
-  <div id="map"><button id="baseToggle">地図: 通常</button><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図でタップして追加</span><div class="tb2"><button id="pbDone">完了</button></div></div><div id="relBar"><span id="rbQ">関連</span><div class="tb2"><button id="rbPrev">前へ</button><button id="rbAll">全答え</button><button id="rbNext">次へ</button></div></div><div id="toast"></div></div>
+  <div id="map"><button id="baseToggle">地図: 通常</button><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図でタップして追加</span><div class="tb2"><button id="pbSearch">🔍 検索で選ぶ</button><button id="pbDone">完了</button></div></div><div id="relBar"><span id="rbQ">関連</span><div class="tb2"><button id="rbPrev">前へ</button><button id="rbAll">全答え</button><button id="rbNext">次へ</button></div></div><div id="toast"></div></div>
 </div>
 <input type="file" id="medFile" accept="image/*,video/*" multiple style="display:none"/>
 <input type="file" id="eBackFile" accept=".json,application/json" style="display:none"/>
 <input type="file" id="eMergeFile" accept=".json,application/json" multiple style="display:none"/>
 <div id="medOverlay"></div>
 <div id="crossModal"><div class="cmbox"><h3 id="cmTitle">通る通りを選択</h3><input id="cmSearch" placeholder="🔍 通り名で絞り込み"/><div id="cmList"></div><div class="cmbtn"><button id="cmCancel">キャンセル</button><button id="cmOk">決定</button></div></div></div>
-<div id="testModal"><div class="cmbox"><h3 id="tmTitle">テストに入れる項目を選択</h3><input id="tmSearch" placeholder="🔍 名前で絞り込み"/><div id="tmList"></div><div class="cmbtn"><button id="tmCancel">キャンセル</button><button id="tmOk">決定</button></div></div></div>
+<div id="testModal"><div class="cmbox"><h3 id="tmTitle">テストに入れる項目を選択</h3><input id="tmSearch" placeholder="🔍 名前で絞り込み"/><div id="tmList"></div><div class="cmbtn"><button id="tmMap">🗺 地図で選ぶ</button><button id="tmCancel">キャンセル</button><button id="tmOk">決定</button></div></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -815,7 +815,7 @@ function renderPickMode(){
   const bar=document.getElementById('pbQ');const n=t?t.items.length:0;
   bar.textContent=t?('「'+t.name+'」：地図でタップして追加/削除（緑・光=追加済み）　現在 '+n+' 項目'):'先にテストを選んでね';}
 function togglePick(id){const t=curTest();if(!t)return;const i=t.items.indexOf(id);if(i>=0)t.items.splice(i,1);else t.items.push(id);saveTag();refreshTestSel();renderPickMode();}
-document.getElementById('tPickMap').onclick=()=>{const t=curTest();if(!t){toast('先に「＋新規」でテストを作って選んでね');return;}pickMode=true;pickSel=null;render();};
+document.getElementById('tPickMap').onclick=()=>{const t=curTest();if(!t){toast('先に「＋新規」でテストを作って選んでね');return;}const tid=activeTestId;if(mode!=='test')setMode('test');activeTestId=tid;refreshTestSel();pickMode=true;pickSel=null;render();toast('地図でタップして追加/削除');};
 // ===== 関連（施設・出入口）テスト =====
 function childrenOf(p){const t=curTest();const inTest=!!(t&&t.items.length);return ITEMS.filter(it=>{
   if(it.type==='street'||it.type==='route')return false;
@@ -906,6 +906,7 @@ document.getElementById('ttRamp').onclick=()=>{testType='ramp';['ttName','ttDraw
 document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderRelCur();};
 document.getElementById('rbNext').onclick=()=>{const ps=relParentsCur();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelCur();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
 document.getElementById('rbPrev').onclick=()=>{const ps=relParentsCur();if(!ps.length)return;relatedIdx=(relatedIdx-1+ps.length)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelCur();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
+document.getElementById('pbSearch').onclick=()=>{const t=curTest();if(!t){toast('先にテストを選んでね');return;}openTestPicker(t);};
 document.getElementById('pbDone').onclick=()=>{pickMode=false;pickSel=null;render();};
 function tapDot(sid,i,p){if(drawResult)return;const key=sid+':'+i;const pos=drawSeq.map(d=>d.key).indexOf(key);if(pos>=0){drawSeq.splice(pos,1);}else{drawSeq.push({key,streetId:sid,idx:i,lat:p[1],lon:p[0]});}renderDrawTest();}
 function eqSeq(a,b){if(a.length!==b.length)return false;for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;return true;}
@@ -963,6 +964,7 @@ function filterTm(q){q=(q||'').trim().toLowerCase();const kids=Array.prototype.s
   kids.forEach(el=>{if(el.className==='tmgrp'){cur=el;el._any=false;el.style.display='';}else{const vis=!q||(el.dataset.name||'').toLowerCase().indexOf(q)>=0;el.style.display=vis?'':'none';if(vis&&cur)cur._any=true;}});
   kids.forEach(el=>{if(el.className==='tmgrp')el.style.display=el._any?'':'none';});}
 document.getElementById('tmCancel').onclick=()=>document.getElementById('testModal').classList.remove('on');
+document.getElementById('tmMap').onclick=()=>{const t=curTest();if(t){t.items=Array.prototype.slice.call(document.querySelectorAll('#tmList input:checked')).map(c=>c.value);saveTag();refreshTestSel();}const tid=activeTestId;document.getElementById('testModal').classList.remove('on');if(mode!=='test')setMode('test');activeTestId=tid;refreshTestSel();pickMode=true;pickSel=null;render();toast('地図でタップして追加/削除');};
 document.getElementById('tmOk').onclick=()=>{const t=curTest();if(t){t.items=Array.prototype.slice.call(document.querySelectorAll('#tmList input:checked')).map(c=>c.value);saveTag();refreshTestSel();render();toast(t.name+'：'+t.items.length+'問に設定');}document.getElementById('testModal').classList.remove('on');};
 
 document.getElementById('searchBox').oninput=function(){searchQ=this.value;render();};
