@@ -23,7 +23,7 @@
   .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
   .fld{display:flex;flex-direction:column;gap:5px;}
   label{font-size:12px;color:var(--sub);font-weight:600;}
-  input[type=time],input[type=number],input[type=text],input[type=email],input[type=password],select,textarea{font-size:16px;padding:9px 10px;
+  input[type=time],input[type=number],input[type=text],select,textarea{font-size:16px;padding:9px 10px;
     border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;font-family:inherit;}
   textarea{min-height:70px;resize:vertical;line-height:1.5;}
   input[type=number]{width:96px;}
@@ -35,6 +35,7 @@
   .btn.brk{background:var(--brk);}
   .btn.sec{background:#eef0f4;color:#374151;}
   .btn.mini{padding:7px 11px;font-size:13px;}
+  .btn.google{background:#fff;color:#3c4043;border:1px solid #dadce0;display:inline-flex;align-items:center;gap:9px;}
   .btn:disabled{opacity:.42;cursor:not-allowed;}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
   .divider{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px;}
@@ -44,6 +45,7 @@
   .authstat b{color:var(--ink);}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#9ca3af;}
   .dot.on{background:var(--done);}
+  .gicon{width:18px;height:18px;display:inline-block;flex:none;}
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;scroll-margin-top:10px;}
   .seg.work{background:var(--workbg);border-color:#cfe0ff;}
@@ -107,27 +109,27 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。ログインすると東京マップと同じアカウントで、この端末以外とも自動同期します。各ブロックにチェックリスト＋「完了」チェック、点呼前ルーティン等の「やること」も追加できます。</p>
+  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。東京マップと同じGoogleアカウントでログインすると、この端末以外とも自動同期します。各ブロックにチェックリスト＋「完了」チェック、点呼前ルーティン等の「やること」も追加できます。</p>
 
   <!-- アカウント同期 -->
   <div class="card">
     <p class="cardhead">☁️ アカウント同期</p>
     <div class="authstat" id="authStatus"><span class="dot"></span>読み込み中…</div>
     <div id="authForm">
-      <div class="row" style="gap:8px">
-        <div class="fld" style="flex:1;min-width:150px"><label>メールアドレス</label><input type="email" id="authEmail" autocomplete="username" placeholder="tokyo mapと同じメール"></div>
-        <div class="fld" style="flex:1;min-width:150px"><label>パスワード</label><input type="password" id="authPass" autocomplete="current-password" placeholder="パスワード"></div>
-      </div>
-      <div class="btnrow" style="margin-top:10px">
-        <button class="btn mini" id="btnLogin">ログイン</button>
-        <button class="btn sec mini" id="btnSignup">新規登録</button>
+      <div class="btnrow">
+        <button class="btn google mini" id="btnGoogle">
+          <svg class="gicon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Googleでログイン
+        </button>
       </div>
     </div>
     <div id="authLoggedIn" style="display:none">
-      <div class="btnrow"><button class="btn sec mini" id="btnLogout">ログアウト</button>
-        <button class="btn sec mini" id="btnSyncNow">今すぐ同期</button></div>
+      <div class="btnrow">
+        <button class="btn sec mini" id="btnLogout">ログアウト</button>
+        <button class="btn sec mini" id="btnSyncNow">今すぐ同期</button>
+      </div>
     </div>
-    <p class="hint">東京マップと同じアカウント（同じメール・パスワード）でログインできます。ログイン中は保存・変更が自動でクラウドに同期されます。未ログインでもこの端末内には保存されます。</p>
+    <p class="hint">東京マップと同じGoogleアカウントでログインすると、全端末で自動同期します。未ログインでもこの端末内には保存されます。</p>
   </div>
 
   <!-- 今日の流れメモ -->
@@ -579,7 +581,7 @@ function scrollToFirstIncomplete(force){
   if(target) target.scrollIntoView({block:"start"});
 }
 
-/* ====== Firebase アカウント同期 ====== */
+/* ====== Firebase アカウント同期（Googleログイン） ====== */
 let fbUser=null, fbDb=null, fbReady=false, _syncT=null, _pulling=false;
 function setAuthStatus(html, on){
   $("#authStatus").innerHTML=`<span class="dot${on?' on':''}"></span>`+html;
@@ -588,7 +590,7 @@ function updateAuthUI(){
   if(fbUser){
     $("#authForm").style.display="none";
     $("#authLoggedIn").style.display="block";
-    setAuthStatus(`ログイン中：<b>${esc(fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true);
+    setAuthStatus(`ログイン中：<b>${esc(fbUser.displayName||fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true);
   }else{
     $("#authForm").style.display="block";
     $("#authLoggedIn").style.display="none";
@@ -601,11 +603,25 @@ function fbInit(){
     firebase.initializeApp(FIREBASE_CONFIG);
     fbDb=firebase.firestore();
     fbReady=true;
+    firebase.auth().getRedirectResult().catch(()=>{});
     firebase.auth().onAuthStateChanged(u=>{
       fbUser=u||null; updateAuthUI();
       if(fbUser) cloudPull();
     });
   }catch(e){ setAuthStatus("同期の初期化に失敗しました", false); }
+}
+async function googleLogin(){
+  if(!fbReady){ alert("同期の準備ができていません（通信環境を確認してください）"); return; }
+  const provider=new firebase.auth.GoogleAuthProvider();
+  try{
+    await firebase.auth().signInWithPopup(provider);
+  }catch(e){
+    const code=e&&e.code;
+    if(code==="auth/popup-blocked"||code==="auth/popup-closed-by-user"||code==="auth/cancelled-popup-request"||code==="auth/operation-not-supported-in-this-environment"){
+      try{ await firebase.auth().signInWithRedirect(provider); return; }catch(e2){ alert("ログインできませんでした：\n"+(e2.message||e2.code)); return; }
+    }
+    alert("ログインできませんでした：\n"+(e.message||code));
+  }
 }
 async function cloudPull(){
   if(!fbReady||!fbUser) return;
@@ -626,7 +642,7 @@ async function cloudPull(){
       toast("クラウドから読み込みました");
     }else{
       _pulling=false;
-      await cloudPushNow(); // クラウドが空なら今のローカルを保存
+      await cloudPushNow();
       return;
     }
   }catch(e){ console.warn(e); setAuthStatus("同期エラー："+esc(e.code||e.message)+"（Firestoreのルール設定が必要かも）", true); }
@@ -732,22 +748,8 @@ $("#sched").addEventListener("click",e=>{
 /* ---- カテゴリ選択 ---- */
 $("#catSel").addEventListener("change",toggleCatNew);
 
-/* ---- アカウント（ログイン/登録/ログアウト/同期） ---- */
-$("#btnLogin").addEventListener("click",async()=>{
-  if(!fbReady){ alert("同期の準備ができていません（通信環境を確認してください）"); return; }
-  const em=$("#authEmail").value.trim(), pw=$("#authPass").value;
-  if(!em||!pw){ alert("メールとパスワードを入力してください"); return; }
-  try{ await firebase.auth().signInWithEmailAndPassword(em,pw); $("#authPass").value=""; toast("ログインしました"); }
-  catch(e){ alert("ログインできませんでした：\n"+(e.message||e.code)); }
-});
-$("#btnSignup").addEventListener("click",async()=>{
-  if(!fbReady){ alert("同期の準備ができていません（通信環境を確認してください）"); return; }
-  const em=$("#authEmail").value.trim(), pw=$("#authPass").value;
-  if(!em||!pw){ alert("メールとパスワードを入力してください"); return; }
-  if(pw.length<6){ alert("パスワードは6文字以上にしてください"); return; }
-  try{ await firebase.auth().createUserWithEmailAndPassword(em,pw); $("#authPass").value=""; toast("アカウントを作成しました"); }
-  catch(e){ alert("登録できませんでした：\n"+(e.message||e.code)); }
-});
+/* ---- アカウント（Googleログイン/ログアウト/同期） ---- */
+$("#btnGoogle").addEventListener("click",googleLogin);
 $("#btnLogout").addEventListener("click",async()=>{
   try{ await firebase.auth().signOut(); toast("ログアウトしました"); }catch(e){}
 });
