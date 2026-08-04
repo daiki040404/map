@@ -23,7 +23,7 @@
   .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
   .fld{display:flex;flex-direction:column;gap:5px;}
   label{font-size:12px;color:var(--sub);font-weight:600;}
-  input[type=time],input[type=number],input[type=text],select,textarea{font-size:16px;padding:9px 10px;
+  input[type=time],input[type=number],input[type=text],input[type=email],input[type=password],select,textarea{font-size:16px;padding:9px 10px;
     border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;font-family:inherit;}
   textarea{min-height:70px;resize:vertical;line-height:1.5;}
   input[type=number]{width:96px;}
@@ -40,6 +40,10 @@
   .divider{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px;}
 
   .cardhead{font-size:13px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
+  .authstat{font-size:12.5px;color:var(--sub);margin-bottom:10px;}
+  .authstat b{color:var(--ink);}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#9ca3af;}
+  .dot.on{background:var(--done);}
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;scroll-margin-top:10px;}
   .seg.work{background:var(--workbg);border-color:#cfe0ff;}
@@ -103,7 +107,28 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各ブロックにチェックリスト＋「完了」チェック。完了ブロックは畳まれ、次に開くと未完了の位置まで自動でスクロールします。点呼前ルーティン等は自分でタイトルを付けた「やること」を先頭・末尾に追加できます。</p>
+  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。ログインすると東京マップと同じアカウントで、この端末以外とも自動同期します。各ブロックにチェックリスト＋「完了」チェック、点呼前ルーティン等の「やること」も追加できます。</p>
+
+  <!-- アカウント同期 -->
+  <div class="card">
+    <p class="cardhead">☁️ アカウント同期</p>
+    <div class="authstat" id="authStatus"><span class="dot"></span>読み込み中…</div>
+    <div id="authForm">
+      <div class="row" style="gap:8px">
+        <div class="fld" style="flex:1;min-width:150px"><label>メールアドレス</label><input type="email" id="authEmail" autocomplete="username" placeholder="tokyo mapと同じメール"></div>
+        <div class="fld" style="flex:1;min-width:150px"><label>パスワード</label><input type="password" id="authPass" autocomplete="current-password" placeholder="パスワード"></div>
+      </div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn mini" id="btnLogin">ログイン</button>
+        <button class="btn sec mini" id="btnSignup">新規登録</button>
+      </div>
+    </div>
+    <div id="authLoggedIn" style="display:none">
+      <div class="btnrow"><button class="btn sec mini" id="btnLogout">ログアウト</button>
+        <button class="btn sec mini" id="btnSyncNow">今すぐ同期</button></div>
+    </div>
+    <p class="hint">東京マップと同じアカウント（同じメール・パスワード）でログインできます。ログイン中は保存・変更が自動でクラウドに同期されます。未ログインでもこの端末内には保存されます。</p>
+  </div>
 
   <!-- 今日の流れメモ -->
   <div class="card">
@@ -151,7 +176,7 @@
       </label>
     </div>
     <div class="saved" id="savedMsg"></div>
-    <p class="hint">保存はこの端末のこのブラウザにだけ残ります。スマホ⇄PCで共有したい時は「書き出し」→もう片方に送って「読み込み」。</p>
+    <p class="hint">未ログイン時はこの端末のこのブラウザにだけ残ります。ログインすれば全端末で共有されます。</p>
   </div>
 
   <div class="card">
@@ -188,11 +213,14 @@
   </div>
 
   <p class="foot">
-    左上のチェックでそのブロックを「完了」に（畳まれます）。次に開くと未完了の位置まで自動スクロール。「↧ 未完了へ」でいつでもジャンプ。<br>
+    左上のチェックでそのブロックを「完了」に（畳まれます）。次に開くと未完了の位置まで自動スクロール。<br>
     実際の営業終了時刻は右の「×」で空白に戻せます。各ブロックのチェック項目は入力してEnterで追加。
   </p>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 const LAST_KEY="taxiShift_last_v1";
@@ -200,6 +228,9 @@ const PRESET_KEY="taxiShift_presets_v3";
 const V2_KEY="taxiShift_presets_v2";
 const V1_KEY="taxiShift_presets_v1";
 const NEWCAT="__new__";
+/* 東京マップと同じ Firebase プロジェクト */
+const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
+const CLOUD_COLLECTION="taxiShift";
 
 const state={
   out:"13:50",
@@ -246,6 +277,7 @@ function persistLast(){
   const snap=snapshot();
   snap.flowName=state.flowName; snap.flowCat=state.flowCat; snap.currentId=state.currentId;
   storeSet(LAST_KEY, snap);
+  scheduleSync();
 }
 
 /* presets: { id: {id, cat, name, data} } */
@@ -267,7 +299,7 @@ function getPresets(){
   }
   return p||{};
 }
-function savePresets(p){ storeSet(PRESET_KEY,p); }
+function savePresets(p){ storeSet(PRESET_KEY,p); scheduleSync(); }
 function categories(){ return [...new Set(Object.values(getPresets()).map(x=>x.cat||"").filter(c=>c!==""))].sort(); }
 
 function refreshPresetList(sel){
@@ -547,6 +579,73 @@ function scrollToFirstIncomplete(force){
   if(target) target.scrollIntoView({block:"start"});
 }
 
+/* ====== Firebase アカウント同期 ====== */
+let fbUser=null, fbDb=null, fbReady=false, _syncT=null, _pulling=false;
+function setAuthStatus(html, on){
+  $("#authStatus").innerHTML=`<span class="dot${on?' on':''}"></span>`+html;
+}
+function updateAuthUI(){
+  if(fbUser){
+    $("#authForm").style.display="none";
+    $("#authLoggedIn").style.display="block";
+    setAuthStatus(`ログイン中：<b>${esc(fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true);
+  }else{
+    $("#authForm").style.display="block";
+    $("#authLoggedIn").style.display="none";
+    setAuthStatus("未ログイン（この端末内のみ保存）", false);
+  }
+}
+function fbInit(){
+  if(typeof firebase==="undefined"){ setAuthStatus("同期ライブラリを読み込めません（オフライン保存のみ）", false); return; }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb=firebase.firestore();
+    fbReady=true;
+    firebase.auth().onAuthStateChanged(u=>{
+      fbUser=u||null; updateAuthUI();
+      if(fbUser) cloudPull();
+    });
+  }catch(e){ setAuthStatus("同期の初期化に失敗しました", false); }
+}
+async function cloudPull(){
+  if(!fbReady||!fbUser) return;
+  try{
+    _pulling=true;
+    const snap=await fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid).get();
+    if(snap.exists){
+      const d=snap.data()||{};
+      if(d.presets && typeof d.presets==="object") storeSet(PRESET_KEY, d.presets);
+      if(d.last){
+        applySnapshot(d.last);
+        state.flowName=d.last.flowName||""; state.flowCat=d.last.flowCat||""; state.currentId=d.last.currentId||null;
+        storeSet(LAST_KEY, d.last);
+      }
+      refreshPresetList(state.currentId||"");
+      $("#presetName").value=state.flowName; setCatUI(state.flowCat);
+      syncInputs(); updateCurFlow(); render();
+      toast("クラウドから読み込みました");
+    }else{
+      _pulling=false;
+      await cloudPushNow(); // クラウドが空なら今のローカルを保存
+      return;
+    }
+  }catch(e){ console.warn(e); setAuthStatus("同期エラー："+esc(e.code||e.message)+"（Firestoreのルール設定が必要かも）", true); }
+  finally{ _pulling=false; }
+}
+async function cloudPushNow(){
+  if(!fbReady||!fbUser||_pulling) return;
+  try{
+    const last=storeGet(LAST_KEY)||snapshot();
+    await fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid).set({
+      presets:getPresets(), last:last, updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+  }catch(e){ console.warn(e); setAuthStatus("クラウド保存エラー："+esc(e.code||e.message), true); }
+}
+function scheduleSync(){
+  if(!fbReady||!fbUser||_pulling) return;
+  clearTimeout(_syncT); _syncT=setTimeout(cloudPushNow, 900);
+}
+
 /* ---- 入力イベント ---- */
 $("#dayMemo").addEventListener("input",e=>{state.dayMemo=e.target.value;persistLast();});
 $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
@@ -567,7 +666,7 @@ $("#reset").addEventListener("click",()=>{
 $("#sched").addEventListener("input",e=>{
   const t=e.target; const x=t.dataset.idx, k=t.dataset.k;
   if(x===undefined) return;
-  if(k===undefined) return;   // 項目追加の入力欄など（再描画しない）
+  if(k===undefined) return;
   const s=state.segments[+x];
   if(k==="memo"){ s.memo=t.value; persistLast(); return; }
   if(k==="title"){ s.title=t.value; persistLast(); return; }
@@ -632,6 +731,27 @@ $("#sched").addEventListener("click",e=>{
 
 /* ---- カテゴリ選択 ---- */
 $("#catSel").addEventListener("change",toggleCatNew);
+
+/* ---- アカウント（ログイン/登録/ログアウト/同期） ---- */
+$("#btnLogin").addEventListener("click",async()=>{
+  if(!fbReady){ alert("同期の準備ができていません（通信環境を確認してください）"); return; }
+  const em=$("#authEmail").value.trim(), pw=$("#authPass").value;
+  if(!em||!pw){ alert("メールとパスワードを入力してください"); return; }
+  try{ await firebase.auth().signInWithEmailAndPassword(em,pw); $("#authPass").value=""; toast("ログインしました"); }
+  catch(e){ alert("ログインできませんでした：\n"+(e.message||e.code)); }
+});
+$("#btnSignup").addEventListener("click",async()=>{
+  if(!fbReady){ alert("同期の準備ができていません（通信環境を確認してください）"); return; }
+  const em=$("#authEmail").value.trim(), pw=$("#authPass").value;
+  if(!em||!pw){ alert("メールとパスワードを入力してください"); return; }
+  if(pw.length<6){ alert("パスワードは6文字以上にしてください"); return; }
+  try{ await firebase.auth().createUserWithEmailAndPassword(em,pw); $("#authPass").value=""; toast("アカウントを作成しました"); }
+  catch(e){ alert("登録できませんでした：\n"+(e.message||e.code)); }
+});
+$("#btnLogout").addEventListener("click",async()=>{
+  try{ await firebase.auth().signOut(); toast("ログアウトしました"); }catch(e){}
+});
+$("#btnSyncNow").addEventListener("click",async()=>{ await cloudPushNow(); toast("同期しました"); });
 
 /* ---- 保存・更新・読込・削除 ---- */
 function currentName(){ return $("#presetName").value.trim(); }
@@ -742,6 +862,7 @@ $("#importJson").addEventListener("change",e=>{
   $("#presetName").value=state.flowName; setCatUI(state.flowCat);
   syncInputs(); updateCurFlow(); render();
   setTimeout(()=>scrollToFirstIncomplete(false),60);
+  fbInit();
 })();
 </script>
 </body>
