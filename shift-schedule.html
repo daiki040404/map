@@ -58,6 +58,9 @@
   .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
     padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
   .seg-ctrl .fld label{font-size:11px;}
+  .timewrap{display:flex;gap:6px;align-items:center;}
+  .clearbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;
+    font-size:14px;font-weight:800;color:#6b7280;cursor:pointer;line-height:1;flex:none;}
   .eq{align-self:center;color:var(--sub);font-size:13px;font-weight:800;padding-bottom:9px;}
   .memo{flex:1 1 100%;}
   .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
@@ -186,7 +189,7 @@
 
   <p class="foot">
     左上のチェックでそのブロックを「完了」に（畳まれます）。次に開くと未完了の位置まで自動スクロール。「↧ 未完了へ」でいつでもジャンプ。<br>
-    やることリストは時間に影響しません。各ブロックのチェック項目は入力してEnterで追加。
+    実際の営業終了時刻は右の「×」で空白に戻せます。各ブロックのチェック項目は入力してEnterで追加。
   </p>
 </div>
 
@@ -458,7 +461,10 @@ function render(){
           </div>
           <div class="fld">
             <label>実際の営業終了時刻</label>
-            <input type="time" value="${seg.actual||""}" data-k="actual" data-idx="${row.idx}">
+            <div class="timewrap">
+              <input type="time" value="${seg.actual||""}" data-k="actual" data-idx="${row.idx}">
+              <button class="clearbtn" data-clearactual="${row.idx}" title="実際の終了時刻を空白に戻す">×</button>
+            </div>
             <span class="hint">${actualHint}</span>
           </div>
           ${segButtons(row.idx)}
@@ -609,6 +615,9 @@ $("#sched").addEventListener("click",e=>{
   const t=e.target;
   if(t.dataset.del!==undefined){
     if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); }
+  }else if(t.dataset.clearactual!==undefined){
+    const idx=+t.dataset.clearactual;
+    if(state.segments[idx]){ state.segments[idx].actual=null; render(); }
   }else if(t.dataset.deltask!==undefined){
     const idx=+t.dataset.idx, ti=+t.dataset.ti;
     if(state.segments[idx]&&state.segments[idx].tasks){ state.segments[idx].tasks.splice(ti,1); render(); }
