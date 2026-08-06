@@ -52,6 +52,7 @@
   .remain-neg{color:var(--danger); font-weight:700;}
   .sec-title{font-size:14px; font-weight:600; margin:0 0 10px;}
   .tbl-wrap{overflow-x:auto;}
+  code{background:#F0F2F1;padding:2px 6px;border-radius:5px;font-size:12px}
 </style>
 </head>
 <body>
@@ -118,12 +119,25 @@
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
       <button onclick="clearData()">全部クリア</button>
     </div>
-    <p class="note">始業・終業のカレンダーは空のとき今日の日付で開きます。営収は金額を数字で記入してください。入力はこのブラウザに自動保存されます。「CSVで書き出し」で記録をファイルに残せます（Excel等で開けます）。「バックアップ保存」したファイルは「バックアップ読み込み」でこのツールに戻せます。</p>
+    <p class="note">始業・終業のカレンダーは空のとき今日の日付で開きます。営収は金額を数字で記入してください。入力はこのブラウザに自動保存されます。</p>
+  </div>
+
+  <div class="card">
+    <p class="sec-title">全端末で同期する（スマホ・PCで同じデータ）</p>
+    <p class="note" id="syncStatus" style="margin-top:0">同期状態を確認中…</p>
+    <p class="note">この端末で入れた内容をスマホ・PC共通にしたいときは、下の「GitHub用にコピー」を押して、GitHubの <code>taxi_data.json</code> に貼り付けて Commit してください。起動時にGitHubの内容を自動で読み込み、より新しい方を表示します。</p>
+    <div class="btns">
+      <button class="primary" onclick="copyForGitHub()">GitHub用にコピー</button>
+      <button onclick="openTaxiDataOnGitHub()">GitHubのtaxi_data.jsonを開く</button>
+      <button onclick="reloadFromRepo()">GitHubから今すぐ読み込む</button>
+    </div>
   </div>
 </div>
 
 <script>
 var KEY = 'taxi_kinmu_v3';
+var TAXI_DATA_URL = './taxi_data.json';
+var GITHUB_EDIT_URL = 'https://github.com/daiki040404/map/edit/main/taxi_data.json';
 
 function parseTime(s){
   if(!s) return null;
@@ -146,6 +160,11 @@ function bindMinutes(startStr, endStr){
   return {mins:diff, valid: diff > 0};
 }
 function fmtYen(n){ return '¥' + Math.round(n).toLocaleString('ja-JP'); }
+function fmtStamp(ms){
+  if(!ms) return '';
+  var d = new Date(ms), p = function(n){return (n<10?'0':'')+n;};
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
 
 function buildRows(){
   var n = parseInt(document.getElementById('shiftCount').value,10) || 13;
@@ -285,13 +304,39 @@ function recalc(){
   }
 }
 
-function saveData(silent){
-  var data = {
+function currentData(){
+  return {
     monthType: document.getElementById('monthType').value,
     target: document.getElementById('target').value,
     shiftCount: document.getElementById('shiftCount').value,
-    rows: readInputs()
+    rows: readInputs(),
+    updatedAt: Date.now()
   };
+}
+
+function applyData(d){
+  if(!d) return;
+  if(d.monthType) document.getElementById('monthType').value = d.monthType;
+  if(d.target) document.getElementById('target').value = d.target;
+  if(d.shiftCount) document.getElementById('shiftCount').value = d.shiftCount;
+  buildRows();
+  if(d.rows){
+    var trs = document.querySelectorAll('#rows tr');
+    d.rows.forEach(function(r,i){
+      if(trs[i]){
+        trs[i].querySelector('.start').value = r.start||'';
+        trs[i].querySelector('.end').value = r.end||'';
+        trs[i].querySelector('.drive').value = r.drive||'';
+        trs[i].querySelector('.tgt').value = r.tgt||'';
+        trs[i].querySelector('.rev').value = r.rev||'';
+      }
+    });
+  }
+  recalc();
+}
+
+function saveData(silent){
+  var data = currentData();
   try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
   if(!silent && window.event && window.event.target){ var b=window.event.target; var t=b.textContent; b.textContent='保存しました'; setTimeout(function(){b.textContent=t;},1200); }
 }
@@ -300,30 +345,54 @@ function loadData(){
   var raw;
   try{ raw = localStorage.getItem(KEY); }catch(e){}
   if(raw){
-    try{
-      var d = JSON.parse(raw);
-      if(d.monthType) document.getElementById('monthType').value = d.monthType;
-      if(d.target) document.getElementById('target').value = d.target;
-      if(d.shiftCount) document.getElementById('shiftCount').value = d.shiftCount;
-      buildRows();
-      if(d.rows){
-        var trs = document.querySelectorAll('#rows tr');
-        d.rows.forEach(function(r,i){
-          if(trs[i]){
-            trs[i].querySelector('.start').value = r.start||'';
-            trs[i].querySelector('.end').value = r.end||'';
-            trs[i].querySelector('.drive').value = r.drive||'';
-            trs[i].querySelector('.tgt').value = r.tgt||'';
-            trs[i].querySelector('.rev').value = r.rev||'';
-          }
-        });
-        recalc();
-      }
-      return;
-    }catch(e){}
+    try{ applyData(JSON.parse(raw)); return; }catch(e){}
   }
   buildRows();
 }
+
+function setSyncStatus(msg){ var el=document.getElementById('syncStatus'); if(el) el.textContent = msg; }
+
+function localData(){
+  try{ var r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; }
+}
+
+function loadFromRepo(manual){
+  fetch(TAXI_DATA_URL + '?t=' + Date.now(), {cache:'no-store'})
+    .then(function(res){ if(!res.ok) throw new Error('nofile'); return res.json(); })
+    .then(function(remote){
+      var local = localData();
+      var rU = remote.updatedAt || 0;
+      var lU = (local && local.updatedAt) ? local.updatedAt : 0;
+      if(!local || rU >= lU){
+        applyData(remote);
+        try{ localStorage.setItem(KEY, JSON.stringify(remote)); }catch(e){}
+        setSyncStatus('GitHubの最新を表示中'+(remote.updatedAt?'（更新 '+fmtStamp(remote.updatedAt)+'）':'')+'。');
+      } else {
+        setSyncStatus('この端末に未反映の新しい入力があります。「GitHub用にコピー」で共通化してください。');
+      }
+    })
+    .catch(function(){
+      if(!localData()) loadData();
+      setSyncStatus('ローカル表示中（GitHubのtaxi_data.jsonが未作成、またはオフライン）。「GitHub用にコピー」で作成できます。');
+    });
+}
+
+function reloadFromRepo(){ setSyncStatus('GitHubから読み込み中…'); loadFromRepo(true); }
+
+function copyForGitHub(){
+  var data = currentData();
+  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  var txt = JSON.stringify(data, null, 2);
+  function done(){ setSyncStatus('コピー完了。「GitHubのtaxi_data.jsonを開く」で貼り付け→Commitすれば全端末に反映されます。'); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(function(){ done(); alert('コピーしました。\n\n次に「GitHubのtaxi_data.jsonを開く」を押し、中身を全部消して貼り付け、Commit changes で全端末に反映されます。'); },
+    function(){ window.prompt('以下を全部コピーして taxi_data.json に貼り付けてください：', txt); });
+  } else {
+    window.prompt('以下を全部コピーして taxi_data.json に貼り付けてください：', txt);
+  }
+}
+
+function openTaxiDataOnGitHub(){ window.open(GITHUB_EDIT_URL, '_blank'); }
 
 function fmtDT(v){ return v ? v.replace('T',' ').replace(/-/g,'/') : ''; }
 function todayStamp(){
@@ -381,13 +450,7 @@ function exportCSV(){
 }
 
 function exportJSON(){
-  var data = {
-    monthType: document.getElementById('monthType').value,
-    target: document.getElementById('target').value,
-    shiftCount: document.getElementById('shiftCount').value,
-    rows: readInputs()
-  };
-  download('タクシー勤務バックアップ_'+todayStamp()+'.json', JSON.stringify(data,null,2), 'application/json');
+  download('タクシー勤務バックアップ_'+todayStamp()+'.json', JSON.stringify(currentData(),null,2), 'application/json');
 }
 
 function importJSON(input){
@@ -397,23 +460,8 @@ function importJSON(input){
   reader.onload = function(e){
     try{
       var d = JSON.parse(e.target.result);
-      if(d.monthType) document.getElementById('monthType').value = d.monthType;
-      if(d.target) document.getElementById('target').value = d.target;
-      if(d.shiftCount) document.getElementById('shiftCount').value = d.shiftCount;
-      buildRows();
-      if(d.rows){
-        var trs = document.querySelectorAll('#rows tr');
-        d.rows.forEach(function(r,i){
-          if(trs[i]){
-            trs[i].querySelector('.start').value = r.start||'';
-            trs[i].querySelector('.end').value = r.end||'';
-            trs[i].querySelector('.drive').value = r.drive||'';
-            trs[i].querySelector('.tgt').value = r.tgt||'';
-            trs[i].querySelector('.rev').value = r.rev||'';
-          }
-        });
-      }
-      recalc(); saveData(true);
+      applyData(d);
+      saveData(true);
       alert('読み込みました。');
     }catch(err){ alert('読み込めませんでした。バックアップ(JSON)ファイルを選んでください。'); }
     input.value = '';
@@ -433,6 +481,7 @@ document.getElementById('target').addEventListener('input', function(){ recalc()
 document.getElementById('shiftCount').addEventListener('input', function(){ buildRows(); saveData(true); });
 
 loadData();
+loadFromRepo();
 </script>
 </body>
 </html>
