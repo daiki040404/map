@@ -52,6 +52,8 @@
   .remain-neg{color:var(--danger); font-weight:700;}
   .sec-title{font-size:14px; font-weight:600; margin:0 0 10px;}
   .tbl-wrap{overflow-x:auto;}
+  .sync-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#c9c8bf;margin-right:6px;vertical-align:middle;}
+  .sync-dot.on{background:#3b6d11;} .sync-dot.err{background:#a32d2d;}
   code{background:#F0F2F1;padding:2px 6px;border-radius:5px;font-size:12px}
 </style>
 </head>
@@ -59,6 +61,15 @@
 <div class="wrap">
   <h1>タクシー勤務管理</h1>
   <p class="sub">始業・終業をそれぞれ「日付＋時刻」で選ぶと拘束時間を自動計算します（翌日終業もそのまま正しく計算）。月間拘束の残り・運転時間の平均・営収の平均も出ます。</p>
+
+  <div class="card">
+    <p class="sec-title">全端末で同期（Googleログイン）</p>
+    <p class="note" id="syncStatus" style="margin-top:0"><span class="sync-dot" id="syncDot"></span>同期状態を確認中…</p>
+    <p class="note">スマホとPCで<b>同じGoogleアカウント</b>にログインすると、入力が自動で全端末に同期されます（東京マップと同じ仕組み）。ログインしない場合はこの端末だけに保存されます。</p>
+    <div class="btns">
+      <button class="primary" id="authBtn" onclick="authClick()">Googleでログイン</button>
+    </div>
+  </div>
 
   <div class="card">
     <div class="controls">
@@ -119,25 +130,27 @@
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
       <button onclick="clearData()">全部クリア</button>
     </div>
-    <p class="note">始業・終業のカレンダーは空のとき今日の日付で開きます。営収は金額を数字で記入してください。入力はこのブラウザに自動保存されます。</p>
-  </div>
-
-  <div class="card">
-    <p class="sec-title">全端末で同期する（スマホ・PCで同じデータ）</p>
-    <p class="note" id="syncStatus" style="margin-top:0">同期状態を確認中…</p>
-    <p class="note">この端末で入れた内容をスマホ・PC共通にしたいときは、下の「GitHub用にコピー」を押して、GitHubの <code>taxi_data.json</code> に貼り付けて Commit してください。起動時にGitHubの内容を自動で読み込み、より新しい方を表示します。</p>
-    <div class="btns">
-      <button class="primary" onclick="copyForGitHub()">GitHub用にコピー</button>
-      <button onclick="openTaxiDataOnGitHub()">GitHubのtaxi_data.jsonを開く</button>
-      <button onclick="reloadFromRepo()">GitHubから今すぐ読み込む</button>
-    </div>
+    <p class="note">始業・終業のカレンダーは空のとき今日の日付で開きます。営収は金額を数字で記入してください。入力は自動保存され、ログイン中は全端末に同期されます。</p>
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 var KEY = 'taxi_kinmu_v3';
-var TAXI_DATA_URL = './taxi_data.json';
-var GITHUB_EDIT_URL = 'https://github.com/daiki040404/map/edit/main/taxi_data.json';
+
+/* ===== 東京マップと同じ Firebase プロジェクト（Googleログイン同期） ===== */
+var FB_CONFIG = {
+  apiKey: "AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",
+  authDomain: "tokyo-75556.firebaseapp.com",
+  projectId: "tokyo-75556",
+  storageBucket: "tokyo-75556.firebasestorage.app",
+  messagingSenderId: "143590278758",
+  appId: "1:143590278758:web:3086b0b046376283b3cfa7"
+};
+var FB_COLLECTION = 'taxiKinmu';  /* マップ等と干渉しない専用コレクション */
+var fbUser = null, fbDb = null, _syncT = null, _applyingRemote = false, _unsub = null;
 
 function parseTime(s){
   if(!s) return null;
@@ -338,6 +351,7 @@ function applyData(d){
 function saveData(silent){
   var data = currentData();
   try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+  syncPush();
   if(!silent && window.event && window.event.target){ var b=window.event.target; var t=b.textContent; b.textContent='保存しました'; setTimeout(function(){b.textContent=t;},1200); }
 }
 
@@ -350,50 +364,98 @@ function loadData(){
   buildRows();
 }
 
-function setSyncStatus(msg){ var el=document.getElementById('syncStatus'); if(el) el.textContent = msg; }
-
 function localData(){
   try{ var r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; }
 }
 
-function loadFromRepo(manual){
-  fetch(TAXI_DATA_URL + '?t=' + Date.now(), {cache:'no-store'})
-    .then(function(res){ if(!res.ok) throw new Error('nofile'); return res.json(); })
-    .then(function(remote){
-      var local = localData();
-      var rU = remote.updatedAt || 0;
-      var lU = (local && local.updatedAt) ? local.updatedAt : 0;
-      if(!local || rU >= lU){
-        applyData(remote);
-        try{ localStorage.setItem(KEY, JSON.stringify(remote)); }catch(e){}
-        setSyncStatus('GitHubの最新を表示中'+(remote.updatedAt?'（更新 '+fmtStamp(remote.updatedAt)+'）':'')+'。');
-      } else {
-        setSyncStatus('この端末に未反映の新しい入力があります。「GitHub用にコピー」で共通化してください。');
-      }
-    })
-    .catch(function(){
-      if(!localData()) loadData();
-      setSyncStatus('ローカル表示中（GitHubのtaxi_data.jsonが未作成、またはオフライン）。「GitHub用にコピー」で作成できます。');
-    });
+/* ===== 同期の表示 ===== */
+function setSyncStatus(msg, state){
+  var el = document.getElementById('syncStatus');
+  var dot = '<span class="sync-dot'+(state==='on'?' on':(state==='err'?' err':''))+'" id="syncDot"></span>';
+  if(el) el.innerHTML = dot + msg;
 }
 
-function reloadFromRepo(){ setSyncStatus('GitHubから読み込み中…'); loadFromRepo(true); }
-
-function copyForGitHub(){
-  var data = currentData();
-  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
-  var txt = JSON.stringify(data, null, 2);
-  function done(){ setSyncStatus('コピー完了。「GitHubのtaxi_data.jsonを開く」で貼り付け→Commitすれば全端末に反映されます。'); }
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(function(){ done(); alert('コピーしました。\n\n次に「GitHubのtaxi_data.jsonを開く」を押し、中身を全部消して貼り付け、Commit changes で全端末に反映されます。'); },
-    function(){ window.prompt('以下を全部コピーして taxi_data.json に貼り付けてください：', txt); });
-  } else {
-    window.prompt('以下を全部コピーして taxi_data.json に貼り付けてください：', txt);
+/* ===== Firebase：Googleログインで自動同期 ===== */
+function initFirebase(){
+  if(typeof firebase === 'undefined'){ setSyncStatus('同期ライブラリを読み込めませんでした（オフライン？）。ローカル保存で動作します。','err'); return; }
+  try{
+    firebase.initializeApp(FB_CONFIG);
+    fbDb = firebase.firestore();
+    firebase.auth().onAuthStateChanged(function(u){
+      fbUser = u;
+      var btn = document.getElementById('authBtn');
+      if(u){
+        btn.textContent = 'ログアウト';
+        setSyncStatus('ログイン中：'+(u.email||u.displayName||'')+' — 自動同期オン', 'on');
+        startSync();
+      } else {
+        btn.textContent = 'Googleでログイン';
+        setSyncStatus('未ログイン（この端末だけに保存）。ログインすると全端末で自動同期します。');
+        if(_unsub){ _unsub(); _unsub=null; }
+      }
+    });
+    firebase.auth().getRedirectResult().catch(function(){});
+  }catch(e){
+    setSyncStatus('同期の初期化に失敗しました。ローカル保存で動作します。','err');
   }
 }
 
-function openTaxiDataOnGitHub(){ window.open(GITHUB_EDIT_URL, '_blank'); }
+function authClick(){
+  if(typeof firebase === 'undefined' || !firebase.auth){ alert('同期ライブラリを読み込めませんでした。通信環境をご確認ください。'); return; }
+  if(fbUser){ firebase.auth().signOut(); return; }
+  var provider = new firebase.auth.GoogleAuthProvider();
+  setSyncStatus('ログイン処理中…');
+  firebase.auth().signInWithPopup(provider).catch(function(err){
+    var code = err && err.code || '';
+    if(code==='auth/popup-blocked' || code==='auth/cancelled-popup-request' || code==='auth/operation-not-supported-in-this-environment' || code==='auth/popup-closed-by-user'){
+      firebase.auth().signInWithRedirect(provider);
+    } else {
+      setSyncStatus('ログインできませんでした（'+code+'）。','err');
+    }
+  });
+}
 
+function startSync(){
+  if(!fbUser || !fbDb) return;
+  var ref = fbDb.collection(FB_COLLECTION).doc(fbUser.uid);
+  if(_unsub){ _unsub(); }
+  _unsub = ref.onSnapshot(function(snap){
+    if(!snap.exists){ syncPush(true); return; }
+    if(snap.metadata.hasPendingWrites) return;   // 自分の書き込みのエコーは無視
+    var remote = snap.data() || {};
+    var rd = null; try{ rd = JSON.parse(remote.dataJson); }catch(e){}
+    if(!rd) return;
+    var local = localData();
+    var rU = remote.updatedAt || 0, lU = (local && local.updatedAt) ? local.updatedAt : 0;
+    if(rU > lU){
+      _applyingRemote = true;
+      applyData(rd);
+      try{ localStorage.setItem(KEY, JSON.stringify(rd)); }catch(e){}
+      _applyingRemote = false;
+      setSyncStatus('最新に同期しました（更新 '+fmtStamp(rU)+'）。', 'on');
+    } else if(lU > rU){
+      syncPush(true);   // この端末の方が新しい → クラウドへ反映
+    }
+  }, function(err){
+    setSyncStatus('同期エラー（'+(err&&err.code||'')+'）。', 'err');
+  });
+}
+
+function syncPush(force){
+  if(!fbUser || !fbDb) return;
+  if(_applyingRemote && !force) return;
+  clearTimeout(_syncT);
+  _syncT = setTimeout(function(){
+    var data = currentData();
+    try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+    fbDb.collection(FB_COLLECTION).doc(fbUser.uid)
+      .set({ dataJson: JSON.stringify(data), updatedAt: data.updatedAt })
+      .then(function(){ setSyncStatus('同期しました（'+fmtStamp(data.updatedAt)+'）。', 'on'); })
+      .catch(function(err){ setSyncStatus('保存エラー（'+(err&&err.code||'')+'）。', 'err'); });
+  }, 800);
+}
+
+/* ===== 書き出し・バックアップ ===== */
 function fmtDT(v){ return v ? v.replace('T',' ').replace(/-/g,'/') : ''; }
 function todayStamp(){
   var d = new Date();
@@ -474,6 +536,7 @@ function clearData(){
   try{ localStorage.removeItem(KEY); }catch(e){}
   document.querySelectorAll('#rows input').forEach(function(i){ i.value=''; });
   recalc();
+  saveData(true);
 }
 
 document.getElementById('monthType').addEventListener('change', function(){ recalc(); saveData(true); });
@@ -481,7 +544,7 @@ document.getElementById('target').addEventListener('input', function(){ recalc()
 document.getElementById('shiftCount').addEventListener('input', function(){ buildRows(); saveData(true); });
 
 loadData();
-loadFromRepo();
+initFirebase();
 </script>
 </body>
 </html>
