@@ -3,21 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>タクシー営業ダッシュボード</title>
+<title>タクシー営収分析</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+<!-- Firebase（東京マップと同じ方式：Googleアカウント同期） -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root { color-scheme: light; }
 * { box-sizing: border-box; }
-body { margin:0; background:#f4f6fa; color:#1a2233;
-  font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
-.wrap { max-width:900px; margin:0 auto; padding:18px 16px 48px; }
-h1 { font-size:19px; margin:4px 0 2px; }
-.sub { color:#6b7688; font-size:13px; margin-bottom:16px; }
+body { margin:0; background:#f4f6fa; color:#1a2233; font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+.wrap { max-width:900px; margin:0 auto; padding:16px 16px 48px; }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+h1 { font-size:19px; margin:4px 0; }
+.sub { color:#6b7688; font-size:13px; }
+.authbox { font-size:13px; display:flex; align-items:center; gap:8px; }
+.btn { border:0; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
+.btn.g { background:#4285F4; color:#fff; }
+.btn.ghost { background:#eaeef5; color:#333; }
+.btn.add { background:#1e824c; color:#fff; }
+.pill { font-size:12px; color:#2e7d32; background:#eafaf1; padding:4px 10px; border-radius:999px; }
+.pill.off { color:#8a6d3b; background:#fcf3e3; }
 
-.heroRow { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.heroRow { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
 .hero { border-radius:18px; padding:20px 22px; color:#fff; }
-.hero.green { background:linear-gradient(135deg,#1e824c,#2ecc71); box-shadow:0 6px 16px rgba(30,130,76,.22); }
-.hero.blue  { background:linear-gradient(135deg,#2c5fa8,#4a90e2); box-shadow:0 6px 16px rgba(44,95,168,.22); }
+.hero.green { background:linear-gradient(135deg,#1e824c,#2ecc71); }
+.hero.blue  { background:linear-gradient(135deg,#2c5fa8,#4a90e2); }
 .hero .lbl { font-size:14px; opacity:.92; }
 .hero .big { font-size:44px; font-weight:800; line-height:1.05; margin:6px 0 2px; letter-spacing:-1px; }
 .hero .big span { font-size:20px; font-weight:700; }
@@ -27,136 +38,267 @@ h1 { font-size:19px; margin:4px 0 2px; }
 .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
 .sm { background:#fff; border-radius:14px; padding:14px 10px; text-align:center; box-shadow:0 2px 8px rgba(20,30,60,.06); }
 .sm .k { font-size:12px; color:#6b7688; }
-.sm .v { font-size:22px; font-weight:800; margin-top:4px; }
-.sm .v small{ font-size:13px; color:#8a94a6; font-weight:700; }
+.sm .v { font-size:22px; font-weight:800; margin-top:4px; } .sm .v small{font-size:13px;color:#8a94a6;font-weight:700;}
 @media(max-width:560px){ .summary{grid-template-columns:repeat(2,1fr);} }
 
-.panel { background:#fff; border-radius:16px; padding:16px 16px 12px; margin-top:16px; box-shadow:0 2px 8px rgba(20,30,60,.06); }
+.panel { background:#fff; border-radius:16px; padding:16px; margin-top:16px; box-shadow:0 2px 8px rgba(20,30,60,.06); }
 .panel h2 { font-size:15px; margin:0 0 4px; }
 .panel .note { font-size:12px; color:#8a94a6; margin:0 0 10px; }
-select { font-size:13px; padding:4px 8px; border-radius:8px; border:1px solid #cfd6e2; }
+select,input,textarea { font-size:13px; padding:6px 8px; border-radius:8px; border:1px solid #cfd6e2; font-family:inherit; }
 .chartbox { position:relative; height:240px; }
-
 table { width:100%; border-collapse:collapse; font-size:14px; }
 th,td { padding:9px 8px; text-align:right; white-space:nowrap; }
 th { color:#6b7688; font-size:12px; border-bottom:2px solid #e6eaf1; }
 td:first-child, th:first-child { text-align:left; }
 tbody tr:nth-child(odd){ background:#fafbfd; }
-tbody tr:last-child{ background:#eafaf1; font-weight:700; }
 .tblwrap{ overflow-x:auto; }
-.err{ background:#fff3f3; border:1px solid #f3c0c0; color:#a12; padding:14px; border-radius:12px; }
+.form-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.form-grid label{ font-size:12px; color:#6b7688; display:flex; flex-direction:column; gap:3px; }
+@media(max-width:560px){ .form-grid{grid-template-columns:repeat(2,1fr);} }
+.delx{ background:none; border:0; color:#c0392b; cursor:pointer; font-size:13px; }
+.muted{ color:#8a94a6; font-size:12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🚕 タクシー営業ダッシュボード</h1>
-  <div class="sub">辻大貴さん / 日本交通 三鷹第一営業所 — <span id="count"></span></div>
+  <div class="topbar">
+    <div>
+      <h1>🚕 タクシー営収分析</h1>
+      <div class="sub">辻大貴さん / 日本交通 三鷹第一営業所 — <span id="count"></span></div>
+    </div>
+    <div class="authbox" id="authbox">
+      <span class="pill off" id="syncState">ローカル保存中</span>
+      <button class="btn g" id="loginBtn">Googleでログイン</button>
+    </div>
+  </div>
 
   <div id="app"></div>
+
+  <div class="panel">
+    <h2>➕ 今日のデータを追加</h2>
+    <p class="note">仕事終わりにここへ入力（または下の枠にJSONを貼り付け）→「追加」。ログイン中なら自動でアカウントに保存されます。</p>
+    <div class="form-grid">
+      <label>日付<input type="date" id="f_date"></label>
+      <label>営業収入(円)<input type="number" id="f_uri" placeholder="41090"></label>
+      <label>ハンドル時間(h:mm)<input type="text" id="f_handle" placeholder="14:41"></label>
+      <label>営業回数<input type="number" id="f_kaisu" placeholder="19"></label>
+      <label>実車km<input type="number" id="f_jissha" placeholder="64"></label>
+      <label>全走行km<input type="number" id="f_soukou" placeholder="247"></label>
+      <label style="grid-column:span 2">時間帯別売上（例 16:6100, 18:5900, 1:11430）<input type="text" id="f_slots" placeholder="16:6100, 18:5900, 22:1000"></label>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn add" id="addBtn">この内容で追加</button>
+      <span class="muted">または ↓ にJSONを貼って追加</span>
+    </div>
+    <textarea id="pasteBox" rows="4" style="width:100%; margin-top:8px;" placeholder='貼り付け例：{ "date":"2026-07-27","wday":"月","uriage":38500,"handleH":13.5,"kaisu":17,"jissha":60,"soukou":230,"slots":{"18":5000,"22":8000} }'></textarea>
+    <div style="margin-top:8px;"><button class="btn ghost" id="pasteBtn">貼り付けたJSONを追加</button></div>
+  </div>
 </div>
 
-<!-- データ本体（毎日ここに追記していく） -->
-<script src="data.js"></script>
 <script>
-(function(){
-  const DATA = (window.TAXI_DATA||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
-  const CFG  = window.TAXI_CONFIG||{};
-  const app  = document.getElementById("app");
-  if(!DATA.length){ app.innerHTML='<div class="err">データがありません。data.js に1件追加してください。</div>'; return; }
+/* ====== Firebase（東京マップと同じプロジェクト＝同じGoogleアカウント同期） ====== */
+const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
+const LS_DATA='taxi_eigyo_v1';
+const COLL='eigyo_bunseki'; // 地図データと別の保管場所
+let fbAuth=null, fbDb=null, fbUser=null, _syncT=null, _cloudLoading=false;
 
-  const yen  = n => "¥"+Math.round(n).toLocaleString();
-  const tanka= d => Math.round(d.uriage/d.handleH);
-  const kyaku= d => Math.round(d.uriage/d.kaisu);
-  const jisRt= d => (d.jissha/d.soukou*100);
-  const hhmm = h => Math.floor(h)+":"+String(Math.round((h-Math.floor(h))*60)).padStart(2,"0");
-  const md   = d => { const p=d.date.split("-"); return (+p[1])+"/"+(+p[2])+"("+(d.wday||"")+")"; };
-  const last = DATA[DATA.length-1];
-  document.getElementById("count").textContent = "記録 "+DATA.length+"日分";
+/* ====== データ（初期値。以降はローカル/クラウドが優先） ====== */
+const DEFAULT_DATA=[
+  { "date":"2026-07-26","wday":"日","uriage":41090,"handleH":14.683,"kaisu":19,"jissha":64,"soukou":247,
+    "slots":{"16":6100,"18":5900,"20":5200,"21":7600,"22":1000,"0":1900,"1":11430,"4":11120} }
+];
+let DATA;
+try{ const s=localStorage.getItem(LS_DATA); DATA=s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+catch(e){ DATA=JSON.parse(JSON.stringify(DEFAULT_DATA)); }
 
-  // 合計・平均（給与計算シート的サマリー）
-  const sumUri = DATA.reduce((s,d)=>s+d.uriage,0);
-  const avgTanka = Math.round(DATA.reduce((s,d)=>s+tanka(d),0)/DATA.length);
-  const avgKyaku = Math.round(DATA.reduce((s,d)=>s+kyaku(d),0)/DATA.length);
-  const payHtml = (CFG.commissionRate)
-      ? `<div class="sm"><div class="k">推定給与(歩合${Math.round(CFG.commissionRate*100)}%)</div><div class="v">${yen(sumUri*CFG.commissionRate)}</div></div>`
-      : `<div class="sm"><div class="k">記録日数</div><div class="v">${DATA.length}<small>日</small></div></div>`;
+function saveData(){ try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){} syncPush(); render(); }
+function dedupeSort(arr){
+  const m={}; arr.forEach(d=>{ if(d&&d.date) m[d.date]=d; });
+  return Object.values(m).sort((a,b)=>a.date<b.date?-1:1);
+}
 
-  app.innerHTML = `
+/* ====== Firebase 初期化・同期 ====== */
+function initFirebase(){
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth=firebase.auth(); fbDb=firebase.firestore();
+    fbAuth.onAuthStateChanged(async user=>{
+      fbUser=user;
+      if(user){
+        setSync(true, user.email||user.displayName||"ログイン中");
+        await cloudLoad();
+      }else{
+        setSync(false);
+      }
+      renderAuth();
+    });
+  }catch(e){ console.warn('firebase init failed',e); setSync(false); }
+}
+function setSync(on,label){
+  const el=document.getElementById('syncState');
+  if(on){ el.className='pill'; el.textContent='☁ 同期中: '+(label||''); }
+  else  { el.className='pill off'; el.textContent='ローカル保存中'; }
+}
+async function login(){
+  if(!fbAuth) return;
+  try{ await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+  catch(e){ alert('ログインに失敗しました: '+(e&&e.message||e)); }
+}
+async function logout(){ if(fbAuth) await fbAuth.signOut(); }
+async function cloudLoad(){
+  if(!fbUser||!fbDb) return;
+  _cloudLoading=true;
+  try{
+    const ref=fbDb.collection(COLL).doc(fbUser.uid);
+    const snap=await ref.get();
+    if(snap.exists && Array.isArray(snap.data().data) && snap.data().data.length){
+      DATA=dedupeSort(snap.data().data);
+      try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){}
+    }else{
+      await ref.set({data:DATA, updatedAt:Date.now()}); // 初回：ローカルをクラウドへ
+    }
+  }catch(e){ console.warn('cloudLoad failed',e); }
+  _cloudLoading=false;
+  render();
+}
+function syncPush(){
+  if(!fbUser||!fbDb||_cloudLoading) return;
+  clearTimeout(_syncT);
+  _syncT=setTimeout(async()=>{
+    try{ await fbDb.collection(COLL).doc(fbUser.uid).set({data:DATA, updatedAt:Date.now()}); }
+    catch(e){ console.warn('syncPush failed',e); }
+  }, 600);
+}
+function renderAuth(){
+  const box=document.getElementById('authbox');
+  const state=document.getElementById('syncState');
+  box.innerHTML='';
+  box.appendChild(state);
+  const b=document.createElement('button');
+  if(fbUser){ b.className='btn ghost'; b.textContent='ログアウト'; b.onclick=logout; }
+  else      { b.className='btn g';     b.textContent='Googleでログイン'; b.onclick=login; }
+  box.appendChild(b);
+}
+
+/* ====== 計算 ====== */
+const yen  = n => "¥"+Math.round(n).toLocaleString();
+const tanka= d => Math.round(d.uriage/d.handleH);
+const kyaku= d => Math.round(d.uriage/d.kaisu);
+const jisRt= d => (d.soukou? d.jissha/d.soukou*100 : 0);
+const hhmm = h => Math.floor(h)+":"+String(Math.round((h-Math.floor(h))*60)).padStart(2,"0");
+const md   = d => { const p=d.date.split("-"); return (+p[1])+"/"+(+p[2])+"("+(d.wday||"")+")"; };
+const ord  = k => { const h=parseInt(k); return h>=13?h:h+24; };
+const sortH= ks => ks.slice().sort((a,b)=>ord(a)-ord(b));
+
+let charts={};
+function killCharts(){ Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}}); charts={}; }
+
+/* ====== 描画 ====== */
+function render(){
+  const app=document.getElementById('app');
+  DATA=dedupeSort(DATA);
+  document.getElementById('count').textContent = '記録 '+DATA.length+'日分';
+  killCharts();
+  if(!DATA.length){ app.innerHTML='<div class="panel">データがありません。下のフォームから追加してください。</div>'; return; }
+  const last=DATA[DATA.length-1];
+  const sumUri=DATA.reduce((s,d)=>s+d.uriage,0);
+  const avgTanka=Math.round(DATA.reduce((s,d)=>s+tanka(d),0)/DATA.length);
+  const avgKyaku=Math.round(DATA.reduce((s,d)=>s+kyaku(d),0)/DATA.length);
+
+  app.innerHTML=`
     <div class="heroRow">
-      <div class="hero green">
-        <div class="lbl">最新の時間単価（売上 ÷ ハンドル時間）</div>
+      <div class="hero green"><div class="lbl">最新の時間単価（売上 ÷ ハンドル時間）</div>
         <div class="big">¥${tanka(last).toLocaleString()}<span>/時</span></div>
-        <div class="day">${md(last)} ・ ハンドル${hhmm(last.handleH)}</div>
-      </div>
-      <div class="hero blue">
-        <div class="lbl">最新の客単価（売上 ÷ 営業回数）</div>
+        <div class="day">${md(last)} ・ ハンドル${hhmm(last.handleH)}</div></div>
+      <div class="hero blue"><div class="lbl">最新の客単価（売上 ÷ 営業回数）</div>
         <div class="big">¥${kyaku(last).toLocaleString()}</div>
-        <div class="day">${md(last)} ・ ${last.kaisu}回</div>
-      </div>
+        <div class="day">${md(last)} ・ ${last.kaisu}回</div></div>
     </div>
-
     <div class="summary">
       <div class="sm"><div class="k">合計売上</div><div class="v">${yen(sumUri)}</div></div>
       <div class="sm"><div class="k">平均 時間単価</div><div class="v">${yen(avgTanka)}</div></div>
       <div class="sm"><div class="k">平均 客単価</div><div class="v">${yen(avgKyaku)}</div></div>
-      ${payHtml}
+      <div class="sm"><div class="k">記録日数</div><div class="v">${DATA.length}<small>日</small></div></div>
     </div>
-
-    <div class="panel">
-      <h2>📋 過去の営業データ</h2>
-      <p class="note">新しい日が下に増えます。</p>
-      <div class="tblwrap"><table id="hist">
-        <thead><tr><th>日付</th><th>売上</th><th>時間単価</th><th>客単価</th><th>実車率</th><th>回数</th><th>ハンドル</th></tr></thead>
-        <tbody></tbody></table></div>
-    </div>
-
-    <div class="panel"><h2>📈 時間単価の推移</h2><p class="note">棒が高いほど1時間でよく稼げた日。</p><div class="chartbox"><canvas id="cTanka"></canvas></div></div>
-    <div class="panel"><h2>💰 客単価の推移</h2><p class="note">1回の乗車で平均いくら＝長距離を取れてるか。</p><div class="chartbox"><canvas id="cKyaku"></canvas></div></div>
-    <div class="panel"><h2>🕐 時間帯別 売上　<select id="slotDay"></select></h2><p class="note">その日の中でどの時間帯が稼げたか。「全日の平均」でいつも強い時間帯がわかる。</p><div class="chartbox"><canvas id="cSlots"></canvas></div></div>
-    <div class="panel"><h2>⏱️ 時間帯ごとの過去の営収　<select id="hourSel"></select></h2><p class="note">選んだ時間帯が、過去の各日でいくら稼げてたか。</p><div class="chartbox"><canvas id="cHour"></canvas></div></div>
+    <div class="panel"><h2>📋 過去の営業データ</h2><p class="note">新しい日が下に増えます。</p>
+      <div class="tblwrap"><table id="hist"><thead><tr><th>日付</th><th>売上</th><th>時間単価</th><th>客単価</th><th>実車率</th><th>回数</th><th>ハンドル</th><th></th></tr></thead><tbody></tbody></table></div></div>
+    <div class="panel"><h2>📈 時間単価の推移</h2><div class="chartbox"><canvas id="cTanka"></canvas></div></div>
+    <div class="panel"><h2>💰 客単価の推移</h2><div class="chartbox"><canvas id="cKyaku"></canvas></div></div>
+    <div class="panel"><h2>🕐 時間帯別 売上　<select id="slotDay"></select></h2><p class="note">「全日の平均」でいつも強い時間帯がわかる。</p><div class="chartbox"><canvas id="cSlots"></canvas></div></div>
+    <div class="panel"><h2>⏱️ 時間帯ごとの過去の営収　<select id="hourSel"></select></h2><p class="note">選んだ時間帯が過去の各日でいくら稼げてたか。</p><div class="chartbox"><canvas id="cHour"></canvas></div></div>
   `;
 
-  // 履歴テーブル
-  const tb=document.querySelector("#hist tbody");
-  DATA.forEach(d=>{ const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${md(d)}</td><td>${yen(d.uriage)}</td><td>${yen(tanka(d))}</td><td>${yen(kyaku(d))}</td><td>${jisRt(d).toFixed(1)}%</td><td>${d.kaisu}回</td><td>${hhmm(d.handleH)}</td>`;
+  const tb=document.querySelector('#hist tbody');
+  DATA.forEach(d=>{ const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${md(d)}</td><td>${yen(d.uriage)}</td><td>${yen(tanka(d))}</td><td>${yen(kyaku(d))}</td><td>${jisRt(d).toFixed(1)}%</td><td>${d.kaisu}回</td><td>${hhmm(d.handleH)}</td><td><button class="delx" data-date="${d.date}">削除</button></td>`;
     tb.appendChild(tr); });
+  tb.querySelectorAll('.delx').forEach(b=>b.onclick=()=>{ if(confirm(b.dataset.date+' を削除しますか？')){ DATA=DATA.filter(x=>x.date!==b.dataset.date); saveData(); } });
 
   const yenFmt=v=>"¥"+Math.round(v).toLocaleString();
   const labels=DATA.map(md);
-  function bar(id,arr,c){ new Chart(document.getElementById(id),{type:"bar",
+  function bar(id,arr,c){ charts[id]=new Chart(document.getElementById(id),{type:'bar',
     data:{labels,datasets:[{data:arr,backgroundColor:DATA.map((_,i)=>i===DATA.length-1?c[0]:c[1]),borderRadius:8,maxBarThickness:64}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:yenFmt}}}}}); }
-  bar("cTanka",DATA.map(tanka),["#2ecc71","#a9d8bd"]);
-  bar("cKyaku",DATA.map(kyaku),["#4a90e2","#b7d4f2"]);
+  bar('cTanka',DATA.map(tanka),["#2ecc71","#a9d8bd"]);
+  bar('cKyaku',DATA.map(kyaku),["#4a90e2","#b7d4f2"]);
 
-  // 時間帯（1日 / 全日平均）
-  const ord=k=>{const h=parseInt(k);return h>=13?h:h+24;};
-  const sortH=ks=>ks.slice().sort((a,b)=>ord(a)-ord(b));
-  const lbl=k=>k+"時";
   function avgSlots(){const s={},c={};DATA.forEach(d=>Object.entries(d.slots||{}).forEach(([k,v])=>{if(v>0){s[k]=(s[k]||0)+v;c[k]=(c[k]||0)+1;}}));const o={};Object.keys(s).forEach(k=>o[k]=Math.round(s[k]/c[k]));return o;}
-  let slotChart=null;
   function renderSlots(sel){const src=sel==="avg"?avgSlots():DATA[+sel].slots||{};const keys=sortH(Object.keys(src)).filter(k=>src[k]>0);
-    if(slotChart)slotChart.destroy();
-    slotChart=new Chart(document.getElementById("cSlots"),{type:"bar",data:{labels:keys.map(lbl),datasets:[{data:keys.map(k=>src[k]),backgroundColor:sel==="avg"?"#e67e22":"#8a63d2",borderRadius:6,maxBarThickness:40}]},
+    if(charts.slot)charts.slot.destroy();
+    charts.slot=new Chart(document.getElementById('cSlots'),{type:'bar',data:{labels:keys.map(k=>k+"時"),datasets:[{data:keys.map(k=>src[k]),backgroundColor:sel==="avg"?"#e67e22":"#8a63d2",borderRadius:6,maxBarThickness:40}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}}); }
-  const dd=document.getElementById("slotDay");
-  DATA.forEach((d,i)=>{const o=document.createElement("option");o.value=i;o.textContent=md(d);dd.appendChild(o);});
-  if(DATA.length>=2){const o=document.createElement("option");o.value="avg";o.textContent="全日の平均";dd.appendChild(o);}
+  const dd=document.getElementById('slotDay');
+  DATA.forEach((d,i)=>{const o=document.createElement('option');o.value=i;o.textContent=md(d);dd.appendChild(o);});
+  if(DATA.length>=2){const o=document.createElement('option');o.value="avg";o.textContent="全日の平均";dd.appendChild(o);}
   dd.value=String(DATA.length-1); dd.onchange=e=>renderSlots(e.target.value); renderSlots(dd.value);
 
-  // 時間帯ごとの過去の営収
   const allH=sortH([...new Set(DATA.flatMap(d=>Object.keys(d.slots||{})))]);
-  let hourChart=null;
   function renderHour(h){const arr=DATA.map(d=>(d.slots&&d.slots[h])||0);
-    if(hourChart)hourChart.destroy();
-    hourChart=new Chart(document.getElementById("cHour"),{type:"bar",data:{labels,datasets:[{data:arr,backgroundColor:"#e67e22",borderRadius:6,maxBarThickness:64}]},
+    if(charts.hour)charts.hour.destroy();
+    charts.hour=new Chart(document.getElementById('cHour'),{type:'bar',data:{labels,datasets:[{data:arr,backgroundColor:"#e67e22",borderRadius:6,maxBarThickness:64}]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:h+"時の営収",color:"#6b7688",font:{size:13}},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}}); }
-  const hs=document.getElementById("hourSel");
-  allH.forEach(h=>{const o=document.createElement("option");o.value=h;o.textContent=h+"時";hs.appendChild(o);});
-  const bestH=sortH(Object.keys(last.slots||{})).reduce((a,b)=>((last.slots[b]||0)>(last.slots[a]||0)?b:a),Object.keys(last.slots||{})[0]);
-  if(bestH){hs.value=bestH;} hs.onchange=e=>renderHour(e.target.value); if(allH.length)renderHour(hs.value);
-})();
+  const hs=document.getElementById('hourSel');
+  allH.forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h+"時";hs.appendChild(o);});
+  if(allH.length){ const bestH=sortH(Object.keys(last.slots||{})).reduce((a,b)=>((last.slots[b]||0)>(last.slots[a]||0)?b:a),Object.keys(last.slots||{})[0]); hs.value=bestH; hs.onchange=e=>renderHour(e.target.value); renderHour(hs.value); }
+}
+
+/* ====== 追加処理 ====== */
+function parseHandle(v){ v=(v||'').trim(); if(v.includes(':')){const[a,b]=v.split(':');return (+a)+(+b)/60;} return parseFloat(v)||0; }
+function parseSlots(v){ const o={}; (v||'').split(',').forEach(p=>{p=p.trim();if(!p)return;const[h,y]=p.split(':');if(h!==undefined&&y!==undefined)o[String(parseInt(h))]=parseInt(String(y).replace(/[^0-9]/g,''))||0;}); return o; }
+const WD=['日','月','火','水','木','金','土'];
+function addFromForm(){
+  const date=document.getElementById('f_date').value;
+  if(!date){ alert('日付を入れてください'); return; }
+  const rec={ date, wday:WD[new Date(date).getDay()],
+    uriage:parseInt(document.getElementById('f_uri').value)||0,
+    handleH:parseHandle(document.getElementById('f_handle').value),
+    kaisu:parseInt(document.getElementById('f_kaisu').value)||0,
+    jissha:parseInt(document.getElementById('f_jissha').value)||0,
+    soukou:parseInt(document.getElementById('f_soukou').value)||0,
+    slots:parseSlots(document.getElementById('f_slots').value) };
+  if(!rec.uriage||!rec.handleH){ alert('営業収入とハンドル時間は必須です'); return; }
+  DATA.push(rec); saveData();
+  ['f_date','f_uri','f_handle','f_kaisu','f_jissha','f_soukou','f_slots'].forEach(id=>document.getElementById(id).value='');
+}
+function addFromPaste(){
+  let t=document.getElementById('pasteBox').value.trim();
+  if(!t){ return; }
+  t=t.replace(/^[,\s]+/,'').replace(/[,\s]+$/,'');
+  try{
+    const obj=JSON.parse(t);
+    const list=Array.isArray(obj)?obj:[obj];
+    list.forEach(o=>{ if(o.date){ if(!o.wday) o.wday=WD[new Date(o.date).getDay()]; DATA.push(o); } });
+    document.getElementById('pasteBox').value='';
+    saveData();
+  }catch(e){ alert('JSONの形式が正しくないようです。例のとおり { } の形で貼り付けてください。\n'+e.message); }
+}
+
+/* ====== 起動 ====== */
+document.getElementById('loginBtn').onclick=login;
+document.getElementById('addBtn').onclick=addFromForm;
+document.getElementById('pasteBtn').onclick=addFromPaste;
+render();
+if(window.firebase && firebase.initializeApp){ initFirebase(); } else { setSync(false); }
 </script>
 </body>
 </html>
