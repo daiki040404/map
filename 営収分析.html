@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>タクシー営業ダッシュボード</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin:0; background:#f4f6fa; color:#1a2233;
+  font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
+.wrap { max-width:900px; margin:0 auto; padding:18px 16px 48px; }
+h1 { font-size:19px; margin:4px 0 2px; }
+.sub { color:#6b7688; font-size:13px; margin-bottom:16px; }
+
+.heroRow { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.hero { border-radius:18px; padding:20px 22px; color:#fff; }
+.hero.green { background:linear-gradient(135deg,#1e824c,#2ecc71); box-shadow:0 6px 16px rgba(30,130,76,.22); }
+.hero.blue  { background:linear-gradient(135deg,#2c5fa8,#4a90e2); box-shadow:0 6px 16px rgba(44,95,168,.22); }
+.hero .lbl { font-size:14px; opacity:.92; }
+.hero .big { font-size:44px; font-weight:800; line-height:1.05; margin:6px 0 2px; letter-spacing:-1px; }
+.hero .big span { font-size:20px; font-weight:700; }
+.hero .day { font-size:13px; opacity:.9; }
+@media(max-width:560px){ .heroRow{grid-template-columns:1fr;} .hero .big{font-size:40px;} }
+
+.summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
+.sm { background:#fff; border-radius:14px; padding:14px 10px; text-align:center; box-shadow:0 2px 8px rgba(20,30,60,.06); }
+.sm .k { font-size:12px; color:#6b7688; }
+.sm .v { font-size:22px; font-weight:800; margin-top:4px; }
+.sm .v small{ font-size:13px; color:#8a94a6; font-weight:700; }
+@media(max-width:560px){ .summary{grid-template-columns:repeat(2,1fr);} }
+
+.panel { background:#fff; border-radius:16px; padding:16px 16px 12px; margin-top:16px; box-shadow:0 2px 8px rgba(20,30,60,.06); }
+.panel h2 { font-size:15px; margin:0 0 4px; }
+.panel .note { font-size:12px; color:#8a94a6; margin:0 0 10px; }
+select { font-size:13px; padding:4px 8px; border-radius:8px; border:1px solid #cfd6e2; }
+.chartbox { position:relative; height:240px; }
+
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th,td { padding:9px 8px; text-align:right; white-space:nowrap; }
+th { color:#6b7688; font-size:12px; border-bottom:2px solid #e6eaf1; }
+td:first-child, th:first-child { text-align:left; }
+tbody tr:nth-child(odd){ background:#fafbfd; }
+tbody tr:last-child{ background:#eafaf1; font-weight:700; }
+.tblwrap{ overflow-x:auto; }
+.err{ background:#fff3f3; border:1px solid #f3c0c0; color:#a12; padding:14px; border-radius:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🚕 タクシー営業ダッシュボード</h1>
+  <div class="sub">辻大貴さん / 日本交通 三鷹第一営業所 — <span id="count"></span></div>
+
+  <div id="app"></div>
+</div>
+
+<!-- データ本体（毎日ここに追記していく） -->
+<script src="data.js"></script>
+<script>
+(function(){
+  const DATA = (window.TAXI_DATA||[]).slice().sort((a,b)=>a.date<b.date?-1:1);
+  const CFG  = window.TAXI_CONFIG||{};
+  const app  = document.getElementById("app");
+  if(!DATA.length){ app.innerHTML='<div class="err">データがありません。data.js に1件追加してください。</div>'; return; }
+
+  const yen  = n => "¥"+Math.round(n).toLocaleString();
+  const tanka= d => Math.round(d.uriage/d.handleH);
+  const kyaku= d => Math.round(d.uriage/d.kaisu);
+  const jisRt= d => (d.jissha/d.soukou*100);
+  const hhmm = h => Math.floor(h)+":"+String(Math.round((h-Math.floor(h))*60)).padStart(2,"0");
+  const md   = d => { const p=d.date.split("-"); return (+p[1])+"/"+(+p[2])+"("+(d.wday||"")+")"; };
+  const last = DATA[DATA.length-1];
+  document.getElementById("count").textContent = "記録 "+DATA.length+"日分";
+
+  // 合計・平均（給与計算シート的サマリー）
+  const sumUri = DATA.reduce((s,d)=>s+d.uriage,0);
+  const avgTanka = Math.round(DATA.reduce((s,d)=>s+tanka(d),0)/DATA.length);
+  const avgKyaku = Math.round(DATA.reduce((s,d)=>s+kyaku(d),0)/DATA.length);
+  const payHtml = (CFG.commissionRate)
+      ? `<div class="sm"><div class="k">推定給与(歩合${Math.round(CFG.commissionRate*100)}%)</div><div class="v">${yen(sumUri*CFG.commissionRate)}</div></div>`
+      : `<div class="sm"><div class="k">記録日数</div><div class="v">${DATA.length}<small>日</small></div></div>`;
+
+  app.innerHTML = `
+    <div class="heroRow">
+      <div class="hero green">
+        <div class="lbl">最新の時間単価（売上 ÷ ハンドル時間）</div>
+        <div class="big">¥${tanka(last).toLocaleString()}<span>/時</span></div>
+        <div class="day">${md(last)} ・ ハンドル${hhmm(last.handleH)}</div>
+      </div>
+      <div class="hero blue">
+        <div class="lbl">最新の客単価（売上 ÷ 営業回数）</div>
+        <div class="big">¥${kyaku(last).toLocaleString()}</div>
+        <div class="day">${md(last)} ・ ${last.kaisu}回</div>
+      </div>
+    </div>
+
+    <div class="summary">
+      <div class="sm"><div class="k">合計売上</div><div class="v">${yen(sumUri)}</div></div>
+      <div class="sm"><div class="k">平均 時間単価</div><div class="v">${yen(avgTanka)}</div></div>
+      <div class="sm"><div class="k">平均 客単価</div><div class="v">${yen(avgKyaku)}</div></div>
+      ${payHtml}
+    </div>
+
+    <div class="panel">
+      <h2>📋 過去の営業データ</h2>
+      <p class="note">新しい日が下に増えます。</p>
+      <div class="tblwrap"><table id="hist">
+        <thead><tr><th>日付</th><th>売上</th><th>時間単価</th><th>客単価</th><th>実車率</th><th>回数</th><th>ハンドル</th></tr></thead>
+        <tbody></tbody></table></div>
+    </div>
+
+    <div class="panel"><h2>📈 時間単価の推移</h2><p class="note">棒が高いほど1時間でよく稼げた日。</p><div class="chartbox"><canvas id="cTanka"></canvas></div></div>
+    <div class="panel"><h2>💰 客単価の推移</h2><p class="note">1回の乗車で平均いくら＝長距離を取れてるか。</p><div class="chartbox"><canvas id="cKyaku"></canvas></div></div>
+    <div class="panel"><h2>🕐 時間帯別 売上　<select id="slotDay"></select></h2><p class="note">その日の中でどの時間帯が稼げたか。「全日の平均」でいつも強い時間帯がわかる。</p><div class="chartbox"><canvas id="cSlots"></canvas></div></div>
+    <div class="panel"><h2>⏱️ 時間帯ごとの過去の営収　<select id="hourSel"></select></h2><p class="note">選んだ時間帯が、過去の各日でいくら稼げてたか。</p><div class="chartbox"><canvas id="cHour"></canvas></div></div>
+  `;
+
+  // 履歴テーブル
+  const tb=document.querySelector("#hist tbody");
+  DATA.forEach(d=>{ const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${md(d)}</td><td>${yen(d.uriage)}</td><td>${yen(tanka(d))}</td><td>${yen(kyaku(d))}</td><td>${jisRt(d).toFixed(1)}%</td><td>${d.kaisu}回</td><td>${hhmm(d.handleH)}</td>`;
+    tb.appendChild(tr); });
+
+  const yenFmt=v=>"¥"+Math.round(v).toLocaleString();
+  const labels=DATA.map(md);
+  function bar(id,arr,c){ new Chart(document.getElementById(id),{type:"bar",
+    data:{labels,datasets:[{data:arr,backgroundColor:DATA.map((_,i)=>i===DATA.length-1?c[0]:c[1]),borderRadius:8,maxBarThickness:64}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:yenFmt}}}}}); }
+  bar("cTanka",DATA.map(tanka),["#2ecc71","#a9d8bd"]);
+  bar("cKyaku",DATA.map(kyaku),["#4a90e2","#b7d4f2"]);
+
+  // 時間帯（1日 / 全日平均）
+  const ord=k=>{const h=parseInt(k);return h>=13?h:h+24;};
+  const sortH=ks=>ks.slice().sort((a,b)=>ord(a)-ord(b));
+  const lbl=k=>k+"時";
+  function avgSlots(){const s={},c={};DATA.forEach(d=>Object.entries(d.slots||{}).forEach(([k,v])=>{if(v>0){s[k]=(s[k]||0)+v;c[k]=(c[k]||0)+1;}}));const o={};Object.keys(s).forEach(k=>o[k]=Math.round(s[k]/c[k]));return o;}
+  let slotChart=null;
+  function renderSlots(sel){const src=sel==="avg"?avgSlots():DATA[+sel].slots||{};const keys=sortH(Object.keys(src)).filter(k=>src[k]>0);
+    if(slotChart)slotChart.destroy();
+    slotChart=new Chart(document.getElementById("cSlots"),{type:"bar",data:{labels:keys.map(lbl),datasets:[{data:keys.map(k=>src[k]),backgroundColor:sel==="avg"?"#e67e22":"#8a63d2",borderRadius:6,maxBarThickness:40}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}}); }
+  const dd=document.getElementById("slotDay");
+  DATA.forEach((d,i)=>{const o=document.createElement("option");o.value=i;o.textContent=md(d);dd.appendChild(o);});
+  if(DATA.length>=2){const o=document.createElement("option");o.value="avg";o.textContent="全日の平均";dd.appendChild(o);}
+  dd.value=String(DATA.length-1); dd.onchange=e=>renderSlots(e.target.value); renderSlots(dd.value);
+
+  // 時間帯ごとの過去の営収
+  const allH=sortH([...new Set(DATA.flatMap(d=>Object.keys(d.slots||{})))]);
+  let hourChart=null;
+  function renderHour(h){const arr=DATA.map(d=>(d.slots&&d.slots[h])||0);
+    if(hourChart)hourChart.destroy();
+    hourChart=new Chart(document.getElementById("cHour"),{type:"bar",data:{labels,datasets:[{data:arr,backgroundColor:"#e67e22",borderRadius:6,maxBarThickness:64}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:h+"時の営収",color:"#6b7688",font:{size:13}},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}}); }
+  const hs=document.getElementById("hourSel");
+  allH.forEach(h=>{const o=document.createElement("option");o.value=h;o.textContent=h+"時";hs.appendChild(o);});
+  const bestH=sortH(Object.keys(last.slots||{})).reduce((a,b)=>((last.slots[b]||0)>(last.slots[a]||0)?b:a),Object.keys(last.slots||{})[0]);
+  if(bestH){hs.value=bestH;} hs.onchange=e=>renderHour(e.target.value); if(allH.length)renderHour(hs.value);
+})();
+</script>
+</body>
+</html>
