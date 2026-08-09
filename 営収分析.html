@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>タクシー営収分析</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
-<!-- Firebase（東京マップと同じ方式：Googleアカウント同期） -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -24,7 +23,6 @@ h1 { font-size:19px; margin:4px 0; }
 .btn.add { background:#1e824c; color:#fff; }
 .pill { font-size:12px; color:#2e7d32; background:#eafaf1; padding:4px 10px; border-radius:999px; }
 .pill.off { color:#8a6d3b; background:#fcf3e3; }
-
 .heroRow { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
 .hero { border-radius:18px; padding:20px 22px; color:#fff; }
 .hero.green { background:linear-gradient(135deg,#1e824c,#2ecc71); }
@@ -34,13 +32,11 @@ h1 { font-size:19px; margin:4px 0; }
 .hero .big span { font-size:20px; font-weight:700; }
 .hero .day { font-size:13px; opacity:.9; }
 @media(max-width:560px){ .heroRow{grid-template-columns:1fr;} .hero .big{font-size:40px;} }
-
 .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
 .sm { background:#fff; border-radius:14px; padding:14px 10px; text-align:center; box-shadow:0 2px 8px rgba(20,30,60,.06); }
 .sm .k { font-size:12px; color:#6b7688; }
 .sm .v { font-size:22px; font-weight:800; margin-top:4px; } .sm .v small{font-size:13px;color:#8a94a6;font-weight:700;}
 @media(max-width:560px){ .summary{grid-template-columns:repeat(2,1fr);} }
-
 .panel { background:#fff; border-radius:16px; padding:16px; margin-top:16px; box-shadow:0 2px 8px rgba(20,30,60,.06); }
 .panel h2 { font-size:15px; margin:0 0 4px; }
 .panel .note { font-size:12px; color:#8a94a6; margin:0 0 10px; }
@@ -57,6 +53,13 @@ tbody tr:nth-child(odd){ background:#fafbfd; }
 @media(max-width:560px){ .form-grid{grid-template-columns:repeat(2,1fr);} }
 .delx{ background:none; border:0; color:#c0392b; cursor:pointer; font-size:13px; }
 .muted{ color:#8a94a6; font-size:12px; }
+.arealist{ margin-top:12px; }
+.arearow{ display:flex; align-items:baseline; gap:10px; padding:9px 8px; border-bottom:1px solid #eef1f6; }
+.arearow .rank{ font-weight:800; color:#e67e22; width:22px; }
+.arearow .name{ font-weight:800; font-size:15px; }
+.arearow .cnt{ font-size:13px; color:#31557f; background:#eef6ff; border-radius:999px; padding:2px 8px; }
+.arearow .avg{ margin-left:auto; font-weight:800; }
+.arearow .spots{ display:block; width:100%; font-size:12px; color:#8a94a6; margin-top:2px; }
 </style>
 </head>
 <body>
@@ -76,7 +79,7 @@ tbody tr:nth-child(odd){ background:#fafbfd; }
 
   <div class="panel">
     <h2>➕ 今日のデータを追加</h2>
-    <p class="note">仕事終わりにここへ入力（または下の枠にJSONを貼り付け）→「追加」。ログイン中なら自動でアカウントに保存されます。</p>
+    <p class="note">入力（または下枠にJSON貼り付け）→「追加」。乗車地エリアの分析には、僕が渡すJSON（rides入り）を貼り付けると自動で反映されます。</p>
     <div class="form-grid">
       <label>日付<input type="date" id="f_date"></label>
       <label>営業収入(円)<input type="number" id="f_uri" placeholder="41090"></label>
@@ -90,7 +93,7 @@ tbody tr:nth-child(odd){ background:#fafbfd; }
       <button class="btn add" id="addBtn">この内容で追加</button>
       <span class="muted">または ↓ にJSONを貼って追加</span>
     </div>
-    <textarea id="pasteBox" rows="4" style="width:100%; margin-top:8px;" placeholder='貼り付け例：{ "date":"2026-07-27","wday":"月","uriage":38500,"handleH":13.5,"kaisu":17,"jissha":60,"soukou":230,"slots":{"18":5000,"22":8000} }'></textarea>
+    <textarea id="pasteBox" rows="4" style="width:100%; margin-top:8px;" placeholder='貼り付け例：{ "date":"2026-07-27","uriage":38500,"handleH":13.5,"kaisu":17,"jissha":60,"soukou":230,"slots":{"18":5000,"22":8000},"rides":[{"h":18,"area":"荻窪","spot":"荻窪駅","fare":5000}] }'></textarea>
     <div style="margin-top:8px;"><button class="btn ghost" id="pasteBtn">貼り付けたJSONを追加</button></div>
   </div>
 </div>
@@ -99,81 +102,72 @@ tbody tr:nth-child(odd){ background:#fafbfd; }
 /* ====== Firebase（東京マップと同じプロジェクト＝同じGoogleアカウント同期） ====== */
 const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
 const LS_DATA='taxi_eigyo_v1';
-const COLL='eigyo_bunseki'; // 地図データと別の保管場所
+const COLL='eigyo_bunseki';
 let fbAuth=null, fbDb=null, fbUser=null, _syncT=null, _cloudLoading=false;
 
 /* ====== データ（初期値。以降はローカル/クラウドが優先） ====== */
 const DEFAULT_DATA=[
   { "date":"2026-07-26","wday":"日","uriage":41090,"handleH":14.683,"kaisu":19,"jissha":64,"soukou":247,
-    "slots":{"16":6100,"18":5900,"20":5200,"21":7600,"22":1000,"0":1900,"1":11430,"4":11120} }
+    "slots":{"16":6100,"18":5900,"20":5200,"21":7600,"22":1000,"0":1900,"1":11430,"4":11120},
+    "rides":[
+      {"h":16,"area":"永福町","spot":"永福町駅前","fare":1100},
+      {"h":17,"area":"中野","spot":"中野駅南口?","fare":5000},
+      {"h":18,"area":"麻布","spot":"三の橋","fare":1600},
+      {"h":18,"area":"芝","spot":"芝五丁目","fare":4300},
+      {"h":20,"area":"市ヶ谷","spot":"防衛省前","fare":3200},
+      {"h":20,"area":"新宿西口","spot":"新宿駅西口","fare":2000},
+      {"h":21,"area":"江戸川橋","spot":"江戸川 小学校前?","fare":7600},
+      {"h":0,"area":"三鷹","spot":"三鷹駅","fare":1900},
+      {"h":1,"area":"荻窪","spot":"荻窪駅","fare":1000},
+      {"h":1,"area":"荻窪","spot":"荻窪駅","fare":9930},
+      {"h":4,"area":"下北沢","spot":"代沢十字路","fare":11120}
+    ] }
 ];
 let DATA;
 try{ const s=localStorage.getItem(LS_DATA); DATA=s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_DATA)); }
 catch(e){ DATA=JSON.parse(JSON.stringify(DEFAULT_DATA)); }
 
 function saveData(){ try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){} syncPush(); render(); }
-function dedupeSort(arr){
-  const m={}; arr.forEach(d=>{ if(d&&d.date) m[d.date]=d; });
-  return Object.values(m).sort((a,b)=>a.date<b.date?-1:1);
-}
+function dedupeSort(arr){ const m={}; arr.forEach(d=>{ if(d&&d.date) m[d.date]=d; }); return Object.values(m).sort((a,b)=>a.date<b.date?-1:1); }
 
-/* ====== Firebase 初期化・同期 ====== */
+/* ====== Firebase ====== */
 function initFirebase(){
   try{
     firebase.initializeApp(FIREBASE_CONFIG);
     fbAuth=firebase.auth(); fbDb=firebase.firestore();
     fbAuth.onAuthStateChanged(async user=>{
       fbUser=user;
-      if(user){
-        setSync(true, user.email||user.displayName||"ログイン中");
-        await cloudLoad();
-      }else{
-        setSync(false);
-      }
+      if(user){ setSync(true, user.email||user.displayName||"ログイン中"); await cloudLoad(); }
+      else{ setSync(false); }
       renderAuth();
     });
   }catch(e){ console.warn('firebase init failed',e); setSync(false); }
 }
-function setSync(on,label){
-  const el=document.getElementById('syncState');
+function setSync(on,label){ const el=document.getElementById('syncState');
   if(on){ el.className='pill'; el.textContent='☁ 同期中: '+(label||''); }
-  else  { el.className='pill off'; el.textContent='ローカル保存中'; }
-}
-async function login(){
-  if(!fbAuth) return;
-  try{ await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
-  catch(e){ alert('ログインに失敗しました: '+(e&&e.message||e)); }
-}
+  else  { el.className='pill off'; el.textContent='ローカル保存中'; } }
+async function login(){ if(!fbAuth) return; try{ await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){ alert('ログインに失敗しました: '+(e&&e.message||e)); } }
 async function logout(){ if(fbAuth) await fbAuth.signOut(); }
 async function cloudLoad(){
-  if(!fbUser||!fbDb) return;
-  _cloudLoading=true;
+  if(!fbUser||!fbDb) return; _cloudLoading=true;
   try{
     const ref=fbDb.collection(COLL).doc(fbUser.uid);
     const snap=await ref.get();
     if(snap.exists && Array.isArray(snap.data().data) && snap.data().data.length){
       DATA=dedupeSort(snap.data().data);
       try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){}
-    }else{
-      await ref.set({data:DATA, updatedAt:Date.now()}); // 初回：ローカルをクラウドへ
-    }
+    }else{ await ref.set({data:DATA, updatedAt:Date.now()}); }
   }catch(e){ console.warn('cloudLoad failed',e); }
-  _cloudLoading=false;
-  render();
+  _cloudLoading=false; render();
 }
 function syncPush(){
   if(!fbUser||!fbDb||_cloudLoading) return;
   clearTimeout(_syncT);
-  _syncT=setTimeout(async()=>{
-    try{ await fbDb.collection(COLL).doc(fbUser.uid).set({data:DATA, updatedAt:Date.now()}); }
-    catch(e){ console.warn('syncPush failed',e); }
-  }, 600);
+  _syncT=setTimeout(async()=>{ try{ await fbDb.collection(COLL).doc(fbUser.uid).set({data:DATA, updatedAt:Date.now()}); }catch(e){ console.warn('syncPush failed',e); } }, 600);
 }
 function renderAuth(){
-  const box=document.getElementById('authbox');
-  const state=document.getElementById('syncState');
-  box.innerHTML='';
-  box.appendChild(state);
+  const box=document.getElementById('authbox'); const state=document.getElementById('syncState');
+  box.innerHTML=''; box.appendChild(state);
   const b=document.createElement('button');
   if(fbUser){ b.className='btn ghost'; b.textContent='ログアウト'; b.onclick=logout; }
   else      { b.className='btn g';     b.textContent='Googleでログイン'; b.onclick=login; }
@@ -195,8 +189,7 @@ function killCharts(){ Object.values(charts).forEach(c=>{try{c.destroy();}catch(
 
 /* ====== 描画 ====== */
 function render(){
-  const app=document.getElementById('app');
-  DATA=dedupeSort(DATA);
+  const app=document.getElementById('app'); DATA=dedupeSort(DATA);
   document.getElementById('count').textContent = '記録 '+DATA.length+'日分';
   killCharts();
   if(!DATA.length){ app.innerHTML='<div class="panel">データがありません。下のフォームから追加してください。</div>'; return; }
@@ -225,7 +218,11 @@ function render(){
     <div class="panel"><h2>📈 時間単価の推移</h2><div class="chartbox"><canvas id="cTanka"></canvas></div></div>
     <div class="panel"><h2>💰 客単価の推移</h2><div class="chartbox"><canvas id="cKyaku"></canvas></div></div>
     <div class="panel"><h2>🕐 時間帯別 売上　<select id="slotDay"></select></h2><p class="note">「全日の平均」でいつも強い時間帯がわかる。</p><div class="chartbox"><canvas id="cSlots"></canvas></div></div>
-    <div class="panel"><h2>⏱️ 時間帯ごとの過去の営収　<select id="hourSel"></select></h2><p class="note">選んだ時間帯が過去の各日でいくら稼げてたか。</p><div class="chartbox"><canvas id="cHour"></canvas></div></div>
+    <div class="panel"><h2>⏱️ 時間帯ごとの過去の営収　<select id="hourSel"></select></h2>
+      <p class="note">選んだ時間帯が過去の各日でいくら稼げてたか。下に「その時間にどこで乗せたか」も出ます。</p>
+      <div class="chartbox"><canvas id="cHour"></canvas></div>
+      <div class="arealist" id="hourAreas"></div>
+    </div>
   `;
 
   const tb=document.querySelector('#hist tbody');
@@ -253,10 +250,23 @@ function render(){
   dd.value=String(DATA.length-1); dd.onchange=e=>renderSlots(e.target.value); renderSlots(dd.value);
 
   const allH=sortH([...new Set(DATA.flatMap(d=>Object.keys(d.slots||{})))]);
-  function renderHour(h){const arr=DATA.map(d=>(d.slots&&d.slots[h])||0);
+  function renderHour(h){
+    const arr=DATA.map(d=>(d.slots&&d.slots[h])||0);
     if(charts.hour)charts.hour.destroy();
     charts.hour=new Chart(document.getElementById('cHour'),{type:'bar',data:{labels,datasets:[{data:arr,backgroundColor:"#e67e22",borderRadius:6,maxBarThickness:64}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:h+"時の営収",color:"#6b7688",font:{size:13}},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}}); }
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:h+"時の営収",color:"#6b7688",font:{size:13}},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}});
+    renderAreas(h);
+  }
+  function renderAreas(h){
+    const box=document.getElementById('hourAreas');
+    const rl=[]; DATA.forEach(d=>(d.rides||[]).forEach(r=>{ if(String(r.h)===String(h)) rl.push(r); }));
+    if(!rl.length){ box.innerHTML='<p class="muted">この時間帯の乗車地データはまだありません（乗降記録を追加すると出ます）。</p>'; return; }
+    const g={}; rl.forEach(r=>{ const a=r.area||'不明'; (g[a]=g[a]||[]).push(r); });
+    const rows=Object.entries(g).map(([a,arr])=>({a,n:arr.length,avg:Math.round(arr.reduce((s,r)=>s+r.fare,0)/arr.length),spots:[...new Set(arr.map(r=>r.spot).filter(Boolean))]}))
+      .sort((x,y)=>y.n-x.n||y.avg-x.avg);
+    box.innerHTML='<div class="muted" style="margin-bottom:4px">この時間帯に乗せた場所（過去 全'+rl.length+'回）</div>'+
+      rows.map((r,i)=>`<div class="arearow"><span class="rank">${i+1}</span><span class="name">${r.a}</span><span class="cnt">${r.n}回</span><span class="avg">平均 ${yen(r.avg)}</span><span class="spots">${r.spots.join(' / ')}</span></div>`).join('');
+  }
   const hs=document.getElementById('hourSel');
   allH.forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h+"時";hs.appendChild(o);});
   if(allH.length){ const bestH=sortH(Object.keys(last.slots||{})).reduce((a,b)=>((last.slots[b]||0)>(last.slots[a]||0)?b:a),Object.keys(last.slots||{})[0]); hs.value=bestH; hs.onchange=e=>renderHour(e.target.value); renderHour(hs.value); }
@@ -281,15 +291,12 @@ function addFromForm(){
   ['f_date','f_uri','f_handle','f_kaisu','f_jissha','f_soukou','f_slots'].forEach(id=>document.getElementById(id).value='');
 }
 function addFromPaste(){
-  let t=document.getElementById('pasteBox').value.trim();
-  if(!t){ return; }
+  let t=document.getElementById('pasteBox').value.trim(); if(!t) return;
   t=t.replace(/^[,\s]+/,'').replace(/[,\s]+$/,'');
   try{
-    const obj=JSON.parse(t);
-    const list=Array.isArray(obj)?obj:[obj];
+    const obj=JSON.parse(t); const list=Array.isArray(obj)?obj:[obj];
     list.forEach(o=>{ if(o.date){ if(!o.wday) o.wday=WD[new Date(o.date).getDay()]; DATA.push(o); } });
-    document.getElementById('pasteBox').value='';
-    saveData();
+    document.getElementById('pasteBox').value=''; saveData();
   }catch(e){ alert('JSONの形式が正しくないようです。例のとおり { } の形で貼り付けてください。\n'+e.message); }
 }
 
