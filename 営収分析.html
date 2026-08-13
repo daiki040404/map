@@ -78,6 +78,14 @@ tbody tr:nth-child(odd){ background:#fafbfd; }
   <div id="app"></div>
 
   <div class="panel">
+    <h2>📤 Claudeに分析してもらう</h2>
+    <p class="note">ボタンで全データをコピー → Claude（スマホ/PC）に貼り付ければ、傾向や強い時間帯・エリア、改善点を分析してもらえます。</p>
+    <button class="btn add" id="copyBtn">📋 全データをコピー（Claude分析用）</button>
+    <button class="btn ghost" id="copyRawBtn">JSONだけコピー</button>
+    <span class="muted" id="copyMsg" style="margin-left:10px"></span>
+  </div>
+
+  <div class="panel">
     <h2>➕ 今日のデータを追加</h2>
     <p class="note">入力（または下枠にJSON貼り付け）→「追加」。乗車地エリアの分析には、僕が渡すJSON（rides入り）を貼り付けると自動で反映されます。</p>
     <div class="form-grid">
@@ -300,10 +308,24 @@ function addFromPaste(){
   }catch(e){ alert('JSONの形式が正しくないようです。例のとおり { } の形で貼り付けてください。\n'+e.message); }
 }
 
+/* ====== コピー（Claude分析用） ====== */
+async function copyToClip(text,msg){
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){}; ta.remove(); }
+  const el=document.getElementById('copyMsg'); el.textContent=msg; setTimeout(()=>{el.textContent='';},4000);
+}
+function copyForClaude(){
+  const prompt='次はタクシー営業の記録データ（JSON）です。時間単価・客単価の推移、よく稼げる時間帯とエリア、弱点、次にどこで何時に流すべきかを、簡潔に分析してください。\n\n'+JSON.stringify(DATA,null,2);
+  copyToClip(prompt,'コピーしました！Claudeに貼り付けてください');
+}
+function copyRaw(){ copyToClip(JSON.stringify(DATA),'JSONをコピーしました！'); }
+
 /* ====== 起動 ====== */
 document.getElementById('loginBtn').onclick=login;
 document.getElementById('addBtn').onclick=addFromForm;
 document.getElementById('pasteBtn').onclick=addFromPaste;
+document.getElementById('copyBtn').onclick=copyForClaude;
+document.getElementById('copyRawBtn').onclick=copyRaw;
 render();
 if(window.firebase && firebase.initializeApp){ initFirebase(); } else { setSync(false); }
 </script>
