@@ -162,7 +162,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v25</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v26</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -813,17 +813,25 @@ function renderNameTest(){
     if(hi.has(o.id))L2.setStyle({opacity:1,weight:6}).addTo(map);
     else if(ctx.has(o.id))L2.setStyle({opacity:.55,weight:4}).addTo(map);
     else L2.setStyle({opacity:.12,weight:3}).addTo(map);});
-  qs.forEach((it,i)=>{const num=i+1;it._num=num;const isCur=(i===nameIdx);
+  const roadNamesOf=(it)=>((it.roads||[]).map(id=>(DATA.find(x=>x.id===id)||{}).name).filter(Boolean));
+  const showRoadN=new Set(); // 答えを開いた項目の通りに名前ラベルを出す
+  qs.forEach((it,i)=>{const num=i+1;it._num=num;const isCur=(i===nameIdx);const rev=revealAll||(nameReveal&&isCur);
     const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:isCur?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
-    if(revealAll||(nameReveal&&isCur))m.bindTooltip(it.name+((it.type==='ramp'&&it.dir)?'（'+it.dir+'）':''),{permanent:true,direction:'top',className:'nameicon'});
+    if(rev){let extra=(it.type==='ramp'&&it.dir)?'（'+it.dir+'）':'';const rn=roadNamesOf(it);if(rn.length)extra+='〔'+rn.join('・')+'〕';
+      m.bindTooltip(it.name+extra,{permanent:true,direction:'top',className:'nameicon'});
+      if(isCur&&it.type!=='street'&&it.type!=='route')(it.roads||[]).forEach(r=>showRoadN.add(r));}
     m.on('click',()=>{if(nameIdx===i){nameReveal=!nameReveal;}else{nameIdx=i;nameReveal=false;}render();panPoint(it);});
     m.addTo(markerGroup);});
+  // 答えを開いた交差点・施設等の「形成する通り」に通り名ラベルを表示
+  ITEMS.filter(it=>(it.type==='street'||it.type==='route')&&showRoadN.has(it.streetId)).forEach(it=>{
+    const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:'<div class="mkwrap"><div class="mk mk-tag" style="background:'+colOf(it)+'">通</div></div>',iconSize:[26,26],iconAnchor:[13,13]})});
+    m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});m.addTo(markerGroup);});
   document.getElementById('tbAll').classList.toggle('on',revealAll);
   const bar=document.getElementById('tbQ');
   if(!qs.length)bar.textContent='問題がありません（テスト・出題種類を確認）';
   else if(revealAll)bar.textContent='全'+qs.length+'問の答えを表示中（紙と照合）';
   else if(!cur)bar.textContent='全'+qs.length+'問／番号をタップして選択（もう1回で答え）';
-  else bar.textContent='問題 '+(nameIdx+1)+' / '+qs.length+(nameReveal?'　→ '+cur.name:'　（もう1回タップで答え）');
+  else bar.textContent='問題 '+(nameIdx+1)+' / '+qs.length+(nameReveal?'　→ '+cur.name+((cur.roads&&cur.roads.length)?'〔'+cur.roads.map(id=>(DATA.find(x=>x.id===id)||{}).name).filter(Boolean).join('・')+'〕':''):'　（もう1回タップで答え）');
   buildList(qs);
   document.getElementById('cAll').textContent=ITEMS.length;
   document.getElementById('cDone').textContent=Object.keys(store.learned).length;
