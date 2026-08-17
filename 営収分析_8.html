@@ -1009,11 +1009,24 @@ async function initCloud(){
     await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
     firebase.initializeApp(FIREBASE_CONFIG);
     _fs=firebase.firestore();
-    badge.style.cursor='pointer'; badge.title='タップでGoogleログイン';
-    badge.onclick=()=>{ if(!firebase.auth().currentUser) firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>alert('ログイン失敗: '+e.message)); };
-    firebase.auth().onAuthStateChanged(async u=>{
-      if(u){ badge.textContent='同期: ON'; await cloudLoad(u.uid); }
-      else { badge.textContent='同期: タップでログイン'; }
+    const auth=firebase.auth();
+    badge.style.cursor='pointer';
+    badge.onclick=async ()=>{
+      const u=auth.currentUser;
+      if(u){ if(confirm((u.email||'このアカウント')+' からログアウトする?')) auth.signOut(); return; }
+      const provider=new firebase.auth.GoogleAuthProvider();
+      badge.textContent='同期: ログイン中…';
+      try{ await auth.signInWithPopup(provider); }
+      catch(e){
+        // ポップアップがブロックされたらリダイレクト方式に切替(スマホ向け)
+        try{ await auth.signInWithRedirect(provider); }
+        catch(e2){ alert('ログインできなかった: '+(e2&&e2.message||e2)); badge.textContent='🔑 ログイン'; }
+      }
+    };
+    auth.getRedirectResult().catch(()=>{});   // リダイレクトから戻ったとき用
+    auth.onAuthStateChanged(async u=>{
+      if(u){ badge.textContent='☁ 同期ON'; badge.title=(u.email||'')+' / タップでログアウト'; await cloudLoad(u.uid); }
+      else { badge.textContent='🔑 ログイン'; badge.title='タップでGoogleログイン'; }
     });
   }catch(e){ console.warn('cloud init failed', e); badge.textContent='同期: 接続失敗'; }
 }
