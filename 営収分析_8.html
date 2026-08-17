@@ -140,6 +140,15 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <select id="fWeather"><option value="">全天候</option>
         <option>晴れ</option><option>曇り</option><option>雨</option><option>雪</option></select>
     </div>
+    <div class="grp">
+      <label class="chip">期間</label>
+      <input type="date" id="fFrom"><span class="muted small">〜</span><input type="date" id="fTo">
+      <button class="icon-btn" id="fClear" style="padding:3px 8px">×</button>
+    </div>
+    <div class="grp">
+      <label class="chip">日付</label>
+      <select id="fDate"><option value="">指定なし</option></select>
+    </div>
     <div class="seg" id="fOutlier">
       <button data-o="all" class="active">全部</button>
       <button data-o="exclude">外れ値除外</button>
@@ -154,6 +163,10 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     <div class="card">
       <h2>日別の推移 <span class="sub">選択中の指標</span></h2>
       <div class="filters">
+        <div class="seg" id="sumAgg">
+          <button data-a="total" class="active">合計</button>
+          <button data-a="avg">1日平均</button>
+        </div>
         <div class="seg" id="sumMetric">
           <button data-m="uriage" class="active">営収</button>
           <button data-m="kaisu">乗車数</button>
@@ -421,7 +434,7 @@ function jitsuByHour(r){
 function pickupHour(r){ const m=toMin(r.on); return m==null?null:Math.floor(m/60)%24; }
 
 /* ---------- フィルタ ---------- */
-const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'' };
+const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'' };
 function outlierOK(r){
   if(state.outlier==='exclude') return !r.outlier;
   if(state.outlier==='only') return !!r.outlier;
@@ -435,7 +448,11 @@ function dayInSeason(date,name){
   return seasonRanges(name).some(s=> date>=s.start && date<=s.end);
 }
 function scopedDays(){
-  return DB.filter(d=> dayInSeason(d.date, state.season) && (!state.weather || (d.weather||'')===state.weather)).sort((a,b)=>a.date<b.date?-1:1);
+  return DB.filter(d=> dayInSeason(d.date, state.season)
+    && (!state.weather || (d.weather||'')===state.weather)
+    && (!state.from || d.date>=state.from)
+    && (!state.to   || d.date<=state.to)
+  ).sort((a,b)=>a.date<b.date?-1:1);
 }
 function scopedRides(){
   const out=[];
@@ -522,19 +539,21 @@ function makeChart(id,cfg){
 }
 
 /* ---------- サマリー ---------- */
-let sumMetric='uriage';
+let sumMetric='uriage', sumAgg='total';
 function renderSummary(){
   const days=scopedDays();
   const m=dayMetrics(days);
+  const nd=days.length||1;
+  const avg=sumAgg==='avg';
   const kp=document.getElementById('sumKpis');
   kp.innerHTML=[
-    ['営収合計', fmtYen(m.uriage)],
-    ['乗車数', m.rc+' 回'],
-    ['実車時間', fmtMin(m.jitsu)],
+    [avg?'1日平均営収':'営収合計', fmtYen(avg? m.uriage/nd : m.uriage)],
+    [avg?'乗車数(平均)':'乗車数', (avg? (m.rc/nd).toFixed(1) : m.rc)+' 回'],
+    [avg?'実車時間(平均)':'実車時間', fmtMin(avg? m.jitsu/nd : m.jitsu)],
     ['実質時給', fmtYen(m.wage)+'<small>/h</small>'],
     ['客単価', fmtYen(m.tanka)],
     ['実車率', (m.jisRt?m.jisRt.toFixed(1):'-')+'<small>%</small>'],
-    ['空転', m.kutenN+'回 <small>'+fmtYen(m.kutenFare)+'</small>'],
+    ['空転', (avg? (m.kutenN/nd).toFixed(1) : m.kutenN)+'回 <small>'+fmtYen(avg? m.kutenFare/nd : m.kutenFare)+'</small>'],
     ['対象日数', days.length+' 日']
   ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div></div>`).join('');
 
@@ -816,6 +835,7 @@ function segWire(id, key, cb){
     cb(b.dataset[key]); });
 }
 segWire('sumMetric','m',v=>{sumMetric=v; renderSummary();});
+segWire('sumAgg','a',v=>{sumAgg=v; renderSummary();});
 segWire('hrMetric','m',v=>{hrMetric=v; renderHourly();});
 segWire('hrView','v',v=>{hrView=v; renderHourly();});
 segWire('pGroup','g',v=>{pGroup=v; renderPeriod();});
@@ -855,6 +875,18 @@ document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
 document.getElementById('fSeason').onchange=e=>{ state.season=e.target.value; renderCurrent(); };
 document.getElementById('fWeather').onchange=e=>{ state.weather=e.target.value; renderCurrent(); };
 segWire('fOutlier','o',v=>{ state.outlier=v; renderCurrent(); });
+document.getElementById('fFrom').onchange=e=>{ state.from=e.target.value; document.getElementById('fDate').value=''; renderCurrent(); };
+document.getElementById('fTo').onchange=e=>{ state.to=e.target.value; document.getElementById('fDate').value=''; renderCurrent(); };
+document.getElementById('fDate').onchange=e=>{ const v=e.target.value; state.from=v; state.to=v;
+  document.getElementById('fFrom').value=v; document.getElementById('fTo').value=v; renderCurrent(); };
+document.getElementById('fClear').onclick=()=>{ state.from=''; state.to='';
+  document.getElementById('fFrom').value=''; document.getElementById('fTo').value=''; document.getElementById('fDate').value=''; renderCurrent(); };
+function refreshDateSelector(){
+  const sel=document.getElementById('fDate'); if(!sel) return; const cur=sel.value;
+  const dates=[...DB].map(d=>d.date).sort();
+  sel.innerHTML='<option value="">指定なし</option>'+dates.map(dt=>`<option value="${dt}">${dt}(${wdayOf(dt)})</option>`).join('');
+  if(dates.includes(cur)) sel.value=cur;
+}
 ['cmpSeason','cmpMetric','cmpAxis'].forEach(id=>document.getElementById(id).onchange=drawCompare);
 function refreshSeasonSelectors(){
   const names=[...new Set(SEASONS.map(s=>s.name))];
@@ -900,7 +932,7 @@ function renderDataTab(){
   }).join('');
   list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=DB.find(x=>x.date===sel.dataset.date); if(day){ day.weather=e.target.value; save(); renderDataTab(); renderCurrent(); } }; });
   // 削除
-  list.querySelectorAll('.del').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm(b.dataset.d+' を削除?')){ DB=DB.filter(x=>x.date!==b.dataset.d); save(); renderDataTab(); renderCurrent(); } });
+  list.querySelectorAll('.del').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm(b.dataset.d+' を削除?')){ DB=DB.filter(x=>x.date!==b.dataset.d); save(); refreshDateSelector(); renderDataTab(); renderCurrent(); } });
   // 外れ値・メモ編集
   list.querySelectorAll('.ride-edit').forEach(row=>{
     const date=row.dataset.date, i=+row.dataset.i;
@@ -919,7 +951,7 @@ document.getElementById('importBtn').onclick=async()=>{
   DB.sort((a,b)=>a.date<b.date?-1:1); save();
   document.getElementById('pasteBox').value='';
   alert(n+'日 取り込んだ。座標を取得します。');
-  renderDataTab(); await geocodeAll(false); renderCurrent();
+  refreshDateSelector(); renderDataTab(); await geocodeAll(false); renderCurrent();
 };
 document.getElementById('copyBtn').onclick=()=>{
   navigator.clipboard.writeText(JSON.stringify(DB,null,2)).then(()=>alert('全データをコピーした'));
@@ -990,7 +1022,7 @@ async function cloudLoad(uid){ _uid=uid;
     const d=doc.exists? doc.data():null;
     if(d && d.days){ DB=d.days; localStorage.setItem(LS_KEY,JSON.stringify(DB));
       if(d.seasons){ SEASONS=d.seasons; saveSeasons(); }
-      renderCurrent(); refreshSeasonSelectors(); geocodeAll(false);
+      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); geocodeAll(false);
     } else {
       pushCloud();   // クラウドにまだ新スキーマが無ければ、この端末のデータを初期反映
     }
@@ -1003,6 +1035,7 @@ function loadScript(src){ return new Promise((res,rej)=>{ const s=document.creat
 
 /* ---------- 起動 ---------- */
 refreshSeasonSelectors();
+refreshDateSelector();
 renderCurrent();
 geocodeAll(false);
 initCloud();
