@@ -40,6 +40,7 @@
   .time-in{width:96px; text-align:center;}
   .rev-in{width:88px; text-align:right;}
   input[type="time"],input[type="datetime-local"]{font-size:14px;}
+  input[type="month"]{font-size:16px; font-weight:600; padding:7px 10px;}
   .rownum{color:var(--muted); font-size:13px;}
   .err{color:var(--danger); font-weight:600;}
   .btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;}
@@ -54,24 +55,44 @@
   .tbl-wrap{overflow-x:auto;}
   .sync-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#c9c8bf;margin-right:6px;vertical-align:middle;}
   .sync-dot.on{background:#3b6d11;} .sync-dot.err{background:#a32d2d;}
+  #monthChips{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .chip{font-size:13px; padding:5px 11px; border:1px solid var(--line2); border-radius:999px; background:#fff; cursor:pointer; color:var(--text);}
+  .chip:hover{background:#f2f1ec;}
+  .chip.chip-on{background:var(--accent); color:#fff; border-color:var(--accent);}
   code{background:#F0F2F1;padding:2px 6px;border-radius:5px;font-size:12px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>タクシー勤務管理</h1>
-  <p class="sub">始業・終業をそれぞれ「日付＋時刻」で選ぶと拘束時間を自動計算します（翌日終業もそのまま正しく計算）。月間拘束の残り・運転時間の平均・営収の平均も出ます。</p>
+  <p class="sub">記録する月（年月）を選んで、毎月の勤務を残せます。始業・終業を「日付＋時刻」で選ぶと拘束時間を自動計算（翌日終業もそのまま正しく計算）。月間拘束の残り・運転時間の平均・営収の平均も出ます。</p>
 
   <div class="card">
     <p class="sec-title">全端末で同期（Googleログイン）</p>
     <p class="note" id="syncStatus" style="margin-top:0"><span class="sync-dot" id="syncDot"></span>同期状態を確認中…</p>
-    <p class="note">スマホとPCで<b>同じGoogleアカウント</b>にログインすると、入力が自動で全端末に同期されます（東京マップと同じ仕組み）。ログインしない場合はこの端末だけに保存されます。</p>
+    <p class="note">スマホとPCで<b>同じGoogleアカウント</b>にログインすると、入力が自動で全端末に同期されます（東京マップと同じ仕組み）。ログインしない場合はこの端末だけに保存されます。すべての月がまとめて同期されます。</p>
     <div class="btns">
       <button class="primary" id="authBtn" onclick="authClick()">Googleでログイン</button>
     </div>
   </div>
 
   <div class="card">
+    <p class="sec-title">記録する月</p>
+    <div class="controls" style="margin-bottom:0">
+      <div>
+        <label>年月を選ぶ</label><br>
+        <input type="month" id="selMonth">
+      </div>
+      <div>
+        <button onclick="deleteMonth()">この月を削除</button>
+      </div>
+    </div>
+    <div id="monthChips"></div>
+    <p class="note" style="margin-top:8px">上のカレンダーで新しい月を選べば、その月の記録を新規で入力できます。丸いボタンは保存済みの月で、押すと切り替わります。</p>
+  </div>
+
+  <div class="card">
+    <p class="sec-title" id="curMonthTitle">この月の設定</p>
     <div class="controls">
       <div>
         <label>月タイプ</label><br>
@@ -128,7 +149,7 @@
       <button onclick="exportJSON()">バックアップ保存</button>
       <button onclick="document.getElementById('importFile').click()">バックアップ読み込み</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">
-      <button onclick="clearData()">全部クリア</button>
+      <button onclick="clearData()">この月をクリア</button>
     </div>
     <p class="note">始業・終業のカレンダーは空のとき今日の日付で開きます。営収は金額を数字で記入してください。入力は自動保存され、ログイン中は全端末に同期されます。</p>
   </div>
@@ -138,7 +159,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
-var KEY = 'taxi_kinmu_v3';
+var LS = 'taxi_kinmu_v4';       /* 複数月まとめて保存 */
+var LS_OLD = 'taxi_kinmu_v3';   /* 旧・単月データ（移行用） */
 
 /* ===== 東京マップと同じ Firebase プロジェクト（Googleログイン同期） ===== */
 var FB_CONFIG = {
@@ -149,8 +171,17 @@ var FB_CONFIG = {
   messagingSenderId: "143590278758",
   appId: "1:143590278758:web:3086b0b046376283b3cfa7"
 };
-var FB_COLLECTION = 'taxiKinmu';  /* マップ等と干渉しない専用コレクション */
+var FB_COLLECTION = 'taxiKinmu';
 var fbUser = null, fbDb = null, _syncT = null, _applyingRemote = false, _unsub = null;
+
+/* ===== 全体データ： STORE = { months:{ "YYYY-MM": {monthType,target,shiftCount,rows,updatedAt} }, updatedAt } ===== */
+var STORE = { months:{}, updatedAt:0 };
+var SEL = '';   /* 現在表示中の "YYYY-MM" */
+
+function pad2(n){ return (n<10?'0':'')+n; }
+function todayKey(){ var d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1); }
+function monthLabel(k){ var p=k.split('-'); return p[0]+'年'+parseInt(p[1],10)+'月'; }
+function defMonth(){ return {monthType:'270', target:'14:30', shiftCount:'13', rows:[], updatedAt:0}; }
 
 function parseTime(s){
   if(!s) return null;
@@ -179,31 +210,37 @@ function fmtStamp(ms){
   return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes());
 }
 
-function buildRows(){
-  var n = parseInt(document.getElementById('shiftCount').value,10) || 13;
+/* ===== 行の描画（n出番ぶん、rowsの内容で埋める） ===== */
+function renderRows(n, rows){
+  rows = rows || [];
   var tbody = document.getElementById('rows');
-  var existing = readInputs();
   tbody.innerHTML = '';
   for(var i=0;i<n;i++){
-    var d = existing[i] || {start:'',end:'',drive:'',rev:''};
+    var d = rows[i] || {start:'',end:'',drive:'',tgt:'',rev:''};
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td class="rownum">'+(i+1)+'</td>'+
-      '<td><input type="datetime-local" class="dt-in start" value="'+d.start+'"></td>'+
-      '<td><input type="datetime-local" class="dt-in end" value="'+d.end+'"></td>'+
+      '<td><input type="datetime-local" class="dt-in start" value="'+(d.start||'')+'"></td>'+
+      '<td><input type="datetime-local" class="dt-in end" value="'+(d.end||'')+'"></td>'+
       '<td class="calc bind">—</td>'+
-      '<td><input type="time" class="time-in drive" value="'+d.drive+'"></td>'+
+      '<td><input type="time" class="time-in drive" value="'+(d.drive||'')+'"></td>'+
       '<td><input class="rev-in tgt" inputmode="numeric" placeholder="50000" value="'+(d.tgt||'')+'"></td>'+
-      '<td><input class="rev-in rev" inputmode="numeric" placeholder="45000" value="'+d.rev+'"></td>'+
+      '<td><input class="rev-in rev" inputmode="numeric" placeholder="45000" value="'+(d.rev||'')+'"></td>'+
       '<td class="calc avgtgt">—</td>'+
       '<td class="calc avgact">—</td>'+
       '<td class="calc remain">—</td>';
     tbody.appendChild(tr);
   }
   tbody.querySelectorAll('input').forEach(function(inp){
-    inp.addEventListener('input', function(){ recalc(); saveData(true); });
+    inp.addEventListener('input', function(){ recalc(); saveCurrent(true); });
   });
   recalc();
+}
+
+/* 出番数を変えたとき（今の入力を保持したまま行数だけ変更） */
+function rebuildKeepingRows(){
+  var n = parseInt(document.getElementById('shiftCount').value,10) || 13;
+  renderRows(n, readInputs());
 }
 
 function readInputs(){
@@ -317,55 +354,123 @@ function recalc(){
   }
 }
 
-function currentData(){
+/* ===== 月データ ↔ フォーム ===== */
+function formData(){
   return {
     monthType: document.getElementById('monthType').value,
     target: document.getElementById('target').value,
     shiftCount: document.getElementById('shiftCount').value,
-    rows: readInputs(),
-    updatedAt: Date.now()
+    rows: readInputs()
   };
 }
 
-function applyData(d){
-  if(!d) return;
-  if(d.monthType) document.getElementById('monthType').value = d.monthType;
-  if(d.target) document.getElementById('target').value = d.target;
-  if(d.shiftCount) document.getElementById('shiftCount').value = d.shiftCount;
-  buildRows();
-  if(d.rows){
-    var trs = document.querySelectorAll('#rows tr');
-    d.rows.forEach(function(r,i){
-      if(trs[i]){
-        trs[i].querySelector('.start').value = r.start||'';
-        trs[i].querySelector('.end').value = r.end||'';
-        trs[i].querySelector('.drive').value = r.drive||'';
-        trs[i].querySelector('.tgt').value = r.tgt||'';
-        trs[i].querySelector('.rev').value = r.rev||'';
-      }
-    });
-  }
+function fillForm(m){
+  _applyingRemote = true;
+  var d = m || defMonth();
+  document.getElementById('monthType').value = d.monthType || '270';
+  document.getElementById('target').value = d.target || '14:30';
+  document.getElementById('shiftCount').value = d.shiftCount || '13';
+  document.getElementById('curMonthTitle').textContent = (SEL ? monthLabel(SEL) : '') + ' の設定';
+  renderRows(parseInt(d.shiftCount,10) || 13, d.rows || []);
+  _applyingRemote = false;
   recalc();
 }
 
-function saveData(silent){
-  var data = currentData();
-  try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+/* 今フォームに出ている内容を SEL の月として保存 */
+function saveCurrent(silent){
+  if(_applyingRemote) return;
+  var now = Date.now();
+  var md = formData(); md.updatedAt = now;
+  STORE.months[SEL] = md;
+  STORE.updatedAt = now;
+  try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
+  renderChips();
   syncPush();
-  if(!silent && window.event && window.event.target){ var b=window.event.target; var t=b.textContent; b.textContent='保存しました'; setTimeout(function(){b.textContent=t;},1200); }
-}
-
-function loadData(){
-  var raw;
-  try{ raw = localStorage.getItem(KEY); }catch(e){}
-  if(raw){
-    try{ applyData(JSON.parse(raw)); return; }catch(e){}
+  if(!silent && window.event && window.event.target){
+    var b=window.event.target; var t=b.textContent;
+    b.textContent='保存しました'; setTimeout(function(){b.textContent=t;},1200);
   }
-  buildRows();
+}
+function saveData(){ saveCurrent(false); }
+
+/* ===== 月の切替 ===== */
+function renderChips(){
+  var wrap = document.getElementById('monthChips');
+  var keys = Object.keys(STORE.months).sort();
+  if(!keys.length){ wrap.innerHTML = '<span class="note" style="margin:0">まだ保存された月はありません。</span>'; return; }
+  wrap.innerHTML = keys.map(function(k){
+    return '<button type="button" class="chip'+(k===SEL?' chip-on':'')+'" onclick="jumpMonth(\''+k+'\')">'+monthLabel(k)+'</button>';
+  }).join('');
+}
+function jumpMonth(k){
+  if(k===SEL) return;
+  saveIfHasContent();          /* 離れる月を保存 */
+  SEL = k;
+  document.getElementById('selMonth').value = k;
+  fillForm(STORE.months[k]);
+  renderChips();
+}
+/* フォームに何か入っていれば保存（空の新規月は保存しない） */
+function saveIfHasContent(){
+  var md = formData();
+  var has = (md.rows || []).some(function(r){ return r.start||r.end||r.drive||r.tgt||r.rev; });
+  if(has || STORE.months[SEL]){
+    var now = Date.now(); md.updatedAt = now;
+    STORE.months[SEL] = md; STORE.updatedAt = now;
+    try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
+    syncPush();
+  }
+}
+function deleteMonth(){
+  if(!SEL) return;
+  if(!STORE.months[SEL]){ alert('この月はまだ保存されていません。'); return; }
+  if(!confirm(monthLabel(SEL)+' の記録を削除しますか？')) return;
+  delete STORE.months[SEL];
+  STORE.updatedAt = Date.now();
+  try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
+  syncPush();
+  var keys = Object.keys(STORE.months).sort();
+  SEL = keys.length ? keys[keys.length-1] : todayKey();
+  document.getElementById('selMonth').value = SEL;
+  fillForm(STORE.months[SEL]);
+  renderChips();
 }
 
-function localData(){
-  try{ var r = localStorage.getItem(KEY); return r ? JSON.parse(r) : null; }catch(e){ return null; }
+/* ===== 保存データの読み込み・正規化 ===== */
+function normalize(o){
+  if(!o) return { months:{}, updatedAt:0 };
+  if(o.months) return { months:o.months||{}, updatedAt:o.updatedAt||0 };
+  /* 旧・単月形式 {monthType,target,shiftCount,rows,updatedAt} を今月ぶんとして取り込む */
+  var k = todayKey();
+  var s = { months:{}, updatedAt:o.updatedAt||Date.now() };
+  s.months[k] = {
+    monthType:o.monthType||'270', target:o.target||'14:30',
+    shiftCount:o.shiftCount||'13', rows:o.rows||[], updatedAt:o.updatedAt||Date.now()
+  };
+  return s;
+}
+function loadStore(){
+  var raw;
+  try{ raw = localStorage.getItem(LS); }catch(e){}
+  if(raw){ try{ return normalize(JSON.parse(raw)); }catch(e){} }
+  try{ var old = localStorage.getItem(LS_OLD); if(old){ return normalize(JSON.parse(old)); } }catch(e){}
+  return { months:{}, updatedAt:0 };
+}
+
+/* 月ごとに新しい方を採用してマージ */
+function mergeStores(remote, local){
+  var out = { months:{}, updatedAt:0 };
+  var keys = {};
+  var lm = (local && local.months) || {}, rm = (remote && remote.months) || {};
+  Object.keys(lm).forEach(function(k){ keys[k]=1; });
+  Object.keys(rm).forEach(function(k){ keys[k]=1; });
+  Object.keys(keys).forEach(function(k){
+    var l = lm[k], r = rm[k];
+    if(l && r) out.months[k] = ((r.updatedAt||0) >= (l.updatedAt||0)) ? r : l;
+    else out.months[k] = l || r;
+  });
+  out.updatedAt = Math.max((local&&local.updatedAt)||0, (remote&&remote.updatedAt)||0);
+  return out;
 }
 
 /* ===== 同期の表示 ===== */
@@ -421,21 +526,21 @@ function startSync(){
   if(_unsub){ _unsub(); }
   _unsub = ref.onSnapshot(function(snap){
     if(!snap.exists){ syncPush(true); return; }
-    if(snap.metadata.hasPendingWrites) return;   // 自分の書き込みのエコーは無視
-    var remote = snap.data() || {};
-    var rd = null; try{ rd = JSON.parse(remote.dataJson); }catch(e){}
-    if(!rd) return;
-    var local = localData();
-    var rU = remote.updatedAt || 0, lU = (local && local.updatedAt) ? local.updatedAt : 0;
-    if(rU > lU){
-      _applyingRemote = true;
-      applyData(rd);
-      try{ localStorage.setItem(KEY, JSON.stringify(rd)); }catch(e){}
-      _applyingRemote = false;
-      setSyncStatus('最新に同期しました（更新 '+fmtStamp(rU)+'）。', 'on');
-    } else if(lU > rU){
-      syncPush(true);   // この端末の方が新しい → クラウドへ反映
-    }
+    if(snap.metadata.hasPendingWrites) return;
+    var remote = null; try{ remote = normalize(JSON.parse((snap.data()||{}).dataJson)); }catch(e){}
+    if(!remote) return;
+    var merged = mergeStores(remote, STORE);
+    var before = JSON.stringify(STORE);
+    STORE = merged;
+    try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
+    /* 入力中でなければ現在の月を最新表示に更新 */
+    var active = document.activeElement;
+    var typing = active && active.closest && active.closest('#rows');
+    if(!typing) fillForm(STORE.months[SEL]);
+    renderChips();
+    setSyncStatus('最新に同期しました（更新 '+fmtStamp(STORE.updatedAt)+'）。', 'on');
+    /* この端末の方が新しい月があればクラウドへ反映 */
+    if(JSON.stringify(STORE) !== JSON.stringify(remote)) syncPush(true);
   }, function(err){
     setSyncStatus('同期エラー（'+(err&&err.code||'')+'）。', 'err');
   });
@@ -446,11 +551,10 @@ function syncPush(force){
   if(_applyingRemote && !force) return;
   clearTimeout(_syncT);
   _syncT = setTimeout(function(){
-    var data = currentData();
-    try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
+    try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
     fbDb.collection(FB_COLLECTION).doc(fbUser.uid)
-      .set({ dataJson: JSON.stringify(data), updatedAt: data.updatedAt })
-      .then(function(){ setSyncStatus('同期しました（'+fmtStamp(data.updatedAt)+'）。', 'on'); })
+      .set({ dataJson: JSON.stringify(STORE), updatedAt: STORE.updatedAt })
+      .then(function(){ setSyncStatus('同期しました（'+fmtStamp(STORE.updatedAt)+'）。', 'on'); })
       .catch(function(err){ setSyncStatus('保存エラー（'+(err&&err.code||'')+'）。', 'err'); });
   }, 800);
 }
@@ -459,8 +563,7 @@ function syncPush(force){
 function fmtDT(v){ return v ? v.replace('T',' ').replace(/-/g,'/') : ''; }
 function todayStamp(){
   var d = new Date();
-  var p = function(n){ return (n<10?'0':'')+n; };
-  return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate());
+  return d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate());
 }
 function download(name, content, type){
   var blob = new Blob([content], {type:type});
@@ -475,6 +578,7 @@ function exportCSV(){
   var rows = document.querySelectorAll('#rows tr');
   var limit = parseInt(document.getElementById('monthType').value,10);
   var lines = [];
+  lines.push('対象月,'+ (SEL?monthLabel(SEL):''));
   lines.push('出番,始業,終業,拘束時間,運転時間,目標営収(円),実績営収(円),平均営収(目標),平均営収(実績),この時点の拘束残り');
   var cum = 0, totalBind = 0, totalDrive = 0, driveCnt = 0;
   var lastT = '';
@@ -508,11 +612,13 @@ function exportCSV(){
   lines.push('平均営収(目標),'+ lastT);
   lines.push('平均営収(実績),'+ lastA);
   var csv = '﻿' + lines.join('\r\n');
-  download('タクシー勤務記録_'+todayStamp()+'.csv', csv, 'text/csv;charset=utf-8;');
+  download('タクシー勤務記録_'+(SEL?SEL.replace('-',''):todayStamp())+'.csv', csv, 'text/csv;charset=utf-8;');
 }
 
+/* バックアップは全月まとめて */
 function exportJSON(){
-  download('タクシー勤務バックアップ_'+todayStamp()+'.json', JSON.stringify(currentData(),null,2), 'application/json');
+  saveIfHasContent();
+  download('タクシー勤務バックアップ_全月_'+todayStamp()+'.json', JSON.stringify(STORE,null,2), 'application/json');
 }
 
 function importJSON(input){
@@ -521,10 +627,17 @@ function importJSON(input){
   var reader = new FileReader();
   reader.onload = function(e){
     try{
-      var d = JSON.parse(e.target.result);
-      applyData(d);
-      saveData(true);
-      alert('読み込みました。');
+      var d = normalize(JSON.parse(e.target.result));
+      STORE = mergeStores(d, STORE);
+      STORE.updatedAt = Date.now();
+      try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e2){}
+      var keys = Object.keys(STORE.months).sort();
+      if(keys.indexOf(SEL)<0 && keys.length) SEL = keys[keys.length-1];
+      document.getElementById('selMonth').value = SEL;
+      fillForm(STORE.months[SEL]);
+      renderChips();
+      syncPush(true);
+      alert('読み込みました（全月をまとめて取り込み）。');
     }catch(err){ alert('読み込めませんでした。バックアップ(JSON)ファイルを選んでください。'); }
     input.value = '';
   };
@@ -532,18 +645,32 @@ function importJSON(input){
 }
 
 function clearData(){
-  if(!confirm('入力を全部消しますか？')) return;
-  try{ localStorage.removeItem(KEY); }catch(e){}
+  if(!confirm(monthLabel(SEL)+' の入力を全部消しますか？')) return;
   document.querySelectorAll('#rows input').forEach(function(i){ i.value=''; });
   recalc();
-  saveData(true);
+  saveCurrent(true);
 }
 
-document.getElementById('monthType').addEventListener('change', function(){ recalc(); saveData(true); });
-document.getElementById('target').addEventListener('input', function(){ recalc(); saveData(true); });
-document.getElementById('shiftCount').addEventListener('input', function(){ buildRows(); saveData(true); });
+/* ===== イベント ===== */
+document.getElementById('monthType').addEventListener('change', function(){ recalc(); saveCurrent(true); });
+document.getElementById('target').addEventListener('input', function(){ recalc(); saveCurrent(true); });
+document.getElementById('shiftCount').addEventListener('input', function(){ rebuildKeepingRows(); saveCurrent(true); });
+document.getElementById('selMonth').addEventListener('change', function(){
+  var v = this.value;
+  if(!v){ this.value = SEL; return; }
+  saveIfHasContent();          /* 離れる月を保存 */
+  SEL = v;
+  fillForm(STORE.months[v]);   /* 未保存の月なら空で開く */
+  renderChips();
+});
 
-loadData();
+/* ===== 起動 ===== */
+STORE = loadStore();
+var _keys = Object.keys(STORE.months).sort();
+SEL = (_keys.indexOf(todayKey())>=0) ? todayKey() : (_keys.length ? _keys[_keys.length-1] : todayKey());
+document.getElementById('selMonth').value = SEL;
+fillForm(STORE.months[SEL]);
+renderChips();
 initFirebase();
 </script>
 </body>
