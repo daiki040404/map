@@ -165,7 +165,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <div class="filters">
         <div class="seg" id="sumAgg">
           <button data-a="total" class="active">合計</button>
-          <button data-a="avg">1日平均</button>
+          <button data-a="avg">1乗務平均</button>
         </div>
         <div class="seg" id="sumMetric">
           <button data-m="uriage" class="active">営収</button>
@@ -196,7 +196,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         </div>
         <div class="seg" id="hrAgg">
           <button data-a="total" class="active">合計</button>
-          <button data-a="avg">1日平均</button>
+          <button data-a="avg">1乗務平均</button>
         </div>
         <div class="seg" id="hrView">
           <button data-v="chart" class="active">グラフ</button>
@@ -228,7 +228,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         </div>
         <div class="seg" id="pAgg">
           <button data-a="total" class="active">合計</button>
-          <button data-a="avg">1日平均</button>
+          <button data-a="avg">1乗務平均</button>
         </div>
         <div class="seg" id="pView">
           <button data-v="chart" class="active">グラフ</button>
@@ -243,7 +243,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
   <!-- SEASON / 期間比較 -->
   <section class="view" id="view-season">
     <div class="card">
-      <h2>期間比較 <span class="sub">選んだ項目を重ねて表示（1日平均）</span></h2>
+      <h2>期間比較 <span class="sub">選んだ項目を重ねて表示（1乗務平均）</span></h2>
       <div class="filters">
         <div class="field"><label>指標</label>
           <select id="cmpMetric">
@@ -259,7 +259,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       </div>
       <div id="cmpItems" style="margin-bottom:10px"></div>
       <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
-      <p class="note">上のチェックで表示する項目を選ぶ。全部「登録した勤務日」の1日平均で計算（カレンダー日数では割らない／除外日も抜く）。数値を出すには右上「数値」をON。</p>
+      <p class="note">上のチェックで表示する項目を選ぶ。全部「登録した勤務日」の1乗務平均で計算（カレンダー日数では割らない／除外日も抜く）。数値を出すには右上「数値」をON。</p>
     </div>
     <div class="card">
       <h2>期間の登録・編集</h2>
@@ -561,7 +561,7 @@ function renderSummary(){
   const avg=sumAgg==='avg';
   const kp=document.getElementById('sumKpis');
   kp.innerHTML=[
-    [avg?'1日平均営収':'営収合計', fmtYen(avg? m.uriage/nd : m.uriage)],
+    [avg?'1乗務平均営収':'営収合計', fmtYen(avg? m.uriage/nd : m.uriage)],
     [avg?'乗車数(平均)':'乗車数', (avg? (m.rc/nd).toFixed(1) : m.rc)+' 回'],
     [avg?'実車時間(平均)':'実車時間', fmtMin(avg? m.jitsu/nd : m.jitsu)],
     ['実質時給', fmtYen(m.wage)+'<small>/h</small>'],
@@ -616,7 +616,7 @@ function renderHourly(){
       options:{scales:{y:hrMetric==='rate'?{max:100}:{}}, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=> hrMetric==='fare'?fmtYen(c.parsed.y): hrMetric==='jitsu'? c.parsed.y+'分': hrMetric==='rate'? c.parsed.y+'%': c.parsed.y+'回'}}}}
     });
   } else { cw.style.display='none'; tw.style.display='';
-    const hd=hrAgg==='avg'?'（1日平均）':'';
+    const hd=hrAgg==='avg'?'（1乗務平均）':'';
     let rows=SHIFT_HOURS.map(h=>{ const c=agg.count[h]||0; if(!c && !(agg.fare[h])&&!(agg.jitsu[h])) return '';
       const rt=Math.min(100,Math.round((agg.jitsu[h]||0)/(nd*60)*100));
       const cShow= hrAgg==='avg'? (c/nd).toFixed(1) : c;
