@@ -168,7 +168,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v27</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v28</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -558,7 +558,7 @@ map.on('click',e=>{
   if(mode==='learn'){if(focusId){focusId=null;map.closePopup();render();}return;}
   if(mode!=='edit')return;
   if(addCrossingMode){const n=prompt('交差点の名前（例：呉服橋交差点）');if(n){crossDraft={lon:e.latlng.lng,lat:e.latlng.lat,name:n,editId:null};openRoadPicker([]);}return;}
-  if(addFacilityMode){const n=prompt('施設名');if(n){const id=uid('f');DATA.push({id,name:n,kind:'facility',color:'#4f8cff',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🏢「'+n+'」を追加。面する通りは「通りを選ぶ」で設定できます');}return;}
+  if(addFacilityMode){const n=prompt('施設名');if(n){const id=uid('f');DATA.push({id,name:n,kind:'facility',color:'#4f8cff',lon:e.latlng.lng,lat:e.latlng.lat,roads:[]});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();crossDraft={editId:id,name:n};openRoadPicker([]);toast('🏢「'+n+'」を追加。面する通りを複数タップで選べます');}return;}
   if(addRampMode){const n=prompt('高速出入口の名前（例：霞が関入口）');if(n){const id=uid('r');DATA.push({id,name:n,kind:'ramp',color:'#10b981',dir:'フルランプ',lon:e.latlng.lng,lat:e.latlng.lat,roads:[],expwy:rampExpwyTarget||null});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🟢「'+n+'」を追加'+(rampExpwyTarget?'（首都高に紐付け済み）':'。首都高と通りを設定してね'));}return;}
   if(addStationMode){const n=prompt('駅名（例：東京駅）');if(n){const id=uid('st');DATA.push({id,name:n,kind:'station',color:'#e11d48',lon:e.latlng.lng,lat:e.latlng.lat,roads:[],line:stationLineTarget||null});selectedId=id;activeTestId='';refreshTestSel();saveData();rebuild();toast('🚉「'+n+'」を追加'+(stationLineTarget?'（鉄道に紐付け済み）':'。鉄道はあとで選べる'));}return;}
   if(!selectedId)return;const o=cur();if(!o)return;
@@ -570,7 +570,7 @@ map.on('click',e=>{
 window.startAvoid=(sid,pid)=>{selectedId=sid;addVertexMode=false;addBuildingMode=false;addCautionMode=false;addAvoidMode=true;avoidTargetPid=pid;map.closePopup();updateEditorPanel();toast('地図で回避ポイントの位置をクリック（この注意点に関連付きます）');};
 // ===== crossing (交差点) =====
 let crossDraft=null, rampExpwyTarget=null, expwyPickFor=null, linkRampsFor=null, pickKind='expressway', linkStationsFor=null;
-function openRoadPicker(preselect){const list=document.getElementById('cmList');list.innerHTML='';
+function openRoadPicker(preselect){const list=document.getElementById('cmList');list.innerHTML='';document.getElementById('cmTitle').textContent='面する/通る通りを選択（複数タップ可）';
   const roads=DATA.filter(o=>o.kind==='street'||o.kind==='route');
   if(!roads.length){list.innerHTML='<p class="hint">先に通りかルートを1本以上作ってください。</p>';}
   roads.forEach(o=>{const row=document.createElement('label');row.className='cmrow';row.dataset.name=o.name;
@@ -648,7 +648,7 @@ function updateEditorPanel(){
   document.getElementById('eAddStation').classList.toggle('on',addStationMode);
   if(isCross){const k=o.kind;const lbl=k==='facility'?'施設':(k==='ramp'?'出入口':(k==='station'?'駅':'交差点'));
     document.getElementById('ecName').placeholder=lbl+'名';
-    document.getElementById('ecRoads').textContent=(k==='crossing'?'通る通りを選ぶ':'つながる通りを選ぶ');
+    document.getElementById('ecRoads').textContent=(k==='crossing'?'通る通りを選ぶ（複数可）':(k==='facility'?'面する通りを選ぶ（複数可）':'つながる通りを選ぶ（複数可）'));
     document.getElementById('ecRoads').style.display=(k==='station')?'none':'';
     document.getElementById('ecDel').textContent=lbl+'を削除';
     document.getElementById('ecHint').textContent=(k==='station'?'駅を選ぶと、所属する鉄道が線で強調表示されます。':lbl+'を選ぶと、関連する通りが線で強調表示されます。');
