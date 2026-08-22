@@ -1,333 +1,1123 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>タクシー営収分析</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>営収分析</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-body { margin:0; background:#f4f6fa; color:#1a2233; font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif; }
-.wrap { max-width:900px; margin:0 auto; padding:16px 16px 48px; }
-.topbar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
-h1 { font-size:19px; margin:4px 0; }
-.sub { color:#6b7688; font-size:13px; }
-.authbox { font-size:13px; display:flex; align-items:center; gap:8px; }
-.btn { border:0; border-radius:10px; padding:8px 14px; font-size:13px; font-weight:700; cursor:pointer; }
-.btn.g { background:#4285F4; color:#fff; }
-.btn.ghost { background:#eaeef5; color:#333; }
-.btn.add { background:#1e824c; color:#fff; }
-.pill { font-size:12px; color:#2e7d32; background:#eafaf1; padding:4px 10px; border-radius:999px; }
-.pill.off { color:#8a6d3b; background:#fcf3e3; }
-.heroRow { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px; }
-.hero { border-radius:18px; padding:20px 22px; color:#fff; }
-.hero.green { background:linear-gradient(135deg,#1e824c,#2ecc71); }
-.hero.blue  { background:linear-gradient(135deg,#2c5fa8,#4a90e2); }
-.hero .lbl { font-size:14px; opacity:.92; }
-.hero .big { font-size:44px; font-weight:800; line-height:1.05; margin:6px 0 2px; letter-spacing:-1px; }
-.hero .big span { font-size:20px; font-weight:700; }
-.hero .day { font-size:13px; opacity:.9; }
-@media(max-width:560px){ .heroRow{grid-template-columns:1fr;} .hero .big{font-size:40px;} }
-.summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:12px; }
-.sm { background:#fff; border-radius:14px; padding:14px 10px; text-align:center; box-shadow:0 2px 8px rgba(20,30,60,.06); }
-.sm .k { font-size:12px; color:#6b7688; }
-.sm .v { font-size:22px; font-weight:800; margin-top:4px; } .sm .v small{font-size:13px;color:#8a94a6;font-weight:700;}
-@media(max-width:560px){ .summary{grid-template-columns:repeat(2,1fr);} }
-.panel { background:#fff; border-radius:16px; padding:16px; margin-top:16px; box-shadow:0 2px 8px rgba(20,30,60,.06); }
-.panel h2 { font-size:15px; margin:0 0 4px; }
-.panel .note { font-size:12px; color:#8a94a6; margin:0 0 10px; }
-select,input,textarea { font-size:13px; padding:6px 8px; border-radius:8px; border:1px solid #cfd6e2; font-family:inherit; }
-.chartbox { position:relative; height:240px; }
-table { width:100%; border-collapse:collapse; font-size:14px; }
-th,td { padding:9px 8px; text-align:right; white-space:nowrap; }
-th { color:#6b7688; font-size:12px; border-bottom:2px solid #e6eaf1; }
-td:first-child, th:first-child { text-align:left; }
-tbody tr:nth-child(odd){ background:#fafbfd; }
-.tblwrap{ overflow-x:auto; }
-.form-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-.form-grid label{ font-size:12px; color:#6b7688; display:flex; flex-direction:column; gap:3px; }
-@media(max-width:560px){ .form-grid{grid-template-columns:repeat(2,1fr);} }
-.delx{ background:none; border:0; color:#c0392b; cursor:pointer; font-size:13px; }
-.muted{ color:#8a94a6; font-size:12px; }
-.arealist{ margin-top:12px; }
-.arearow{ display:flex; align-items:baseline; gap:10px; padding:9px 8px; border-bottom:1px solid #eef1f6; }
-.arearow .rank{ font-weight:800; color:#e67e22; width:22px; }
-.arearow .name{ font-weight:800; font-size:15px; }
-.arearow .cnt{ font-size:13px; color:#31557f; background:#eef6ff; border-radius:999px; padding:2px 8px; }
-.arearow .avg{ margin-left:auto; font-weight:800; }
-.arearow .spots{ display:block; width:100%; font-size:12px; color:#8a94a6; margin-top:2px; }
+:root{
+  color-scheme: dark;
+  --plane:#0d0d0d; --surface:#1a1a19; --surface2:#232322;
+  --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --good:#0ca30c; --seqlo:#184f95; --seqhi:#cde2fb;
+  --accent:#3987e5;
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb; --surface2:#f1f0ec;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --good:#006300; --seqlo:#104281; --seqhi:#cde2fb;
+  --accent:#2a78d6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--plane); color:var(--ink);
+  font-family: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",sans-serif;
+  font-size:15px; line-height:1.5;
+}
+header{
+  position:sticky; top:0; z-index:500;
+  background:var(--surface); border-bottom:1px solid var(--border);
+  padding:10px 14px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+header h1{font-size:18px; margin:0; font-weight:700; letter-spacing:.02em}
+.sync-badge{font-size:12px; color:var(--muted); border:1px solid var(--border); border-radius:20px; padding:3px 10px}
+.spacer{flex:1}
+button{font-family:inherit; cursor:pointer}
+.icon-btn{background:var(--surface2); color:var(--ink); border:1px solid var(--border); border-radius:8px; padding:6px 10px; font-size:13px}
+.icon-btn:hover{border-color:var(--accent)}
+nav.tabs{display:flex; gap:4px; padding:8px 14px 0; background:var(--surface); overflow-x:auto; border-bottom:1px solid var(--border); position:sticky; top:53px; z-index:490}
+nav.tabs button{
+  background:transparent; border:none; color:var(--ink2); font-size:14px;
+  padding:8px 14px; border-radius:8px 8px 0 0; white-space:nowrap; border-bottom:2px solid transparent;
+}
+nav.tabs button.active{color:var(--ink); border-bottom-color:var(--accent); font-weight:600}
+main{padding:16px; max-width:1100px; margin:0 auto}
+.view{display:none}
+.view.active{display:block}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px}
+.card h2{font-size:15px; margin:0 0 12px; font-weight:600}
+.card h2 .sub{font-weight:400; color:var(--muted); font-size:12px; margin-left:6px}
+.filters{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px}
+.filters .grp{display:flex; gap:4px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:4px}
+.filters label.chip{font-size:12px; color:var(--muted); padding:2px 6px}
+.seg{display:inline-flex; background:var(--surface2); border-radius:8px; padding:2px; gap:2px}
+.seg button{background:transparent; border:none; color:var(--ink2); font-size:13px; padding:5px 11px; border-radius:6px}
+.seg button.active{background:var(--accent); color:#fff; font-weight:600}
+select,input[type=text],input[type=date],input[type=number],textarea{
+  font-family:inherit; font-size:14px; background:var(--surface2); color:var(--ink);
+  border:1px solid var(--border); border-radius:8px; padding:6px 8px;
+}
+textarea{width:100%; min-height:120px; resize:vertical; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:14px}
+.kpi{background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px}
+.kpi .lab{font-size:12px; color:var(--muted); margin-bottom:4px}
+.kpi .val{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums}
+.kpi .val small{font-size:13px; font-weight:500; color:var(--ink2)}
+table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums}
+th,td{text-align:right; padding:7px 10px; border-bottom:1px solid var(--grid); font-size:13px}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--surface)}
+tr:hover td{background:var(--surface2)}
+.chart-wrap{position:relative; height:320px}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.note{font-size:12px; color:var(--muted); margin-top:8px}
+#map{height:520px; border-radius:12px; border:1px solid var(--border)}
+.leaflet-container{background:var(--surface2)}
+.map-legend{font-size:12px; line-height:1.7; background:var(--surface); padding:8px 10px; border-radius:8px; border:1px solid var(--border)}
+.legend-bar{height:10px; border-radius:5px; background:linear-gradient(90deg,var(--seqhi),var(--seqlo)); margin:4px 0}
+.pill{display:inline-block; font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--ink2); margin-left:4px}
+.season-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--grid)}
+.season-row .name{font-weight:600; min-width:120px}
+.del{color:var(--s8); background:transparent; border:none; font-size:13px}
+.empty{padding:40px; text-align:center; color:var(--muted)}
+.ride-edit{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:7px 6px; border-bottom:1px solid var(--grid)}
+.day-det{border:1px solid var(--border); border-radius:10px; padding:8px 12px; margin-bottom:8px; background:var(--surface)}
+.day-det summary{cursor:pointer; font-weight:600}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end}
+.field{display:flex; flex-direction:column; gap:3px}
+.field label{font-size:12px; color:var(--muted)}
+code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size:12px}
+.gc-status{font-size:12px; color:var(--muted); margin-left:8px}
+@media(max-width:600px){ .chart-wrap{height:260px} #map{height:420px} main{padding:12px} }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="topbar">
-    <div>
-      <h1>🚕 タクシー営収分析</h1>
-      <div class="sub">辻大貴さん / 日本交通 三鷹第一営業所 — <span id="count"></span></div>
+<header>
+  <h1>営収分析</h1>
+  <span class="sync-badge" id="syncBadge">同期: 接続中…</span>
+  <div class="spacer"></div>
+  <button class="icon-btn" id="valuesBtn">123 数値OFF</button>
+  <button class="icon-btn" id="themeBtn">☾ / ☀</button>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="summary" class="active">サマリー</button>
+  <button data-tab="hourly">時間別</button>
+  <button data-tab="period">月・曜日・出庫</button>
+  <button data-tab="season">シーズン比較</button>
+  <button data-tab="map">地図</button>
+  <button data-tab="data">データ</button>
+</nav>
+
+<main>
+  <!-- global filter -->
+  <div class="filters" id="globalFilters">
+    <div class="grp">
+      <label class="chip">配車</label>
+      <label class="small"><input type="checkbox" class="ftype" value="アプリ" checked> アプリ</label>
+      <label class="small"><input type="checkbox" class="ftype" value="無線" checked> 無線</label>
+      <label class="small"><input type="checkbox" class="ftype" value="流し" checked> 流し</label>
     </div>
-    <div class="authbox" id="authbox">
-      <span class="pill off" id="syncState">ローカル保存中</span>
-      <button class="btn g" id="loginBtn">Googleでログイン</button>
+    <div class="grp">
+      <label class="chip">シーズン</label>
+      <select id="fSeason"><option value="">全期間</option></select>
     </div>
+    <div class="grp">
+      <label class="chip">天候</label>
+      <select id="fWeather"><option value="">全天候</option>
+        <option>晴れ</option><option>曇り</option><option>雨</option><option>雪</option></select>
+    </div>
+    <div class="grp">
+      <label class="chip">期間</label>
+      <input type="date" id="fFrom"><span class="muted small">〜</span><input type="date" id="fTo">
+      <button class="icon-btn" id="fClear" style="padding:3px 8px">×</button>
+    </div>
+    <div class="grp">
+      <label class="chip">日付</label>
+      <select id="fDate"><option value="">指定なし</option></select>
+    </div>
+    <div class="seg" id="fOutlier">
+      <button data-o="all" class="active">全部</button>
+      <button data-o="exclude">外れ値除外</button>
+      <button data-o="only">外れ値のみ</button>
+    </div>
+    <span class="muted small" id="scopeInfo"></span>
   </div>
 
-  <div id="app"></div>
-
-  <div class="panel">
-    <h2>📤 Claudeに分析してもらう</h2>
-    <p class="note">ボタンで全データをコピー → Claude（スマホ/PC）に貼り付ければ、傾向や強い時間帯・エリア、改善点を分析してもらえます。</p>
-    <button class="btn add" id="copyBtn">📋 全データをコピー（Claude分析用）</button>
-    <button class="btn ghost" id="copyRawBtn">JSONだけコピー</button>
-    <span class="muted" id="copyMsg" style="margin-left:10px"></span>
-  </div>
-
-  <div class="panel">
-    <h2>➕ 今日のデータを追加</h2>
-    <p class="note">入力（または下枠にJSON貼り付け）→「追加」。乗車地エリアの分析には、僕が渡すJSON（rides入り）を貼り付けると自動で反映されます。</p>
-    <div class="form-grid">
-      <label>日付<input type="date" id="f_date"></label>
-      <label>営業収入(円)<input type="number" id="f_uri" placeholder="41090"></label>
-      <label>ハンドル時間(h:mm)<input type="text" id="f_handle" placeholder="14:41"></label>
-      <label>営業回数<input type="number" id="f_kaisu" placeholder="19"></label>
-      <label>実車km<input type="number" id="f_jissha" placeholder="64"></label>
-      <label>全走行km<input type="number" id="f_soukou" placeholder="247"></label>
-      <label style="grid-column:span 2">時間帯別売上（例 16:6100, 18:5900, 1:11430）<input type="text" id="f_slots" placeholder="16:6100, 18:5900, 22:1000"></label>
+  <!-- SUMMARY -->
+  <section class="view active" id="view-summary">
+    <div class="kpis" id="sumKpis"></div>
+    <div class="card">
+      <h2>日別の推移 <span class="sub">選択中の指標</span></h2>
+      <div class="filters">
+        <div class="seg" id="sumAgg">
+          <button data-a="total" class="active">合計</button>
+          <button data-a="avg">1日平均</button>
+        </div>
+        <div class="seg" id="sumMetric">
+          <button data-m="uriage" class="active">営収</button>
+          <button data-m="kaisu">乗車数</button>
+          <button data-m="jitsu">実車時間</button>
+          <button data-m="wage">実質時給</button>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="sumChart"></canvas></div>
     </div>
-    <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-      <button class="btn add" id="addBtn">この内容で追加</button>
-      <span class="muted">または ↓ にJSONを貼って追加</span>
+    <div class="card">
+      <h2>メモ付きの営業 <span class="sub">外れ値・覚え書き（絞り込み反映）</span></h2>
+      <div id="sumMemoList"></div>
     </div>
-    <textarea id="pasteBox" rows="4" style="width:100%; margin-top:8px;" placeholder='貼り付け例：{ "date":"2026-07-27","uriage":38500,"handleH":13.5,"kaisu":17,"jissha":60,"soukou":230,"slots":{"18":5000,"22":8000},"rides":[{"h":18,"area":"荻窪","spot":"荻窪駅","fare":5000}] }'></textarea>
-    <div style="margin-top:8px;"><button class="btn ghost" id="pasteBtn">貼り付けたJSONを追加</button></div>
-  </div>
-</div>
+  </section>
+
+  <!-- HOURLY -->
+  <section class="view" id="view-hourly">
+    <div class="kpis" id="hrKpis"></div>
+    <div class="card">
+      <h2>時間帯別 <span class="sub">出庫からの一勤務を時刻順(13時→翌12時)で表示</span></h2>
+      <div class="filters">
+        <div class="seg" id="hrMetric">
+          <button data-m="fare" class="active">売上(料金)</button>
+          <button data-m="count">営業回数</button>
+          <button data-m="jitsu">実車時間(分)</button>
+          <button data-m="rate">実車率(%)</button>
+        </div>
+        <div class="seg" id="hrAgg">
+          <button data-a="total" class="active">合計</button>
+          <button data-a="avg">1日平均</button>
+        </div>
+        <div class="seg" id="hrView">
+          <button data-v="chart" class="active">グラフ</button>
+          <button data-v="table">表</button>
+        </div>
+      </div>
+      <div id="hrChartWrap" class="chart-wrap"><canvas id="hrChart"></canvas></div>
+      <div id="hrTableWrap" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- PERIOD -->
+  <section class="view" id="view-period">
+    <div class="card">
+      <h2>期間別の集計</h2>
+      <div class="filters">
+        <div class="seg" id="pGroup">
+          <button data-g="month" class="active">月別</button>
+          <button data-g="wday">曜日別</button>
+          <button data-g="shukko">出庫時間別</button>
+        </div>
+        <div class="seg" id="pMetric">
+          <button data-m="uriage" class="active">営収</button>
+          <button data-m="count">乗車数</button>
+          <button data-m="jitsu">実車時間</button>
+          <button data-m="rate">実車率</button>
+          <button data-m="wage">実質時給</button>
+          <button data-m="tanka">客単価</button>
+        </div>
+        <div class="seg" id="pAgg">
+          <button data-a="total" class="active">合計</button>
+          <button data-a="avg">1日平均</button>
+        </div>
+        <div class="seg" id="pView">
+          <button data-v="chart" class="active">グラフ</button>
+          <button data-v="table">表</button>
+        </div>
+      </div>
+      <div id="pChartWrap" class="chart-wrap"><canvas id="pChart"></canvas></div>
+      <div id="pTableWrap" style="display:none"></div>
+    </div>
+  </section>
+
+  <!-- SEASON / 期間比較 -->
+  <section class="view" id="view-season">
+    <div class="card">
+      <h2>期間比較 <span class="sub">選んだ項目を重ねて表示（1日平均）</span></h2>
+      <div class="filters">
+        <div class="field"><label>指標</label>
+          <select id="cmpMetric">
+            <option value="fare">売上(料金)</option>
+            <option value="count">営業回数</option>
+            <option value="jitsu">実車時間</option>
+          </select></div>
+        <div class="field"><label>軸</label>
+          <select id="cmpAxis">
+            <option value="hour">時間帯</option>
+            <option value="wday">曜日</option>
+          </select></div>
+      </div>
+      <div id="cmpItems" style="margin-bottom:10px"></div>
+      <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
+      <p class="note">上のチェックで表示する項目を選ぶ。全部「登録した勤務日」の1日平均で計算（カレンダー日数では割らない／除外日も抜く）。数値を出すには右上「数値」をON。</p>
+    </div>
+    <div class="card">
+      <h2>期間の登録・編集</h2>
+      <div class="row" style="margin-bottom:10px">
+        <div class="field"><label>名前</label><input type="text" id="seaName" placeholder="お盆シーズン"></div>
+        <div class="field"><label>開始</label><input type="date" id="seaStart"></div>
+        <div class="field"><label>終了</label><input type="date" id="seaEnd"></div>
+        <button class="icon-btn" id="seaAdd">追加</button>
+      </div>
+      <div id="seaList"></div>
+      <p class="note">同じ名前で期間を複数足すと1項目にまとまる（毎年のお盆など）。名前・期間はその場で直せる。各期間に「除外」を足すと、その日/期間は平均から抜ける。</p>
+    </div>
+  </section>
+
+  <!-- MAP -->
+  <section class="view" id="view-map">
+    <div class="card">
+      <h2>乗車地マップ <span class="sub">町丁目レベル・点＋ヒート</span></h2>
+      <div class="filters">
+        <div class="seg" id="mapMode">
+          <button data-m="heat" class="active">乗車ヒート</button>
+          <button data-m="tanka">乗車地×客単価</button>
+          <button data-m="od">OD(降車先)</button>
+          <button data-m="allod">全乗降</button>
+        </div>
+        <button class="icon-btn" id="odClear" style="padding:3px 8px">選択クリア</button>
+        <div class="grp">
+          <label class="chip">曜日</label>
+          <select id="mapWday"><option value="">全部</option>
+            <option>日</option><option>月</option><option>火</option><option>水</option>
+            <option>木</option><option>金</option><option>土</option></select>
+        </div>
+        <div class="grp">
+          <label class="chip">時間</label>
+          <select id="mapHFrom"></select><span class="muted small">〜</span><select id="mapHTo"></select>
+        </div>
+        <button class="icon-btn" id="locBtn">📍 現在地</button>
+        <span class="gc-status" id="gcStatus"></span>
+      </div>
+      <div id="map"></div>
+      <div class="row" style="margin-top:10px; align-items:flex-start">
+        <div class="map-legend" id="mapLegend"></div>
+        <div class="note" style="flex:1; min-width:200px" id="mapHint">
+          「乗車地×客単価」で丸をタップすると件数と客単価が出る。「OD」でエリアをタップすると、そこで乗せた客の降車先が表示される。⚠マーカーは外れ値（タップでメモ）。
+        </div>
+      </div>
+      <div id="mapMemoList" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <!-- DATA -->
+  <section class="view" id="view-data">
+    <div class="card">
+      <h2>データ取り込み</h2>
+      <p class="small muted">タブレットの営業履歴＋日報から作ったJSONを貼り付けて「取り込む」。同じ日付は上書き。</p>
+      <textarea id="pasteBox" placeholder='{"date":"2026-08-16", ... , "rides":[ ... ]}'></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="icon-btn" id="importBtn">取り込む</button>
+        <button class="icon-btn" id="copyBtn">全データをJSONでコピー</button>
+        <button class="icon-btn" id="fmtBtn">入力フォーマットを表示</button>
+        <button class="icon-btn" id="regcBtn">座標を再取得</button>
+      </div>
+      <div id="fmtBox" style="display:none; margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2>登録済みの日 <span class="sub" id="dayCount"></span></h2>
+      <div id="dayList"></div>
+    </div>
+  </section>
+</main>
 
 <script>
-/* ====== Firebase（東京マップと同じプロジェクト＝同じGoogleアカウント同期） ====== */
-const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
-const LS_DATA='taxi_eigyo_v1';
-const COLL='eigyo_bunseki';
-let fbAuth=null, fbDb=null, fbUser=null, _syncT=null, _cloudLoading=false;
+/* ============================================================
+   営収分析 — 単一ファイル版
+   データ: localStorage 'taxi_eigyo_v2'
+   クラウド同期: FIREBASE_CONFIG に設定を入れると有効化(下部参照)
+   ============================================================ */
 
-/* ====== データ（初期値。以降はローカル/クラウドが優先） ====== */
-const DEFAULT_DATA=[
-  { "date":"2026-07-26","wday":"日","uriage":41090,"handleH":14.683,"kaisu":19,"jissha":64,"soukou":247,
-    "slots":{"16":6100,"18":5900,"20":5200,"21":7600,"22":1000,"0":1900,"1":11430,"4":11120},
-    "rides":[
-      {"h":16,"area":"永福町","spot":"永福町駅前","fare":1100},
-      {"h":17,"area":"中野","spot":"中野駅南口?","fare":5000},
-      {"h":18,"area":"麻布","spot":"三の橋","fare":1600},
-      {"h":18,"area":"芝","spot":"芝五丁目","fare":4300},
-      {"h":20,"area":"市ヶ谷","spot":"防衛省前","fare":3200},
-      {"h":20,"area":"新宿西口","spot":"新宿駅西口","fare":2000},
-      {"h":21,"area":"江戸川橋","spot":"江戸川 小学校前?","fare":7600},
-      {"h":0,"area":"三鷹","spot":"三鷹駅","fare":1900},
-      {"h":1,"area":"荻窪","spot":"荻窪駅","fare":1000},
-      {"h":1,"area":"荻窪","spot":"荻窪駅","fare":9930},
-      {"h":4,"area":"下北沢","spot":"代沢十字路","fare":11120}
-    ] }
-];
-let DATA;
-try{ const s=localStorage.getItem(LS_DATA); DATA=s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT_DATA)); }
-catch(e){ DATA=JSON.parse(JSON.stringify(DEFAULT_DATA)); }
+/* ---------- 初期データ(2026-08-15) ---------- */
+const SEED = [{
+  date:"2026-08-15", shukko:"13:07", weather:"晴れ", uriage:57500, handle:"13:32", kaisu:21, jissha:102, soukou:262,
+  rides:[
+    {type:"アプリ", on:"14:40", off:"14:46", from:"東京都世田谷区南烏山3丁目9-10", to:"東京都世田谷区北烏山2丁目3", pay:"交通系IC", fare:1600},
+    {type:"アプリ", on:"15:01", off:"15:43", from:"東京都杉並区高井戸東2丁目3", to:"東京都練馬区東大泉2丁目10", pay:"現金・その他", fare:5300},
+    {type:"アプリ", on:"15:58", off:"16:06", from:"東京都練馬区大泉学園町2丁目12", to:"東京都練馬区東大泉3丁目31-11", pay:"QRコード決済", fare:1300},
+    {type:"アプリ", on:"17:38", off:"18:01", from:"東京都練馬区谷原5丁目19-20", to:"東京都練馬区関町南4丁目14", pay:"GO Pay", fare:3600},
+    {type:"アプリ", on:"18:35", off:"19:00", from:"東京都練馬区上石神井南町8-10", to:"東京都西東京市下保谷5丁目10-16", pay:"GO Pay", fare:4000},
+    {type:"アプリ", on:"19:31", off:"19:43", from:"東京都練馬区高松4丁目26-10", to:"東京都練馬区豊玉北5丁目23-15", pay:"GO Pay", fare:2500},
+    {type:"アプリ", on:"19:49", off:"19:50", from:"東京都練馬区豊玉北4丁目27-13", to:"東京都練馬区豊玉北4丁目27-13", pay:"現金・その他", fare:1000},
+    {type:"アプリ", on:"20:03", off:"20:19", from:"東京都練馬区中村北1丁目21-3", to:"東京都練馬区光が丘2丁目6-1", pay:"QRコード決済", fare:2800},
+    {type:"アプリ", on:"20:23", off:"20:23", from:"東京都練馬区光が丘2丁目2", to:"東京都練馬区光が丘2丁目2", pay:"現金・その他", fare:1000},
+    {type:"アプリ", on:"21:20", off:"21:23", from:"東京都板橋区成増4丁目1-3", to:"東京都板橋区赤塚3丁目8-15", pay:"GO Pay", fare:1000},
+    {type:"流し", on:"21:37", off:"22:11", from:"東京都板橋区赤塚4丁目29-6", to:"東京都渋谷区恵比寿南2丁目2-2", pay:"QRコード決済", fare:11670, outlier:true, memo:"乗車:板橋区赤塚4丁目29-6 → 降車:渋谷区恵比寿南2丁目2-2 / おそらく夜職の人"},
+    {type:"アプリ", on:"22:25", off:"22:26", from:"東京都目黒区青葉台3丁目22-1", to:"東京都目黒区青葉台3丁目22-1", pay:"現金・その他", fare:1000},
+    {type:"アプリ", on:"1:29", off:"1:47", from:"東京都品川区東品川1丁目7", to:"東京都港区六本木6丁目2", pay:"GO Pay", fare:4000},
+    {type:"流し", on:"1:51", off:"1:59", from:"東京都港区西麻布1丁目12", to:"東京都渋谷区神泉町9", pay:"クレジットカードタッチ", fare:1700},
+    {type:"アプリ", on:"3:57", off:"3:58", from:"東京都江東区門前仲町1丁目19-13", to:"東京都江東区門前仲町1丁目19-13", pay:"現金・その他", fare:1000},
+    {type:"アプリ", on:"3:59", off:"4:00", from:"東京都江東区門前仲町1丁目19-13", to:"東京都江東区門前仲町1丁目19-13", pay:"現金・その他", fare:1000},
+    {type:"流し", on:"4:01", off:"4:07", from:"東京都江東区門前仲町1丁目20", to:"東京都江東区東陽5丁目2-10", pay:"現金・その他", fare:1200, outlier:true, memo:"江東区のイベント準備のための需要"},
+    {type:"流し", on:"4:30", off:"4:42", from:"東京都中央区日本橋浜町3丁目22-1", to:"東京都江東区東陽5丁目3", pay:"QRコード決済", fare:2400, outlier:true, memo:"江東区のイベント準備のための需要"},
+    {type:"アプリ", on:"5:02", off:"5:07", from:"東京都江東区南砂4丁目5-14", to:"東京都江東区木場3丁目16", pay:"GO Pay", fare:1600, outlier:true, memo:"江東区のイベント準備のための需要"},
+    {type:"アプリ", on:"5:43", off:"6:08", from:"東京都江戸川区清新町2丁目4-11", to:"東京都大田区羽田空港3丁目4", pay:"GO Pay", fare:9770},
+    {type:"アプリ", on:"6:32", off:"6:56", from:"東京都大田区南馬込4丁目34-14", to:"東京都大田区羽田空港2丁目6", pay:"GO Pay", fare:4700}
+  ]
+},{
+  date:"2026-08-13", shukko:"13:08", weather:"雨", uriage:64460, handle:"14:26", kaisu:27, jissha:111, soukou:242,
+  rides:[
+    {type:"アプリ", on:"15:25", off:"15:32", from:"東京都三鷹市牟礼5丁目13", to:"東京都三鷹市井の頭1丁目30-23", pay:"GO Pay", fare:1400},
+    {type:"流し", on:"15:44", off:"15:55", from:"東京都杉並区宮前5丁目15", to:"東京都杉並区高井戸東3丁目28-30", pay:"クレジットカードタッチ", fare:1900},
+    {type:"アプリ", on:"16:03", off:"16:19", from:"東京都杉並区高井戸東1丁目31-5", to:"東京都杉並区和田1丁目40", pay:"GO Pay", fare:2800},
+    {type:"流し", on:"16:32", off:"16:55", from:"東京都杉並区和田3丁目61-8", to:"東京都新宿区西新宿1丁目1", pay:"QRコード決済", fare:3600},
+    {type:"アプリ", on:"17:17", off:"17:27", from:"東京都豊島区南池袋1丁目28", to:"東京都豊島区東池袋3丁目1", pay:"GO Pay", fare:1500},
+    {type:"アプリ", on:"17:42", off:"17:51", from:"東京都豊島区上池袋4丁目9", to:"東京都豊島区南大塚2丁目8-1", pay:"クレジットカードタッチ", fare:1800},
+    {type:"アプリ", on:"17:57", off:"18:32", from:"東京都文京区大塚2丁目8-6", to:"東京都千代田区丸の内1丁目9", pay:"GO Pay", fare:5100},
+    {type:"アプリ", on:"19:36", off:"19:40", from:"東京都千代田区大手町1丁目7", to:"東京都中央区日本橋小伝馬町9-10", pay:"GO Pay", fare:1200},
+    {type:"アプリ", on:"19:53", off:"20:02", from:"東京都千代田区外神田1丁目11-3", to:"東京都台東区上野7丁目1", pay:"交通系IC", fare:1700},
+    {type:"流し", on:"20:05", off:"20:28", from:"東京都台東区上野7丁目1", to:"東京都北区西ケ原1丁目61", pay:"クレジットカードタッチ", fare:3200},
+    {type:"アプリ", on:"20:45", off:"20:50", from:"東京都豊島区巣鴨3丁目27", to:"東京都豊島区南大塚1丁目30-20", pay:"現金・その他", fare:1200},
+    {type:"流し", on:"21:03", off:"21:14", from:"東京都豊島区東池袋1丁目17", to:"東京都豊島区高田1丁目7-4", pay:"現金・その他", fare:1500},
+    {type:"アプリ", on:"21:23", off:"21:30", from:"東京都豊島区高田1丁目12-9", to:"東京都新宿区早稲田鶴巻町563", pay:"GO Pay", fare:1200},
+    {type:"アプリ", on:"22:14", off:"22:21", from:"東京都新宿区西早稲田1丁目3", to:"東京都新宿区大久保1丁目1", pay:"現金・その他", fare:2100},
+    {type:"流し", on:"22:37", off:"22:52", from:"東京都渋谷区神宮前1丁目4", to:"東京都世田谷区大原2丁目23", pay:"クレジットカードタッチ", fare:2900},
+    {type:"流し", on:"23:06", off:"23:14", from:"東京都世田谷区太子堂5丁目28-1", to:"東京都世田谷区北沢2丁目22-13", pay:"現金・その他", fare:1200},
+    {type:"流し", on:"23:15", off:"23:20", from:"東京都世田谷区北沢2丁目23-7", to:"東京都世田谷区大原1丁目31-10", pay:"GO Pay", fare:900},
+    {type:"流し", on:"23:38", off:"0:06", from:"東京都渋谷区恵比寿1丁目8", to:"東京都豊島区南池袋1丁目28", pay:"現金・その他", fare:5700},
+    {type:"流し", on:"0:29", off:"0:34", from:"東京都中野区東中野4丁目4", to:"東京都中野区中野1丁目30-16", pay:"クレジットカードタッチ", fare:1000},
+    {type:"流し", on:"0:43", off:"0:53", from:"東京都中野区中央2丁目1", to:"東京都杉並区和田1丁目43-3", pay:"QUICPay", fare:1800},
+    {type:"流し", on:"1:01", off:"1:11", from:"東京都中野区中野4丁目", to:"東京都豊島区南長崎6丁目15", pay:"QRコード決済", fare:2000},
+    {type:"流し", on:"2:25", off:"2:32", from:"東京都豊島区東池袋1丁目29", to:"東京都豊島区南大塚3丁目34-3", pay:"QRコード決済", fare:1100},
+    {type:"流し", on:"2:44", off:"2:52", from:"東京都豊島区南池袋1丁目18-1", to:"東京都新宿区高田馬場1丁目26", pay:"iD", fare:1500},
+    {type:"流し", on:"2:55", off:"3:05", from:"東京都新宿区高田馬場2丁目14-6", to:"東京都新宿区河田町3", pay:"QUICPay", fare:1900}
+  ]
+}];
 
-function saveData(){ try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){} syncPush(); render(); }
-function dedupeSort(arr){ const m={}; arr.forEach(d=>{ if(d&&d.date) m[d.date]=d; }); return Object.values(m).sort((a,b)=>a.date<b.date?-1:1); }
+/* ---------- 保存 ---------- */
+const LS_KEY='taxi_eigyo_v2', LS_SEASON='taxi_seasons_v2', LS_GEO='taxi_geocache_v2';
+let _fs=null, _uid=null, _pushT=null;   // クラウド同期の状態(先に宣言してTDZ回避)
+let DB = load(LS_KEY, null);
+if(!DB){ DB = SEED; save(); }
+let SEASONS = load(LS_SEASON, [{name:"お盆シーズン", start:"2026-08-08", end:"2026-08-17", excludes:[]}]);
+SEASONS.forEach(s=>{ if(!s.excludes) s.excludes=[]; });   // 旧データに除外欄を補完
+let GEO = load(LS_GEO, {});
 
-/* ====== Firebase ====== */
-function initFirebase(){
-  try{
-    firebase.initializeApp(FIREBASE_CONFIG);
-    fbAuth=firebase.auth(); fbDb=firebase.firestore();
-    fbAuth.onAuthStateChanged(async user=>{
-      fbUser=user;
-      if(user){ setSync(true, user.email||user.displayName||"ログイン中"); await cloudLoad(); }
-      else{ setSync(false); }
-      renderAuth();
-    });
-  }catch(e){ console.warn('firebase init failed',e); setSync(false); }
-}
-function setSync(on,label){ const el=document.getElementById('syncState');
-  if(on){ el.className='pill'; el.textContent='☁ 同期中: '+(label||''); }
-  else  { el.className='pill off'; el.textContent='ローカル保存中'; } }
-async function login(){ if(!fbAuth) return; try{ await fbAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){ alert('ログインに失敗しました: '+(e&&e.message||e)); } }
-async function logout(){ if(fbAuth) await fbAuth.signOut(); }
-async function cloudLoad(){
-  if(!fbUser||!fbDb) return; _cloudLoading=true;
-  try{
-    const ref=fbDb.collection(COLL).doc(fbUser.uid);
-    const snap=await ref.get();
-    if(snap.exists && Array.isArray(snap.data().data) && snap.data().data.length){
-      DATA=dedupeSort(snap.data().data);
-      try{localStorage.setItem(LS_DATA,JSON.stringify(DATA));}catch(e){}
-    }else{ await ref.set({data:DATA, updatedAt:Date.now()}); }
-  }catch(e){ console.warn('cloudLoad failed',e); }
-  _cloudLoading=false; render();
-}
-function syncPush(){
-  if(!fbUser||!fbDb||_cloudLoading) return;
-  clearTimeout(_syncT);
-  _syncT=setTimeout(async()=>{ try{ await fbDb.collection(COLL).doc(fbUser.uid).set({data:DATA, updatedAt:Date.now()}); }catch(e){ console.warn('syncPush failed',e); } }, 600);
-}
-function renderAuth(){
-  const box=document.getElementById('authbox'); const state=document.getElementById('syncState');
-  box.innerHTML=''; box.appendChild(state);
-  const b=document.createElement('button');
-  if(fbUser){ b.className='btn ghost'; b.textContent='ログアウト'; b.onclick=logout; }
-  else      { b.className='btn g';     b.textContent='Googleでログイン'; b.onclick=login; }
-  box.appendChild(b);
-}
+function load(k,def){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DB)); pushCloud(); }
+function saveSeasons(){ localStorage.setItem(LS_SEASON, JSON.stringify(SEASONS)); }
+function saveGeo(){ localStorage.setItem(LS_GEO, JSON.stringify(GEO)); }
 
-/* ====== 計算 ====== */
-const yen  = n => "¥"+Math.round(n).toLocaleString();
-const tanka= d => Math.round(d.uriage/d.handleH);
-const kyaku= d => Math.round(d.uriage/d.kaisu);
-const jisRt= d => (d.soukou? d.jissha/d.soukou*100 : 0);
-const hhmm = h => Math.floor(h)+":"+String(Math.round((h-Math.floor(h))*60)).padStart(2,"0");
-const md   = d => { const p=d.date.split("-"); return (+p[1])+"/"+(+p[2])+"("+(d.wday||"")+")"; };
-const ord  = k => { const h=parseInt(k); return h>=13?h:h+24; };
-const sortH= ks => ks.slice().sort((a,b)=>ord(a)-ord(b));
-
-let charts={};
-function killCharts(){ Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}}); charts={}; }
-
-/* ====== 描画 ====== */
-function render(){
-  const app=document.getElementById('app'); DATA=dedupeSort(DATA);
-  document.getElementById('count').textContent = '記録 '+DATA.length+'日分';
-  killCharts();
-  if(!DATA.length){ app.innerHTML='<div class="panel">データがありません。下のフォームから追加してください。</div>'; return; }
-  const last=DATA[DATA.length-1];
-  const sumUri=DATA.reduce((s,d)=>s+d.uriage,0);
-  const avgTanka=Math.round(DATA.reduce((s,d)=>s+tanka(d),0)/DATA.length);
-  const avgKyaku=Math.round(DATA.reduce((s,d)=>s+kyaku(d),0)/DATA.length);
-
-  app.innerHTML=`
-    <div class="heroRow">
-      <div class="hero green"><div class="lbl">最新の時間単価（売上 ÷ ハンドル時間）</div>
-        <div class="big">¥${tanka(last).toLocaleString()}<span>/時</span></div>
-        <div class="day">${md(last)} ・ ハンドル${hhmm(last.handleH)}</div></div>
-      <div class="hero blue"><div class="lbl">最新の客単価（売上 ÷ 営業回数）</div>
-        <div class="big">¥${kyaku(last).toLocaleString()}</div>
-        <div class="day">${md(last)} ・ ${last.kaisu}回</div></div>
-    </div>
-    <div class="summary">
-      <div class="sm"><div class="k">合計売上</div><div class="v">${yen(sumUri)}</div></div>
-      <div class="sm"><div class="k">平均 時間単価</div><div class="v">${yen(avgTanka)}</div></div>
-      <div class="sm"><div class="k">平均 客単価</div><div class="v">${yen(avgKyaku)}</div></div>
-      <div class="sm"><div class="k">記録日数</div><div class="v">${DATA.length}<small>日</small></div></div>
-    </div>
-    <div class="panel"><h2>📋 過去の営業データ</h2><p class="note">新しい日が下に増えます。</p>
-      <div class="tblwrap"><table id="hist"><thead><tr><th>日付</th><th>売上</th><th>時間単価</th><th>客単価</th><th>実車率</th><th>回数</th><th>ハンドル</th><th></th></tr></thead><tbody></tbody></table></div></div>
-    <div class="panel"><h2>📈 時間単価の推移</h2><div class="chartbox"><canvas id="cTanka"></canvas></div></div>
-    <div class="panel"><h2>💰 客単価の推移</h2><div class="chartbox"><canvas id="cKyaku"></canvas></div></div>
-    <div class="panel"><h2>🕐 時間帯別 売上　<select id="slotDay"></select></h2><p class="note">「全日の平均」でいつも強い時間帯がわかる。</p><div class="chartbox"><canvas id="cSlots"></canvas></div></div>
-    <div class="panel"><h2>⏱️ 時間帯ごとの過去の営収　<select id="hourSel"></select></h2>
-      <p class="note">選んだ時間帯が過去の各日でいくら稼げてたか。下に「その時間にどこで乗せたか」も出ます。</p>
-      <div class="chartbox"><canvas id="cHour"></canvas></div>
-      <div class="arealist" id="hourAreas"></div>
-    </div>
-  `;
-
-  const tb=document.querySelector('#hist tbody');
-  DATA.forEach(d=>{ const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${md(d)}</td><td>${yen(d.uriage)}</td><td>${yen(tanka(d))}</td><td>${yen(kyaku(d))}</td><td>${jisRt(d).toFixed(1)}%</td><td>${d.kaisu}回</td><td>${hhmm(d.handleH)}</td><td><button class="delx" data-date="${d.date}">削除</button></td>`;
-    tb.appendChild(tr); });
-  tb.querySelectorAll('.delx').forEach(b=>b.onclick=()=>{ if(confirm(b.dataset.date+' を削除しますか？')){ DATA=DATA.filter(x=>x.date!==b.dataset.date); saveData(); } });
-
-  const yenFmt=v=>"¥"+Math.round(v).toLocaleString();
-  const labels=DATA.map(md);
-  function bar(id,arr,c){ charts[id]=new Chart(document.getElementById(id),{type:'bar',
-    data:{labels,datasets:[{data:arr,backgroundColor:DATA.map((_,i)=>i===DATA.length-1?c[0]:c[1]),borderRadius:8,maxBarThickness:64}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:yenFmt}}}}}); }
-  bar('cTanka',DATA.map(tanka),["#2ecc71","#a9d8bd"]);
-  bar('cKyaku',DATA.map(kyaku),["#4a90e2","#b7d4f2"]);
-
-  function avgSlots(){const s={},c={};DATA.forEach(d=>Object.entries(d.slots||{}).forEach(([k,v])=>{if(v>0){s[k]=(s[k]||0)+v;c[k]=(c[k]||0)+1;}}));const o={};Object.keys(s).forEach(k=>o[k]=Math.round(s[k]/c[k]));return o;}
-  function renderSlots(sel){const src=sel==="avg"?avgSlots():DATA[+sel].slots||{};const keys=sortH(Object.keys(src)).filter(k=>src[k]>0);
-    if(charts.slot)charts.slot.destroy();
-    charts.slot=new Chart(document.getElementById('cSlots'),{type:'bar',data:{labels:keys.map(k=>k+"時"),datasets:[{data:keys.map(k=>src[k]),backgroundColor:sel==="avg"?"#e67e22":"#8a63d2",borderRadius:6,maxBarThickness:40}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}}); }
-  const dd=document.getElementById('slotDay');
-  DATA.forEach((d,i)=>{const o=document.createElement('option');o.value=i;o.textContent=md(d);dd.appendChild(o);});
-  if(DATA.length>=2){const o=document.createElement('option');o.value="avg";o.textContent="全日の平均";dd.appendChild(o);}
-  dd.value=String(DATA.length-1); dd.onchange=e=>renderSlots(e.target.value); renderSlots(dd.value);
-
-  const allH=sortH([...new Set(DATA.flatMap(d=>Object.keys(d.slots||{})))]);
-  function renderHour(h){
-    const arr=DATA.map(d=>(d.slots&&d.slots[h])||0);
-    if(charts.hour)charts.hour.destroy();
-    charts.hour=new Chart(document.getElementById('cHour'),{type:'bar',data:{labels,datasets:[{data:arr,backgroundColor:"#e67e22",borderRadius:6,maxBarThickness:64}]},
-      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},title:{display:true,text:h+"時の営収",color:"#6b7688",font:{size:13}},tooltip:{callbacks:{label:x=>yenFmt(x.raw)}}},scales:{y:{beginAtZero:true,ticks:{callback:v=>"¥"+(v/1000)+"k"}}}}});
-    renderAreas(h);
-  }
-  function renderAreas(h){
-    const box=document.getElementById('hourAreas');
-    const rl=[]; DATA.forEach(d=>(d.rides||[]).forEach(r=>{ if(String(r.h)===String(h)) rl.push(r); }));
-    if(!rl.length){ box.innerHTML='<p class="muted">この時間帯の乗車地データはまだありません（乗降記録を追加すると出ます）。</p>'; return; }
-    const g={}; rl.forEach(r=>{ const a=r.area||'不明'; (g[a]=g[a]||[]).push(r); });
-    const rows=Object.entries(g).map(([a,arr])=>({a,n:arr.length,avg:Math.round(arr.reduce((s,r)=>s+r.fare,0)/arr.length),spots:[...new Set(arr.map(r=>r.spot).filter(Boolean))]}))
-      .sort((x,y)=>y.n-x.n||y.avg-x.avg);
-    box.innerHTML='<div class="muted" style="margin-bottom:4px">この時間帯に乗せた場所（過去 全'+rl.length+'回）</div>'+
-      rows.map((r,i)=>`<div class="arearow"><span class="rank">${i+1}</span><span class="name">${r.a}</span><span class="cnt">${r.n}回</span><span class="avg">平均 ${yen(r.avg)}</span><span class="spots">${r.spots.join(' / ')}</span></div>`).join('');
-  }
-  const hs=document.getElementById('hourSel');
-  allH.forEach(h=>{const o=document.createElement('option');o.value=h;o.textContent=h+"時";hs.appendChild(o);});
-  if(allH.length){ const bestH=sortH(Object.keys(last.slots||{})).reduce((a,b)=>((last.slots[b]||0)>(last.slots[a]||0)?b:a),Object.keys(last.slots||{})[0]); hs.value=bestH; hs.onchange=e=>renderHour(e.target.value); renderHour(hs.value); }
-}
-
-/* ====== 追加処理 ====== */
-function parseHandle(v){ v=(v||'').trim(); if(v.includes(':')){const[a,b]=v.split(':');return (+a)+(+b)/60;} return parseFloat(v)||0; }
-function parseSlots(v){ const o={}; (v||'').split(',').forEach(p=>{p=p.trim();if(!p)return;const[h,y]=p.split(':');if(h!==undefined&&y!==undefined)o[String(parseInt(h))]=parseInt(String(y).replace(/[^0-9]/g,''))||0;}); return o; }
+/* ---------- ユーティリティ ---------- */
 const WD=['日','月','火','水','木','金','土'];
-function addFromForm(){
-  const date=document.getElementById('f_date').value;
-  if(!date){ alert('日付を入れてください'); return; }
-  const rec={ date, wday:WD[new Date(date).getDay()],
-    uriage:parseInt(document.getElementById('f_uri').value)||0,
-    handleH:parseHandle(document.getElementById('f_handle').value),
-    kaisu:parseInt(document.getElementById('f_kaisu').value)||0,
-    jissha:parseInt(document.getElementById('f_jissha').value)||0,
-    soukou:parseInt(document.getElementById('f_soukou').value)||0,
-    slots:parseSlots(document.getElementById('f_slots').value) };
-  if(!rec.uriage||!rec.handleH){ alert('営業収入とハンドル時間は必須です'); return; }
-  DATA.push(rec); saveData();
-  ['f_date','f_uri','f_handle','f_kaisu','f_jissha','f_soukou','f_slots'].forEach(id=>document.getElementById(id).value='');
+const SHIFT_HOURS=[13,14,15,16,17,18,19,20,21,22,23,0,1,2,3,4,5,6,7,8,9,10,11,12];
+function wdayOf(d){ const t=new Date(d+'T00:00:00'); return WD[t.getDay()]; }
+function toMin(hm){ if(!hm) return null; const p=String(hm).split(':'); return (+p[0])*60+(+p[1]); }
+function handleH(d){ const m=toMin(d.handle); return m? m/60 : 0; }
+function fmtYen(n){ return '¥'+Math.round(n).toLocaleString('ja-JP'); }
+function fmtMin(n){ n=Math.round(n); if(n<60) return n+'分'; return Math.floor(n/60)+'時間'+(n%60)+'分'; }
+function shukkoHour(d){ const m=toMin(d.shukko); return m==null? null : Math.floor(m/60); }
+function shortAddr(a){ return (a||'').replace(/^東京都/,''); }
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function renderMemoList(elId){
+  const el=document.getElementById(elId); if(!el) return;
+  const rs=scopedRides().filter(r=>r.memo || r.outlier);
+  if(!rs.length){ el.innerHTML='<p class="muted small" style="margin:6px 0">該当する営業なし</p>'; return; }
+  el.innerHTML=`<table><thead><tr><th>日付</th><th>時刻</th><th>種別</th><th>乗車地→降車地</th><th>料金</th><th>メモ</th></tr></thead><tbody>`+
+    rs.map(r=>`<tr><td>${r._date.slice(5)}(${r._wday})</td><td>${r.on}</td><td>${(r.type||'')}${r.outlier?' ⚠':''}</td><td class="small" style="text-align:left">${shortAddr(r.from)}→${shortAddr(r.to)}</td><td>${fmtYen(r.fare)}</td><td class="small" style="text-align:left">${esc(r.memo)}</td></tr>`).join('')+
+    `</tbody></table>`;
 }
-function addFromPaste(){
-  let t=document.getElementById('pasteBox').value.trim(); if(!t) return;
-  t=t.replace(/^[,\s]+/,'').replace(/[,\s]+$/,'');
+
+/* 空転判定: 同時刻または1分で終わってる=実際は乗せてない */
+function durMin(r){ let a=toMin(r.on),b=toMin(r.off); if(a==null||b==null) return null; if(b<a)b+=1440; return b-a; }
+function isKuten(r){ const d=durMin(r); return d!=null && d<=1; }
+
+/* rideの実車分をシフト時刻ごとに配分。戻り: {hour:minutes} */
+function jitsuByHour(r){
+  let a=toMin(r.on), b=toMin(r.off);
+  if(a==null||b==null) return {};
+  if(b<a) b+=1440; // 日跨ぎの1乗車(基本発生しない)
+  const out={};
+  for(let m=a;m<b;m++){ const h=Math.floor(m/60)%24; out[h]=(out[h]||0)+1; }
+  return out;
+}
+function pickupHour(r){ const m=toMin(r.on); return m==null?null:Math.floor(m/60)%24; }
+
+/* ---------- フィルタ ---------- */
+const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'' };
+function outlierOK(r){
+  if(state.outlier==='exclude') return !r.outlier;
+  if(state.outlier==='only') return !!r.outlier;
+  return true;
+}
+/* 集計に入れる乗車か(種別・空転・外れ値モード) ※空転判定は呼び出し側 */
+function typeOK(r){ return state.types.has(r.type||'流し'); }
+function seasonRanges(name){ return SEASONS.filter(s=>s.name===name); }
+function dayInSeason(date,name){
+  if(!name) return true;
+  return SEASONS.some(s=> s.name===name && date>=s.start && date<=s.end
+    && !(s.excludes||[]).some(x=> date>=x.start && date<=x.end));   // 除外期間は入らない
+}
+function scopedDays(){
+  return DB.filter(d=> dayInSeason(d.date, state.season)
+    && (!state.weather || (d.weather||'')===state.weather)
+    && (!state.from || d.date>=state.from)
+    && (!state.to   || d.date<=state.to)
+  ).sort((a,b)=>a.date<b.date?-1:1);
+}
+function scopedRides(){
+  const out=[];
+  scopedDays().forEach(d=> (d.rides||[]).forEach(r=>{
+    if(!typeOK(r)) return;
+    if(isKuten(r)) return;               // 空転は除外
+    if(!outlierOK(r)) return;            // 外れ値モード
+    out.push(Object.assign({_date:d.date,_wday:wdayOf(d.date)}, r));
+  }));
+  return out;
+}
+function scopedKuten(){
+  let n=0,f=0;
+  scopedDays().forEach(d=>(d.rides||[]).forEach(r=>{ if(typeOK(r) && outlierOK(r) && isKuten(r)){ n++; f+=(+r.fare||0);} }));
+  return {n,f};
+}
+
+/* ---------- 集計 ---------- */
+function hourlyAgg(){
+  const fare={},count={},jitsu={};
+  SHIFT_HOURS.forEach(h=>{fare[h]=0;count[h]=0;jitsu[h]=0;});
+  scopedRides().forEach(r=>{
+    const ph=pickupHour(r);
+    if(ph!=null){ fare[ph]+=(+r.fare||0); count[ph]+=1; }
+    const jb=jitsuByHour(r);
+    for(const h in jb) jitsu[h]=(jitsu[h]||0)+jb[h];
+  });
+  return {fare,count,jitsu};
+}
+function dayMetrics(days){
+  let uriage=0,kaisu=0,hh=0,fare=0,jitsu=0,rc=0,kn=0,kf=0,js=0,sk=0;
+  days.forEach(d=>{
+    uriage+=(+d.uriage||0); kaisu+=(+d.kaisu||0); hh+=handleH(d);
+    js+=(+d.jissha||0); sk+=(+d.soukou||0);
+    (d.rides||[]).forEach(r=>{
+      if(!typeOK(r) || !outlierOK(r)) return;
+      if(isKuten(r)){ kn++; kf+=(+r.fare||0); return; }   // 空転は別枠
+      fare+=(+r.fare||0); rc+=1;
+      const jb=jitsuByHour(r); for(const h in jb) jitsu+=jb[h];
+    });
+  });
+  return {uriage,kaisu,hh,fare,jitsu,rc,kutenN:kn,kutenFare:kf,jissha:js,soukou:sk,
+    wage: hh? uriage/hh:0, tanka: rc? fare/rc:0, jisRt: sk? js/sk*100:0};
+}
+
+/* ---------- Chart.js 共通 ---------- */
+const CSS=getComputedStyle(document.documentElement);
+function cv(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+let showValues=false;
+if(window.Chart){
+  Chart.defaults.font.family='system-ui,-apple-system,"Segoe UI",sans-serif';
+  // グラフ上に数値を直接表示するプラグイン(トグルON時のみ・棒グラフ対象)
+  Chart.register({
+    id:'valueLabels',
+    afterDatasetsDraw(chart){
+      if(!showValues || !['bar','line'].includes(chart.config.type)) return;
+      const isLine=chart.config.type==='line';
+      const ctx=chart.ctx; ctx.save();
+      ctx.font='600 10px system-ui,sans-serif'; ctx.textAlign='center';
+      chart.data.datasets.forEach((ds,di)=>{
+        const meta=chart.getDatasetMeta(di); if(meta.hidden) return;
+        // 折れ線は系列色で（重なっても見分けられるように）
+        ctx.fillStyle= isLine ? (ds.borderColor||cv('--ink')) : cv('--ink');
+        meta.data.forEach((el,i)=>{
+          const v=ds.data[i]; if(v==null||v===0) return;
+          const pos=el.tooltipPosition();
+          ctx.fillText(Number(v).toLocaleString('ja-JP'), pos.x, pos.y-6);
+        });
+      });
+      ctx.restore();
+    }
+  });
+}
+let charts={};
+function makeChart(id,cfg){
+  if(!window.Chart) return;
+  if(charts[id]) charts[id].destroy();
+  const ax=cv('--muted'), grid=cv('--grid');
+  cfg.options=cfg.options||{};
+  cfg.options.responsive=true; cfg.options.maintainAspectRatio=false;
+  cfg.options.plugins=cfg.options.plugins||{};
+  cfg.options.plugins.legend=cfg.options.plugins.legend||{labels:{color:cv('--ink2')}};
+  cfg.options.scales=cfg.options.scales||{};
+  ['x','y'].forEach(k=>{ cfg.options.scales[k]=Object.assign({ticks:{color:ax},grid:{color:grid}}, cfg.options.scales[k]||{}); });
+  charts[id]=new Chart(document.getElementById(id), cfg);
+  return charts[id];
+}
+
+/* ---------- サマリー ---------- */
+let sumMetric='uriage', sumAgg='total';
+function renderSummary(){
+  const days=scopedDays();
+  const m=dayMetrics(days);
+  const nd=days.length||1;
+  const avg=sumAgg==='avg';
+  const kp=document.getElementById('sumKpis');
+  kp.innerHTML=[
+    [avg?'1日平均営収':'営収合計', fmtYen(avg? m.uriage/nd : m.uriage)],
+    [avg?'乗車数(平均)':'乗車数', (avg? (m.rc/nd).toFixed(1) : m.rc)+' 回'],
+    [avg?'実車時間(平均)':'実車時間', fmtMin(avg? m.jitsu/nd : m.jitsu)],
+    ['実質時給', fmtYen(m.wage)+'<small>/h</small>'],
+    ['客単価', fmtYen(m.tanka)],
+    ['実車率', (m.jisRt?m.jisRt.toFixed(1):'-')+'<small>%</small>'],
+    ['空転', (avg? (m.kutenN/nd).toFixed(1) : m.kutenN)+'回 <small>'+fmtYen(avg? m.kutenFare/nd : m.kutenFare)+'</small>'],
+    ['対象日数', days.length+' 日']
+  ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div></div>`).join('');
+
+  const labels=days.map(d=>d.date.slice(5)+'('+wdayOf(d.date)+')');
+  const val=days.map(d=>{
+    if(sumMetric==='uriage') return +d.uriage||0;
+    if(sumMetric==='kaisu'){ let c=0; (d.rides||[]).forEach(r=>{ if(typeOK(r) && outlierOK(r) && !isKuten(r)) c++; }); return c; }
+    if(sumMetric==='jitsu'){ let j=0; (d.rides||[]).forEach(r=>{ if(typeOK(r) && outlierOK(r) && !isKuten(r)){const jb=jitsuByHour(r); for(const h in jb)j+=jb[h];} }); return Math.round(j); }
+    if(sumMetric==='wage'){ const hh=handleH(d); return hh? Math.round((+d.uriage||0)/hh):0; }
+  });
+  makeChart('sumChart',{ type:'bar',
+    data:{labels, datasets:[{label:metricLabel(sumMetric), data:val, backgroundColor:cv('--s1'), borderRadius:4, maxBarThickness:46}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+  renderMemoList('sumMemoList');
+}
+function metricLabel(m){ return {uriage:'営収',kaisu:'乗車数',jitsu:'実車時間(分)',wage:'実質時給(¥/h)',fare:'売上(料金)',count:'営業回数',tanka:'客単価',rate:'実車率(%)'}[m]||m; }
+
+/* ---------- 時間別 ---------- */
+let hrMetric='fare', hrView='chart', hrAgg='total';
+function renderHourly(){
+  const agg=hourlyAgg();
+  const days=scopedDays(), m=dayMetrics(days);
+  document.getElementById('hrKpis').innerHTML=[
+    ['乗車数', m.rc+' 回'],
+    ['売上(料金)', fmtYen(m.fare)],
+    ['客単価', fmtYen(m.tanka)],
+    ['実車時間', fmtMin(m.jitsu)],
+    ['実質時給', fmtYen(m.wage)+'<small>/h</small>'],
+    ['空転', m.kutenN+'回 <small>'+fmtYen(m.kutenFare)+'</small>']
+  ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div></div>`).join('');
+
+  const nd=scopedDays().length||1;
+  const f= hrAgg==='avg'? nd : 1;
+  const labels=SHIFT_HOURS.map(h=>h+'時');
+  const data=SHIFT_HOURS.map(h=>{
+    if(hrMetric==='fare') return Math.round((agg.fare[h]||0)/f);
+    if(hrMetric==='count') return hrAgg==='avg'? +((agg.count[h]||0)/nd).toFixed(1) : Math.round(agg.count[h]||0);
+    if(hrMetric==='jitsu') return Math.round((agg.jitsu[h]||0)/f);
+    if(hrMetric==='rate') return Math.min(100, Math.round((agg.jitsu[h]||0)/(nd*60)*100)); // その時間の実車割合(対象日平均)
+  });
+  const cw=document.getElementById('hrChartWrap'), tw=document.getElementById('hrTableWrap');
+  if(hrView==='chart'){ cw.style.display=''; tw.style.display='none';
+    makeChart('hrChart',{ type:'bar',
+      data:{labels, datasets:[{label:metricLabel(hrMetric), data, backgroundColor:cv('--s1'), borderRadius:4, maxBarThickness:26}]},
+      options:{scales:{y:hrMetric==='rate'?{max:100}:{}}, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=> hrMetric==='fare'?fmtYen(c.parsed.y): hrMetric==='jitsu'? c.parsed.y+'分': hrMetric==='rate'? c.parsed.y+'%': c.parsed.y+'回'}}}}
+    });
+  } else { cw.style.display='none'; tw.style.display='';
+    const hd=hrAgg==='avg'?'（1日平均）':'';
+    let rows=SHIFT_HOURS.map(h=>{ const c=agg.count[h]||0; if(!c && !(agg.fare[h])&&!(agg.jitsu[h])) return '';
+      const rt=Math.min(100,Math.round((agg.jitsu[h]||0)/(nd*60)*100));
+      const cShow= hrAgg==='avg'? (c/nd).toFixed(1) : c;
+      return `<tr><td>${h}時</td><td>${fmtYen((agg.fare[h]||0)/f)}</td><td>${cShow}</td><td>${Math.round((agg.jitsu[h]||0)/f)}分</td><td>${rt}%</td><td>${c?fmtYen((agg.fare[h]||0)/c):'-'}</td></tr>`; }).join('');
+    tw.innerHTML=`<table><thead><tr><th>時間帯</th><th>売上${hd}</th><th>回数${hd}</th><th>実車${hd}</th><th>実車率</th><th>客単価</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+}
+
+/* ---------- 期間別 ---------- */
+let pGroup='month', pMetric='uriage', pView='chart', pAgg='total';
+function periodAgg(){
+  const days=scopedDays(); const groups={};
+  days.forEach(d=>{
+    let key;
+    if(pGroup==='month') key=d.date.slice(0,7);
+    else if(pGroup==='wday') key=wdayOf(d.date);
+    else key=(shukkoHour(d)??'?')+'時出庫';
+    (groups[key]=groups[key]||[]).push(d);
+  });
+  let keys=Object.keys(groups);
+  if(pGroup==='wday') keys=WD.filter(w=>groups[w]);
+  else if(pGroup==='shukko') keys.sort((a,b)=>parseInt(a)-parseInt(b));
+  else keys.sort();
+  return keys.map(k=>({key:k, m:dayMetrics(groups[k]), n:groups[k].length}));
+}
+function pVal(x){ const m=x.m; const n=x.n||1; const avg=pAgg==='avg';
+  if(pMetric==='uriage') return Math.round(avg? m.uriage/n : m.uriage);
+  if(pMetric==='count') return avg? +(m.rc/n).toFixed(1) : m.rc;
+  if(pMetric==='jitsu') return Math.round(avg? m.jitsu/n : m.jitsu);
+  if(pMetric==='wage') return Math.round(m.wage);
+  if(pMetric==='tanka') return Math.round(m.tanka);
+  if(pMetric==='rate') return Math.round(m.jisRt*10)/10;
+}
+function renderPeriod(){
+  const rows=periodAgg();
+  const cw=document.getElementById('pChartWrap'), tw=document.getElementById('pTableWrap');
+  if(pView==='chart'){ cw.style.display=''; tw.style.display='none';
+    makeChart('pChart',{ type:'bar',
+      data:{labels:rows.map(r=>r.key), datasets:[{label:metricLabel(pMetric), data:rows.map(pVal), backgroundColor:cv('--s1'), borderRadius:4, maxBarThickness:60}]},
+      options:{plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>{const yen=(pMetric==='uriage'||pMetric==='wage'||pMetric==='tanka'); const unit=pMetric==='jitsu'?'分':pMetric==='rate'?'%':'回'; return (yen?fmtYen(c.parsed.y):c.parsed.y+unit)+`  (${rows[c.dataIndex].n}日)`;}}}}}
+    });
+  } else { cw.style.display='none'; tw.style.display='';
+    const av=pAgg==='avg'; const hd=av?'(平均)':'';
+    tw.innerHTML=`<table><thead><tr><th>${pGroup==='month'?'月':pGroup==='wday'?'曜日':'出庫'}</th><th>日数</th><th>営収${hd}</th><th>乗車${hd}</th><th>実車${hd}</th><th>実車率</th><th>実質時給</th><th>客単価</th></tr></thead><tbody>`+
+      rows.map(r=>`<tr><td>${r.key}</td><td>${r.n}</td><td>${fmtYen(av? r.m.uriage/r.n : r.m.uriage)}</td><td>${av? (r.m.rc/r.n).toFixed(1) : r.m.rc}</td><td>${fmtMin(av? r.m.jitsu/r.n : r.m.jitsu)}</td><td>${r.m.jisRt.toFixed(1)}%</td><td>${fmtYen(r.m.wage)}/h</td><td>${fmtYen(r.m.tanka)}</td></tr>`).join('')+
+      `</tbody></table>`;
+  }
+}
+
+/* ---------- シーズン比較 ---------- */
+let cmpSelected=new Set(['__all__']);
+function renderCmpItems(){
+  const box=document.getElementById('cmpItems'); if(!box) return;
+  const names=[...new Set(SEASONS.map(s=>s.name))];
+  const items=[{key:'__all__',label:'通常期(全期間)'}].concat(names.map(n=>({key:n,label:n})));
+  box.innerHTML='<div class="small muted" style="margin-bottom:4px">表示する項目:</div>'+
+    items.map(it=>`<label class="small" style="display:inline-block;margin:2px 12px 2px 0"><input type="checkbox" class="cmpit" value="${esc(it.key)}" ${cmpSelected.has(it.key)?'checked':''}> ${esc(it.label)}</label>`).join('');
+  box.querySelectorAll('.cmpit').forEach(c=>c.onchange=()=>{ if(c.checked)cmpSelected.add(c.value); else cmpSelected.delete(c.value); drawCompare(); });
+}
+function renderSeasonTab(){
+  renderCmpItems();
+  const list=document.getElementById('seaList');
+  if(!SEASONS.length){ list.innerHTML='<p class="empty">まだ期間が無い。お盆などを登録してみて。</p>'; drawCompare(); return; }
+  list.innerHTML=SEASONS.map((s,i)=>{
+    const exc=(s.excludes||[]).map((x,j)=>`<span class="pill">${x.start.slice(5)}〜${x.end.slice(5)} <button class="exdel" data-i="${i}" data-j="${j}" style="background:none;border:none;color:var(--s8);cursor:pointer">×</button></span>`).join(' ');
+    return `<div class="day-det">
+      <div class="row" style="align-items:flex-end">
+        <div class="field"><label class="small">名前</label><input type="text" class="snm" data-i="${i}" value="${esc(s.name)}"></div>
+        <div class="field"><label class="small">開始</label><input type="date" class="sst" data-i="${i}" value="${s.start}"></div>
+        <div class="field"><label class="small">終了</label><input type="date" class="sen" data-i="${i}" value="${s.end}"></div>
+        <button class="del sdel" data-i="${i}">削除</button>
+      </div>
+      <div class="row" style="margin-top:6px"><span class="small muted">除外:</span> ${exc||'<span class="small muted">なし</span>'}</div>
+      <div class="row" style="margin-top:4px; align-items:flex-end">
+        <div class="field"><label class="small">除外開始</label><input type="date" class="exs" data-i="${i}"></div>
+        <div class="field"><label class="small">除外終了</label><input type="date" class="exe" data-i="${i}"></div>
+        <button class="icon-btn exadd" data-i="${i}" style="padding:3px 8px">除外を追加</button>
+      </div>
+    </div>`;
+  }).join('');
+  const rerender=()=>{ saveSeasons(); refreshSeasonSelectors(); renderSeasonTab(); };
+  list.querySelectorAll('.snm').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].name=el.value.trim()||'(無名)'; rerender(); });
+  list.querySelectorAll('.sst').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].start=el.value; saveSeasons(); drawCompare(); });
+  list.querySelectorAll('.sen').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].end=el.value; saveSeasons(); drawCompare(); });
+  list.querySelectorAll('.sdel').forEach(b=>b.onclick=()=>{ if(confirm(SEASONS[+b.dataset.i].name+' の この期間を削除?')){ SEASONS.splice(+b.dataset.i,1); rerender(); } });
+  list.querySelectorAll('.exadd').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
+    const s=list.querySelector(`.exs[data-i="${i}"]`).value, e=list.querySelector(`.exe[data-i="${i}"]`).value;
+    if(!s||!e){ alert('除外の開始と終了を入れて（1日だけなら同じ日を両方に）'); return; }
+    (SEASONS[i].excludes=SEASONS[i].excludes||[]).push({start:s,end:e}); saveSeasons(); renderSeasonTab(); });
+  list.querySelectorAll('.exdel').forEach(b=>b.onclick=()=>{ SEASONS[+b.dataset.i].excludes.splice(+b.dataset.j,1); saveSeasons(); renderSeasonTab(); });
+  drawCompare();
+}
+function avgSeries(days, axis, metric){
+  // 1日あたり平均。axis: hour(シフト順) or wday
+  const keys= axis==='hour'? SHIFT_HOURS : WD;
+  const sum={}; keys.forEach(k=>sum[k]=0);
+  days.forEach(d=>{
+    (d.rides||[]).forEach(r=>{
+      if(!typeOK(r) || !outlierOK(r)) return;
+      if(isKuten(r)) return;
+      if(axis==='hour'){
+        if(metric==='jitsu'){ const jb=jitsuByHour(r); for(const h in jb) sum[h]=(sum[h]||0)+jb[h]; }
+        else { const ph=pickupHour(r); if(ph!=null){ sum[ph]+= metric==='fare'?(+r.fare||0):1; } }
+      } else {
+        const w=wdayOf(d.date);
+        if(metric==='jitsu'){ const jb=jitsuByHour(r); for(const h in jb) sum[w]=(sum[w]||0)+jb[h]; }
+        else sum[w]+= metric==='fare'?(+r.fare||0):1;
+      }
+    });
+  });
+  const n=Math.max(days.length,1);
+  return keys.map(k=> Math.round((sum[k]||0)/n));
+}
+const CMP_COLORS=['--s1','--s2','--s3','--s4','--s5','--s7','--s8','--s6'];
+function drawCompare(){
+  const metric=document.getElementById('cmpMetric').value;
+  const axis=document.getElementById('cmpAxis').value;
+  const keys= axis==='hour'? SHIFT_HOURS.map(h=>h+'時') : WD;
+  const ds=[]; let ci=0;
+  cmpSelected.forEach(key=>{
+    let days,label;
+    if(key==='__all__'){ days=DB.slice(); label='通常期(全期間)'; }
+    else { days=DB.filter(d=>dayInSeason(d.date,key)); label=key; }
+    ds.push({label:`${label}(${days.length}日平均)`, data:avgSeries(days,axis,metric),
+      borderColor:cv(CMP_COLORS[ci%CMP_COLORS.length]), backgroundColor:'transparent', tension:.3, borderWidth:2, pointRadius:3});
+    ci++;
+  });
+  makeChart('cmpChart',{ type:'line', data:{labels:keys, datasets:ds},
+    options:{plugins:{legend:{labels:{color:cv('--ink2')}}}} });
+}
+
+/* ---------- 地図 ---------- */
+let map, layerGroup, heatLayer, odActive={}, mapMode='heat';
+function initMap(){
+  if(map || !window.L) return;
+  map=L.map('map',{scrollWheelZoom:true}).setView([35.70,139.65],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
+  layerGroup=L.layerGroup().addTo(map);
+}
+function roundKey(lat,lng){ return lat.toFixed(3)+','+lng.toFixed(3); } // ~100m格子
+function mapRides(){
+  const wf=document.getElementById('mapWday').value;
+  const iF=SHIFT_HOURS.indexOf(+document.getElementById('mapHFrom').value);
+  const iT=SHIFT_HOURS.indexOf(+document.getElementById('mapHTo').value);
+  return scopedRides().filter(r=>{
+    if(wf && r._wday!==wf) return false;
+    const ip=SHIFT_HOURS.indexOf(pickupHour(r));
+    return ip>=iF && ip<=iT;
+  });
+}
+function renderMap(){
+  initMap(); if(!map) return; layerGroup.clearLayers();
+  Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={};  // モード/条件変更でOD選択リセット
+  if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
+  const rides=mapRides().filter(r=> r.fromLat!=null);
+  const legend=document.getElementById('mapLegend');
+
+  if(mapMode==='heat'){
+    const pts=rides.map(r=>[r.fromLat,r.fromLng,1]);
+    if(window.L && L.heatLayer && pts.length){ heatLayer=L.heatLayer(pts,{radius:25,blur:18,maxZoom:15}).addTo(map); }
+    else rides.forEach(r=> L.circleMarker([r.fromLat,r.fromLng],{radius:6,color:cv('--s1'),fillOpacity:.5,weight:1}).addTo(layerGroup));
+    legend.innerHTML='<b>乗車ヒート</b><div class="legend-bar"></div><span class="muted small">薄い＝少ない / 濃い＝よく拾う</span>';
+  }
+  else if(mapMode==='tanka'){
+    // 乗車地を100m格子に集約
+    const g={};
+    rides.forEach(r=>{ const k=roundKey(r.fromLat,r.fromLng); (g[k]=g[k]||{lat:r.fromLat,lng:r.fromLng,fare:0,n:0}); g[k].fare+=(+r.fare||0); g[k].n++; });
+    const arr=Object.values(g); const max=Math.max(1,...arr.map(a=>a.fare/a.n));
+    arr.forEach(a=>{ const avg=a.fare/a.n; const t=avg/max;
+      L.circleMarker([a.lat,a.lng],{radius:8+Math.min(a.n,8)*2, color:mixSeq(t), fillColor:mixSeq(t), fillOpacity:.75, weight:1})
+        .bindPopup(`<b>客単価 ${fmtYen(avg)}</b><br>件数 ${a.n}件<br>売上計 ${fmtYen(a.fare)}`).addTo(layerGroup);
+    });
+    legend.innerHTML='<b>乗車地×客単価</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)</span>';
+  }
+  else if(mapMode==='od'){
+    const g={};
+    rides.forEach(r=>{ const k=roundKey(r.fromLat,r.fromLng); (g[k]=g[k]||{lat:r.fromLat,lng:r.fromLng,n:0,rides:[]}); g[k].n++; g[k].rides.push(r); });
+    Object.values(g).forEach(a=>{
+      const mk=L.circleMarker([a.lat,a.lng],{radius:7+Math.min(a.n,8)*2,color:cv('--s1'),fillColor:cv('--s1'),fillOpacity:.7,weight:1})
+        .bindPopup(`乗車 ${a.n}件<br><span class="muted">タップで降車先を表示/非表示</span>`);
+      mk.on('click',()=>showOD(a));
+      mk.addTo(layerGroup);
+    });
+    legend.innerHTML='<b>OD(降車先)</b><br><span class="muted small">乗車エリアをタップで降車先(橙)を表示。選択中は黄。同じ所を再タップで消える。別の所を押せば足せる。「選択クリア」で全部消す。</span>';
+  }
+  else { // allod: 全乗車地×降車地
+    rides.forEach(r=>{ if(r.toLat==null) return;
+      L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:1,opacity:.3}).addTo(layerGroup);
+      L.circleMarker([r.fromLat,r.fromLng],{radius:5,color:cv('--s1'),fillColor:cv('--s1'),fillOpacity:.75,weight:1})
+        .bindPopup(`乗車 ${r.on} ${r.type||''}<br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
+      L.circleMarker([r.toLat,r.toLng],{radius:5,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.75,weight:1})
+        .bindPopup(`降車 ${r.off||''}<br>${r.to}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
+    });
+    legend.innerHTML='<b>全乗降</b><br><span class="muted small">青=乗車 / 橙=降車 / 線=その経路。全部いっぺんに表示。</span>';
+  }
+  // 外れ値マーカー(メモ付き)をどのモードでも重ねる
+  mapRides().filter(r=> r.fromLat!=null && (r.outlier||r.memo)).forEach(r=>{
+    L.circleMarker([r.fromLat,r.fromLng],{radius:9,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2})
+      .bindPopup(`<b>⚠ ${r.on} ${r.type||''}</b><br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
+  });
+  renderMemoList('mapMemoList');
+}
+function showOD(a){
+  if(!map) return;
+  const key=roundKey(a.lat,a.lng);
+  if(odActive[key]){ map.removeLayer(odActive[key]); delete odActive[key]; return; } // 同じ所を再タップで消す
+  const lg=L.layerGroup().addTo(map);
+  a.rides.forEach(r=>{
+    if(r.toLat==null) return;
+    L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.6}).addTo(lg);
+    L.circleMarker([r.toLat,r.toLng],{radius:7,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1})
+      .bindPopup(`降車: ${r.to}<br>${fmtYen(r.fare)} / ${r.type||''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(lg);
+  });
+  L.circleMarker([a.lat,a.lng],{radius:10,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2}).addTo(lg); // 選択中の乗車地(黄)
+  odActive[key]=lg;
+}
+function mixSeq(t){ // 0..1 → 薄青→濃青
+  const lo=[24,79,149], hi=[205,226,251]; // seqlo, seqhi
+  const c=hi.map((h,i)=> Math.round(h+(lo[i]-h)*t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+/* ---------- ジオコーディング(住所→座標, 地理院) ---------- */
+async function geocodeAll(force){
+  const rides=[]; DB.forEach(d=>(d.rides||[]).forEach(r=>rides.push(r)));
+  const st=document.getElementById('gcStatus');
+  let need=[];
+  rides.forEach(r=>{ ['from','to'].forEach(k=>{ const kk=k==='from'?'fromLat':'toLat'; if(force||r[kk]==null) need.push([r,k,kk]); }); });
+  if(!need.length){ if(st)st.textContent=''; return; }
+  let done=0;
+  for(const [r,k,kk] of need){
+    const addr=r[k]; if(!addr){ continue; }
+    let coord=GEO[addr];
+    if(!coord || force){
+      coord=await gsi(addr); if(coord){ GEO[addr]=coord; saveGeo(); }
+      await sleep(110);
+    }
+    if(coord){ r[kk]=coord[1]; r[k==='from'?'fromLng':'toLng']=coord[0]; }
+    done++; if(st) st.textContent=`座標取得中… ${done}/${need.length}`;
+    if(done%6===0){ save(); if(curTab==='map') renderMap(); }
+  }
+  save(); if(st) st.textContent=''; if(curTab==='map') renderMap();
+}
+async function gsi(addr){
   try{
-    const obj=JSON.parse(t); const list=Array.isArray(obj)?obj:[obj];
-    list.forEach(o=>{ if(o.date){ if(!o.wday) o.wday=WD[new Date(o.date).getDay()]; DATA.push(o); } });
-    document.getElementById('pasteBox').value=''; saveData();
-  }catch(e){ alert('JSONの形式が正しくないようです。例のとおり { } の形で貼り付けてください。\n'+e.message); }
+    const res=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(addr));
+    const j=await res.json();
+    if(j && j[0] && j[0].geometry) return j[0].geometry.coordinates; // [lng,lat]
+  }catch(e){}
+  return null;
+}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+/* ---------- タブ ---------- */
+let curTab='summary';
+document.getElementById('tabs').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  curTab=b.dataset.tab;
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('active',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+curTab));
+  document.getElementById('globalFilters').style.display = (curTab==='data'||curTab==='season')?'none':'flex';
+  renderCurrent();
+  if(curTab==='map'){ setTimeout(()=>{ map&&map.invalidateSize(); renderMap(); },60); }
+});
+function renderCurrent(){
+  if(curTab==='summary') renderSummary();
+  else if(curTab==='hourly') renderHourly();
+  else if(curTab==='period') renderPeriod();
+  else if(curTab==='season') renderSeasonTab();
+  else if(curTab==='map') renderMap();
+  else if(curTab==='data') renderDataTab();
+  document.getElementById('scopeInfo').textContent=`${scopedDays().length}日 / ${scopedRides().length}乗車`;
 }
 
-/* ====== コピー（Claude分析用） ====== */
-async function copyToClip(text,msg){
-  try{ await navigator.clipboard.writeText(text); }
-  catch(e){ const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){}; ta.remove(); }
-  const el=document.getElementById('copyMsg'); el.textContent=msg; setTimeout(()=>{el.textContent='';},4000);
+/* ---------- セグメント/フィルタ配線 ---------- */
+function segWire(id, key, cb){
+  document.getElementById(id).addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+    document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.toggle('active',x===b));
+    cb(b.dataset[key]); });
 }
-function copyForClaude(){
-  const prompt='次はタクシー営業の記録データ（JSON）です。時間単価・客単価の推移、よく稼げる時間帯とエリア、弱点、次にどこで何時に流すべきかを、簡潔に分析してください。\n\n'+JSON.stringify(DATA,null,2);
-  copyToClip(prompt,'コピーしました！Claudeに貼り付けてください');
+segWire('sumMetric','m',v=>{sumMetric=v; renderSummary();});
+segWire('sumAgg','a',v=>{sumAgg=v; renderSummary();});
+segWire('hrMetric','m',v=>{hrMetric=v; renderHourly();});
+segWire('hrAgg','a',v=>{hrAgg=v; renderHourly();});
+segWire('hrView','v',v=>{hrView=v; renderHourly();});
+segWire('pGroup','g',v=>{pGroup=v; renderPeriod();});
+segWire('pMetric','m',v=>{pMetric=v; renderPeriod();});
+segWire('pAgg','a',v=>{pAgg=v; renderPeriod();});
+segWire('pView','v',v=>{pView=v; renderPeriod();});
+segWire('mapMode','m',v=>{mapMode=v; renderMap();});
+document.getElementById('mapWday').onchange=renderMap;
+document.getElementById('odClear').onclick=()=>{ Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={}; };
+// 時間帯セレクトを一勤務の並び(13時→翌12時)で用意
+(function(){
+  const opts=SHIFT_HOURS.map(h=>`<option value="${h}">${h}時</option>`).join('');
+  const f=document.getElementById('mapHFrom'), t=document.getElementById('mapHTo');
+  f.innerHTML=opts; t.innerHTML=opts;
+  f.value=SHIFT_HOURS[0]; t.value=SHIFT_HOURS[SHIFT_HOURS.length-1];
+  f.onchange=renderMap; t.onchange=renderMap;
+})();
+// 現在地
+let locLayer=null;
+document.getElementById('locBtn').onclick=()=>{
+  if(!navigator.geolocation){ alert('この端末では位置情報が使えない'); return; }
+  const st=document.getElementById('gcStatus'); st.textContent='現在地を取得中…';
+  navigator.geolocation.getCurrentPosition(p=>{
+    st.textContent='';
+    initMap(); if(!map) return;
+    const ll=[p.coords.latitude, p.coords.longitude];
+    if(locLayer) map.removeLayer(locLayer);
+    locLayer=L.layerGroup([
+      L.circle(ll,{radius:p.coords.accuracy||150, color:cv('--s8'), weight:1, fillColor:cv('--s8'), fillOpacity:.08}),
+      L.circleMarker(ll,{radius:8, color:'#fff', weight:2, fillColor:cv('--s8'), fillOpacity:1}).bindPopup('現在地')
+    ]).addTo(map);
+    map.setView(ll,14);
+  }, err=>{ st.textContent=''; alert('現在地の取得に失敗: '+err.message); }, {enableHighAccuracy:true, timeout:10000, maximumAge:30000});
+};
+document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
+  state.types=new Set([...document.querySelectorAll('.ftype:checked')].map(x=>x.value));
+  renderCurrent();
+});
+document.getElementById('fSeason').onchange=e=>{ state.season=e.target.value; renderCurrent(); };
+document.getElementById('fWeather').onchange=e=>{ state.weather=e.target.value; renderCurrent(); };
+segWire('fOutlier','o',v=>{ state.outlier=v; renderCurrent(); });
+document.getElementById('fFrom').onchange=e=>{ state.from=e.target.value; document.getElementById('fDate').value=''; renderCurrent(); };
+document.getElementById('fTo').onchange=e=>{ state.to=e.target.value; document.getElementById('fDate').value=''; renderCurrent(); };
+document.getElementById('fDate').onchange=e=>{ const v=e.target.value; state.from=v; state.to=v;
+  document.getElementById('fFrom').value=v; document.getElementById('fTo').value=v; renderCurrent(); };
+document.getElementById('fClear').onclick=()=>{ state.from=''; state.to='';
+  document.getElementById('fFrom').value=''; document.getElementById('fTo').value=''; document.getElementById('fDate').value=''; renderCurrent(); };
+function refreshDateSelector(){
+  const sel=document.getElementById('fDate'); if(!sel) return; const cur=sel.value;
+  const dates=[...DB].map(d=>d.date).sort();
+  sel.innerHTML='<option value="">指定なし</option>'+dates.map(dt=>`<option value="${dt}">${dt}(${wdayOf(dt)})</option>`).join('');
+  if(dates.includes(cur)) sel.value=cur;
 }
-function copyRaw(){ copyToClip(JSON.stringify(DATA),'JSONをコピーしました！'); }
+['cmpMetric','cmpAxis'].forEach(id=>document.getElementById(id).onchange=drawCompare);
+function refreshSeasonSelectors(){
+  const names=[...new Set(SEASONS.map(s=>s.name))];
+  const fs=document.getElementById('fSeason');
+  const cur=fs.value;
+  fs.innerHTML='<option value="">全期間</option>'+names.map(n=>`<option>${n}</option>`).join('');
+  fs.value=cur;
+}
 
-/* ====== 起動 ====== */
-document.getElementById('loginBtn').onclick=login;
-document.getElementById('addBtn').onclick=addFromForm;
-document.getElementById('pasteBtn').onclick=addFromPaste;
-document.getElementById('copyBtn').onclick=copyForClaude;
-document.getElementById('copyRawBtn').onclick=copyRaw;
-render();
-if(window.firebase && firebase.initializeApp){ initFirebase(); } else { setSync(false); }
+/* ---------- シーズン追加 ---------- */
+document.getElementById('seaAdd').onclick=()=>{
+  const name=document.getElementById('seaName').value.trim();
+  const s=document.getElementById('seaStart').value, e=document.getElementById('seaEnd').value;
+  if(!name||!s||!e){ alert('名前・開始・終了を入れて'); return; }
+  SEASONS.push({name, start:s, end:e, excludes:[]}); saveSeasons();
+  document.getElementById('seaName').value='';
+  renderSeasonTab(); refreshSeasonSelectors();
+};
+
+/* ---------- データタブ ---------- */
+function renderDataTab(){
+  const list=document.getElementById('dayList');
+  const days=[...DB].sort((a,b)=>a.date<b.date?1:-1);
+  document.getElementById('dayCount').textContent=DB.length+'日';
+  if(!days.length){ list.innerHTML='<p class="empty">データが無い</p>'; return; }
+  list.innerHTML=days.map(d=>{
+    const wsel=`<div class="ride-edit"><span class="small" style="min-width:88px">天候</span>
+      <select class="wsel" data-date="${d.date}">
+        <option value="">未設定</option>
+        ${['晴れ','曇り','雨','雪'].map(w=>`<option ${d.weather===w?'selected':''}>${w}</option>`).join('')}
+      </select></div>`;
+    const rides=wsel+(d.rides||[]).map((r,i)=>{
+      const kuten=isKuten(r);
+      return `<div class="ride-edit" data-date="${d.date}" data-i="${i}">
+        <span class="small" style="min-width:88px">${r.on}〜${r.off}${kuten?' <span class="pill">空転</span>':''}</span>
+        <span class="small" style="flex:1; min-width:150px">${shortAddr(r.from)}→${shortAddr(r.to)}</span>
+        <span class="small" style="min-width:96px">${fmtYen(+r.fare||0)} ${r.type||''}</span>
+        <label class="small"><input type="checkbox" class="ol" ${r.outlier?'checked':''}> 外れ値</label>
+        <input type="text" class="mm" placeholder="メモ" value="${esc(r.memo)}" style="flex:2; min-width:160px">
+      </div>`;
+    }).join('');
+    return `<details class="day-det"><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
+  }).join('');
+  list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=DB.find(x=>x.date===sel.dataset.date); if(day){ day.weather=e.target.value; save(); renderDataTab(); renderCurrent(); } }; });
+  // 削除
+  list.querySelectorAll('.del').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm(b.dataset.d+' を削除?')){ DB=DB.filter(x=>x.date!==b.dataset.d); save(); refreshDateSelector(); renderDataTab(); renderCurrent(); } });
+  // 外れ値・メモ編集
+  list.querySelectorAll('.ride-edit').forEach(row=>{
+    const date=row.dataset.date, i=+row.dataset.i;
+    const day=DB.find(x=>x.date===date); if(!day) return;
+    const r=day.rides[i];
+    row.querySelector('.ol').onchange=e=>{ r.outlier=e.target.checked; save(); };
+    row.querySelector('.mm').onchange=e=>{ r.memo=e.target.value.trim(); save(); };
+  });
+}
+document.getElementById('importBtn').onclick=async()=>{
+  let txt=document.getElementById('pasteBox').value.trim(); if(!txt) return;
+  let obj; try{ obj=JSON.parse(txt); }catch(e){ alert('JSONが読めない: '+e.message); return; }
+  const arr=Array.isArray(obj)?obj:[obj]; let n=0;
+  arr.forEach(d=>{ if(!d.date) return; d.rides=d.rides||[];
+    DB=DB.filter(x=>x.date!==d.date); DB.push(d); n++; });
+  DB.sort((a,b)=>a.date<b.date?-1:1); save();
+  document.getElementById('pasteBox').value='';
+  alert(n+'日 取り込んだ。座標を取得します。');
+  refreshDateSelector(); renderDataTab(); await geocodeAll(false); renderCurrent();
+};
+document.getElementById('copyBtn').onclick=()=>{
+  navigator.clipboard.writeText(JSON.stringify(DB,null,2)).then(()=>alert('全データをコピーした'));
+};
+document.getElementById('regcBtn').onclick=()=>geocodeAll(true);
+document.getElementById('fmtBtn').onclick=()=>{
+  const b=document.getElementById('fmtBox');
+  b.style.display = b.style.display==='none'?'':'none';
+  b.innerHTML=`<p class="small muted">1日＝1オブジェクト（配列でまとめてもOK）。座標は自動取得するので不要。</p>
+<textarea readonly style="min-height:230px">${JSON.stringify({
+  date:"2026-08-16", shukko:"13:05", weather:"晴れ", uriage:60000, handle:"14:20", kaisu:20, jissha:100, soukou:250,
+  rides:[
+    {type:"アプリ", on:"14:30", off:"14:52", from:"東京都◯◯区△△1丁目1-1", to:"東京都□□区◇◇2丁目2-2", pay:"GO Pay", fare:3200},
+    {type:"流し", on:"15:10", off:"15:20", from:"東京都◯◯区…", to:"東京都□□区…", pay:"現金・その他", fare:1500}
+  ]
+},null,2)}</textarea>
+<p class="small muted">type は <code class="k">アプリ</code> / <code class="k">無線</code> / <code class="k">流し</code>。handle は「時:分」。</p>`;
+};
+
+/* ---------- 数値表示トグル ---------- */
+document.getElementById('valuesBtn').onclick=()=>{
+  showValues=!showValues;
+  document.getElementById('valuesBtn').textContent='123 数値'+(showValues?'ON':'OFF');
+  renderCurrent();
+};
+
+/* ---------- テーマ ---------- */
+document.getElementById('themeBtn').onclick=()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme', cur==='dark'?'light':'dark');
+  renderCurrent();
+};
+
+/* ============================================================
+   クラウド同期(Firebase) — 設定を入れると有効化
+   下の FIREBASE_CONFIG に、今の営収分析.html の中の
+   firebaseConfig をそのまま貼れば、スマホ↔PCで同期されます。
+   未設定の間はこの端末のローカル保存だけで動きます。
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",
+  authDomain: "tokyo-75556.firebaseapp.com",
+  projectId: "tokyo-75556",
+  storageBucket: "tokyo-75556.firebasestorage.app",
+  messagingSenderId: "143590278758",
+  appId: "1:143590278758:web:3086b0b046376283b3cfa7"
+};
+const CLOUD_COLLECTION = 'eigyo_bunseki';
+async function initCloud(){
+  if(!FIREBASE_CONFIG) return;
+  const badge=document.getElementById('syncBadge');
+  try{
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js');
+    await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js');
+    firebase.initializeApp(FIREBASE_CONFIG);
+    _fs=firebase.firestore();
+    const auth=firebase.auth();
+    badge.style.cursor='pointer';
+    badge.onclick=async ()=>{
+      const u=auth.currentUser;
+      if(u){ if(confirm((u.email||'このアカウント')+' からログアウトする?')) auth.signOut(); return; }
+      const provider=new firebase.auth.GoogleAuthProvider();
+      badge.textContent='同期: ログイン中…';
+      try{ await auth.signInWithPopup(provider); }
+      catch(e){
+        // ポップアップがブロックされたらリダイレクト方式に切替(スマホ向け)
+        try{ await auth.signInWithRedirect(provider); }
+        catch(e2){ alert('ログインできなかった: '+(e2&&e2.message||e2)); badge.textContent='🔑 ログイン'; }
+      }
+    };
+    auth.getRedirectResult().catch(()=>{});   // リダイレクトから戻ったとき用
+    auth.onAuthStateChanged(async u=>{
+      if(u){ badge.textContent='☁ 同期ON'; badge.title=(u.email||'')+' / タップでログアウト'; await cloudLoad(u.uid); }
+      else { badge.textContent='🔑 ログイン'; badge.title='タップでGoogleログイン'; }
+    });
+  }catch(e){ console.warn('cloud init failed', e); badge.textContent='同期: 接続失敗'; }
+}
+async function cloudLoad(uid){ _uid=uid;
+  try{ const doc=await _fs.collection(CLOUD_COLLECTION).doc(uid).get();
+    const d=doc.exists? doc.data():null;
+    if(d && d.days){ DB=d.days; localStorage.setItem(LS_KEY,JSON.stringify(DB));
+      if(d.seasons){ SEASONS=d.seasons; saveSeasons(); }
+      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); geocodeAll(false);
+    } else {
+      pushCloud();   // クラウドにまだ新スキーマが無ければ、この端末のデータを初期反映
+    }
+  }catch(e){ console.warn(e); }
+}
+function pushCloud(){ if(!_fs||!_uid) return; clearTimeout(_pushT);
+  _pushT=setTimeout(()=>{ _fs.collection(CLOUD_COLLECTION).doc(_uid).set({days:DB, seasons:SEASONS, updated:Date.now()},{merge:true}).catch(()=>{}); },700);
+}
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
+
+/* ---------- 起動 ---------- */
+refreshSeasonSelectors();
+refreshDateSelector();
+renderCurrent();
+geocodeAll(false);
+initCloud();
 </script>
 </body>
 </html>
