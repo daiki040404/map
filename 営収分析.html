@@ -141,6 +141,12 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <option>晴れ</option><option>曇り</option><option>雨</option><option>雪</option></select>
     </div>
     <div class="grp">
+      <label class="chip">曜日</label>
+      <select id="fWday"><option value="">全曜日</option>
+        <option>日</option><option>月</option><option>火</option><option>水</option>
+        <option>木</option><option>金</option><option>土</option></select>
+    </div>
+    <div class="grp">
       <label class="chip">期間</label>
       <input type="date" id="fFrom"><span class="muted small">〜</span><input type="date" id="fTo">
       <button class="icon-btn" id="fClear" style="padding:3px 8px">×</button>
@@ -286,12 +292,6 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <button data-m="allod">全乗降</button>
         </div>
         <button class="icon-btn" id="odClear" style="padding:3px 8px">選択クリア</button>
-        <div class="grp">
-          <label class="chip">曜日</label>
-          <select id="mapWday"><option value="">全部</option>
-            <option>日</option><option>月</option><option>火</option><option>水</option>
-            <option>木</option><option>金</option><option>土</option></select>
-        </div>
         <div class="grp">
           <label class="chip">時間</label>
           <select id="mapHFrom"></select><span class="muted small">〜</span><select id="mapHTo"></select>
@@ -444,7 +444,7 @@ function jitsuByHour(r){
 function pickupHour(r){ const m=toMin(r.on); return m==null?null:Math.floor(m/60)%24; }
 
 /* ---------- フィルタ ---------- */
-const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'' };
+const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'', wday:'' };
 function outlierOK(r){
   if(state.outlier==='exclude') return !r.outlier;
   if(state.outlier==='only') return !!r.outlier;
@@ -461,6 +461,7 @@ function dayInSeason(date,name){
 function scopedDays(){
   return DB.filter(d=> dayInSeason(d.date, state.season)
     && (!state.weather || (d.weather||'')===state.weather)
+    && (!state.wday || wdayOf(d.date)===state.wday)
     && (!state.from || d.date>=state.from)
     && (!state.to   || d.date<=state.to)
   ).sort((a,b)=>a.date<b.date?-1:1);
@@ -758,11 +759,9 @@ function initMap(){
 }
 function roundKey(lat,lng){ return lat.toFixed(3)+','+lng.toFixed(3); } // ~100m格子
 function mapRides(){
-  const wf=document.getElementById('mapWday').value;
   const iF=SHIFT_HOURS.indexOf(+document.getElementById('mapHFrom').value);
   const iT=SHIFT_HOURS.indexOf(+document.getElementById('mapHTo').value);
-  return scopedRides().filter(r=>{
-    if(wf && r._wday!==wf) return false;
+  return scopedRides().filter(r=>{   // 曜日は共通フィルタ(scopedRides)で反映済み
     const ip=SHIFT_HOURS.indexOf(pickupHour(r));
     return ip>=iF && ip<=iT;
   });
@@ -907,7 +906,6 @@ segWire('pMetric','m',v=>{pMetric=v; renderPeriod();});
 segWire('pAgg','a',v=>{pAgg=v; renderPeriod();});
 segWire('pView','v',v=>{pView=v; renderPeriod();});
 segWire('mapMode','m',v=>{mapMode=v; renderMap();});
-document.getElementById('mapWday').onchange=renderMap;
 document.getElementById('odClear').onclick=()=>{ Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={}; };
 // 時間帯セレクトを一勤務の並び(13時→翌12時)で用意
 (function(){
@@ -940,6 +938,7 @@ document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
 });
 document.getElementById('fSeason').onchange=e=>{ state.season=e.target.value; renderCurrent(); };
 document.getElementById('fWeather').onchange=e=>{ state.weather=e.target.value; renderCurrent(); };
+document.getElementById('fWday').onchange=e=>{ state.wday=e.target.value; renderCurrent(); };
 segWire('fOutlier','o',v=>{ state.outlier=v; renderCurrent(); });
 document.getElementById('fFrom').onchange=e=>{ state.from=e.target.value; document.getElementById('fDate').value=''; renderCurrent(); };
 document.getElementById('fTo').onchange=e=>{ state.to=e.target.value; document.getElementById('fDate').value=''; renderCurrent(); };
