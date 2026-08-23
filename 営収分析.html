@@ -265,7 +265,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       </div>
       <div id="cmpItems" style="margin-bottom:10px"></div>
       <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
-      <p class="note">上のチェックで表示する項目を選ぶ。全部「登録した勤務日」の1乗務平均で計算（カレンダー日数では割らない／除外日も抜く）。数値を出すには右上「数値」をON。</p>
+      <p class="note">上のチェックで期間を選ぶ。さらに「営業日を選択」で単日を足すと点線で重ねて比較できる（登録した期間はそのまま使える）。全部「登録した勤務日」の1乗務平均で計算（カレンダー日数では割らない／除外日も抜く）。数値を出すには右上「数値」をON。</p>
     </div>
     <div class="card">
       <h2>期間の登録・編集</h2>
@@ -669,13 +669,38 @@ function renderPeriod(){
 
 /* ---------- シーズン比較 ---------- */
 let cmpSelected=new Set(['__all__']);
+let cmpDays=new Set();   // 個別に選んだ営業日(YYYY-MM-DD)
 function renderCmpItems(){
   const box=document.getElementById('cmpItems'); if(!box) return;
   const names=[...new Set(SEASONS.map(s=>s.name))];
   const items=[{key:'__all__',label:'通常期(全期間)'}].concat(names.map(n=>({key:n,label:n})));
-  box.innerHTML='<div class="small muted" style="margin-bottom:4px">表示する項目:</div>'+
+  // 期間(シーズン)のチェック
+  let html='<div class="small muted" style="margin-bottom:4px">表示する期間:</div>'+
     items.map(it=>`<label class="small" style="display:inline-block;margin:2px 12px 2px 0"><input type="checkbox" class="cmpit" value="${esc(it.key)}" ${cmpSelected.has(it.key)?'checked':''}> ${esc(it.label)}</label>`).join('');
+  // 営業日の選択
+  const allDates=[...DB].map(d=>d.date).sort((a,b)=>a<b?1:-1);   // 新しい順
+  const avail=allDates.filter(dt=>!cmpDays.has(dt));
+  html+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
+    '<div class="small muted" style="margin-bottom:4px">営業日を選択（単日で重ねて比較）:</div>'+
+    '<div class="row" style="align-items:center;gap:6px">'+
+      `<select id="cmpDaySel"><option value="">${avail.length?'日付を選ぶ…':'追加できる営業日なし'}</option>`+
+        avail.map(dt=>`<option value="${dt}">${dt}(${wdayOf(dt)})</option>`).join('')+'</select>'+
+      '<button class="icon-btn" id="cmpDayAdd" style="padding:5px 10px">追加</button>'+
+      (cmpDays.size?'<button class="icon-btn" id="cmpDayClear" style="padding:5px 10px">全解除</button>':'')+
+    '</div>';
+  if(cmpDays.size){
+    html+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+
+      [...cmpDays].sort().map(dt=>`<span class="pill">${dt}(${wdayOf(dt)}) <button class="cmpDayDel" data-d="${dt}" style="background:none;border:none;color:var(--s8);cursor:pointer;padding:0 2px">×</button></span>`).join('')+
+      '</div>';
+  }
+  html+='</div>';
+  box.innerHTML=html;
   box.querySelectorAll('.cmpit').forEach(c=>c.onchange=()=>{ if(c.checked)cmpSelected.add(c.value); else cmpSelected.delete(c.value); drawCompare(); });
+  const addBtn=box.querySelector('#cmpDayAdd');
+  if(addBtn) addBtn.onclick=()=>{ const v=box.querySelector('#cmpDaySel').value; if(v){ cmpDays.add(v); renderCmpItems(); drawCompare(); } };
+  const clrBtn=box.querySelector('#cmpDayClear');
+  if(clrBtn) clrBtn.onclick=()=>{ cmpDays.clear(); renderCmpItems(); drawCompare(); };
+  box.querySelectorAll('.cmpDayDel').forEach(b=>b.onclick=()=>{ cmpDays.delete(b.dataset.d); renderCmpItems(); drawCompare(); });
 }
 function renderSeasonTab(){
   renderCmpItems();
@@ -743,6 +768,13 @@ function drawCompare(){
     else { days=DB.filter(d=>dayInSeason(d.date,key)); label=key; }
     ds.push({label:`${label}(${days.length}日平均)`, data:avgSeries(days,axis,metric),
       borderColor:cv(CMP_COLORS[ci%CMP_COLORS.length]), backgroundColor:'transparent', tension:.3, borderWidth:2, pointRadius:3});
+    ci++;
+  });
+  // 個別に選んだ営業日（単日・点線で表示）
+  [...cmpDays].sort().forEach(dt=>{
+    const days=DB.filter(d=>d.date===dt);
+    ds.push({label:`${dt}(${wdayOf(dt)})`, data:avgSeries(days,axis,metric),
+      borderColor:cv(CMP_COLORS[ci%CMP_COLORS.length]), backgroundColor:'transparent', tension:.3, borderWidth:2, pointRadius:3, borderDash:[6,4]});
     ci++;
   });
   makeChart('cmpChart',{ type:'line', data:{labels:keys, datasets:ds},
