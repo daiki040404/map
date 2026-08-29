@@ -84,11 +84,14 @@
         <input type="month" id="selMonth">
       </div>
       <div>
+        <button onclick="goToday()">今月へ</button>
+      </div>
+      <div>
         <button onclick="deleteMonth()">この月を削除</button>
       </div>
     </div>
     <div id="monthChips"></div>
-    <p class="note" style="margin-top:8px">上のカレンダーで新しい月を選べば、その月の記録を新規で入力できます。丸いボタンは保存済みの月で、押すと切り替わります。</p>
+    <p class="note" style="margin-top:8px">開くと必ず今の月が表示されます。上のカレンダーで前の月を選べば、その月の記録を見られます。丸いボタンは保存済みの月で、押すと切り替わります。</p>
   </div>
 
   <div class="card">
@@ -410,6 +413,15 @@ function jumpMonth(k){
   fillForm(STORE.months[k]);
   renderChips();
 }
+function goToday(){
+  var k = todayKey();
+  if(k===SEL){ document.getElementById('selMonth').value = k; return; }
+  saveIfHasContent();
+  SEL = k;
+  document.getElementById('selMonth').value = k;
+  fillForm(STORE.months[k]);
+  renderChips();
+}
 /* フォームに何か入っていれば保存（空の新規月は保存しない） */
 function saveIfHasContent(){
   var md = formData();
@@ -429,8 +441,7 @@ function deleteMonth(){
   STORE.updatedAt = Date.now();
   try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
   syncPush();
-  var keys = Object.keys(STORE.months).sort();
-  SEL = keys.length ? keys[keys.length-1] : todayKey();
+  SEL = todayKey();
   document.getElementById('selMonth').value = SEL;
   fillForm(STORE.months[SEL]);
   renderChips();
@@ -530,7 +541,6 @@ function startSync(){
     var remote = null; try{ remote = normalize(JSON.parse((snap.data()||{}).dataJson)); }catch(e){}
     if(!remote) return;
     var merged = mergeStores(remote, STORE);
-    var before = JSON.stringify(STORE);
     STORE = merged;
     try{ localStorage.setItem(LS, JSON.stringify(STORE)); }catch(e){}
     /* 入力中でなければ現在の月を最新表示に更新 */
@@ -664,10 +674,9 @@ document.getElementById('selMonth').addEventListener('change', function(){
   renderChips();
 });
 
-/* ===== 起動 ===== */
+/* ===== 起動：開いたら必ず“今の月”を表示。前の月はカレンダー／丸ボタンで選べる ===== */
 STORE = loadStore();
-var _keys = Object.keys(STORE.months).sort();
-SEL = (_keys.indexOf(todayKey())>=0) ? todayKey() : (_keys.length ? _keys[_keys.length-1] : todayKey());
+SEL = todayKey();
 document.getElementById('selMonth').value = SEL;
 fillForm(STORE.months[SEL]);
 renderChips();
