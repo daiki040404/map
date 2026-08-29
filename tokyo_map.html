@@ -168,7 +168,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v29</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v30</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -221,7 +221,7 @@
     <div class="list" id="list"></div>
     </div>
   </div>
-  <div id="map"><button id="baseToggle">地図: 通常</button><div id="locInfo"></div><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図でタップして追加</span><div class="tb2"><button id="pbSearch">🔍 検索で選ぶ</button><button id="pbDone">完了</button></div></div><div id="relBar"><span id="rbQ">関連</span><div class="tb2"><button id="rbPrev">前へ</button><button id="rbAll">全答え</button><button id="rbNext">次へ</button></div></div><div id="toast"></div></div>
+  <div id="map"><button id="baseToggle">地図: 通常</button><div id="locInfo"></div><div id="drawBar"><span id="drawQ">引いてください</span><div class="db2"><button id="dbReset">やり直し</button><button id="dbCheck">答え合わせ</button><button id="dbNext">次へ</button></div></div><div id="testBar"><span id="tbQ">問題</span><div class="tb2"><button id="tbPrev">前へ</button><button id="tbAnswer">答え</button><button id="tbNext">次へ</button><button id="tbAll">全答え</button></div></div><div id="pickBar"><span id="pbQ">地図でタップして追加</span><div class="tb2"><button id="pbSearch">🔍 検索で選ぶ</button><button id="pbDone">完了</button></div></div><div id="relBar"><span id="rbQ">関連</span><div class="tb2"><button id="rbPrev">前へ</button><button id="rbAnswer">答え</button><button id="rbNext">次へ</button><button id="rbAll">全答え</button></div></div><div id="toast"></div></div>
 </div>
 <input type="file" id="medFile" accept="image/*,video/*" multiple style="display:none"/>
 <input type="file" id="eBackFile" accept=".json,application/json" style="display:none"/>
@@ -418,9 +418,7 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function render(){
   _scope=scopeSet();
   if(mode==='test'&&pickMode){renderPickMode();return;}
-  if(mode==='test'&&testType==='related'){renderRelatedTest();return;}
-  if(mode==='test'&&testType==='ramp'){renderRampTest();return;}
-  if(mode==='test'&&testType==='station'){renderStationTest();return;}
+  if(mode==='test'&&(testType==='related'||testType==='ramp'||testType==='station')){renderSeqTest();return;}
   if(mode==='test'&&testType==='draw'){renderDrawTest();return;}
   if(mode==='test'&&testType==='name'){renderNameTest();return;}
   clearDrawLayers();
@@ -801,7 +799,7 @@ function buildCatChips(){
 
 // ===== 線引きテスト =====
 let testType='name', drawIdx=0, drawSeq=[], drawResult=null, nameIdx=-1, nameReveal=false, revealAll=false, pickMode=false, pickSel=null;
-let relatedIdx=0, relAll=false, relRevealed=new Set(), relFocus=null;
+let relatedIdx=0, relAll=false, relRevealed=new Set(), relFocus=null, relSeqIdx=0;
 const dotGroup=L.layerGroup(); let userLine=null, answerLine=null;
 function drawTargets(){let its=ITEMS.filter(x=>(x.type==='street'||x.type==='route'));if(activeTestId){const t=curTest();its=its.filter(x=>t&&t.items.indexOf(x.id)>=0);}return its;}
 function clearDrawLayers(){dotGroup.clearLayers();map.removeLayer(dotGroup);if(userLine){map.removeLayer(userLine);userLine=null;}if(answerLine){map.removeLayer(answerLine);answerLine=null;}document.getElementById('drawBar').classList.remove('on');document.getElementById('testBar').classList.remove('on');document.getElementById('relBar').classList.remove('on');const pb=document.getElementById('pickBar');if(pb&&!pickMode)pb.classList.remove('on');}
@@ -1009,13 +1007,48 @@ function renderStationTest(){
   buildList(kids);
 }
 function relParentsCur(){return testType==='ramp'?rampParents():(testType==='station'?stationParents():relParents());}
-function renderRelCur(){return testType==='ramp'?renderRampTest():(testType==='station'?renderStationTest():renderRelatedTest());}
-document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw','ttRamp','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
-document.getElementById('ttRamp').onclick=()=>{testType='ramp';['ttName','ttDraw','ttRel','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRamp').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
-document.getElementById('ttStn').onclick=()=>{testType='station';['ttName','ttDraw','ttRel','ttRamp'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttStn').classList.add('on');relatedIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
-document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderRelCur();};
-document.getElementById('rbNext').onclick=()=>{const ps=relParentsCur();if(!ps.length)return;relatedIdx=(relatedIdx+1)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelCur();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
-document.getElementById('rbPrev').onclick=()=>{const ps=relParentsCur();if(!ps.length)return;relatedIdx=(relatedIdx-1+ps.length)%ps.length;relRevealed=new Set();relFocus=null;relAll=false;renderRelCur();try{if(lineLayers[ps[relatedIdx].id])map.fitBounds(lineLayers[ps[relatedIdx].id].getBounds(),{padding:[50,50]});}catch(e){}};
+function childrenForParent(P){return testType==='station'?stationChildrenAll(P):(testType==='ramp'?rampChildrenAll(P):childrenOf(P));}
+function renderRelCur(){return renderSeqTest();}
+// ===== 関連系テスト共通：1つずつ順番に（前へ／答え／次へ／全答え） =====
+function renderSeqTest(){
+  clearDrawLayers();document.getElementById('relBar').classList.add('on');
+  markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();dotGroup.clearLayers();
+  const parents=relParentsCur();
+  DATA.forEach(o=>{const L=lineLayers[o.id];if(L)map.removeLayer(L);});
+  const emsg=(testType==='station')?'駅が出せません：編集で鉄道を選び「🔗この鉄道に駅を紐付け」か、テストに駅を追加してください':(testType==='ramp'?'出入口のある首都高がありません（首都高を作り、出入口を紐付けてね）':'関連項目のある通り/首都高がありません');
+  const flat=[];parents.forEach(P=>{childrenForParent(P).forEach(c=>flat.push({P:P,c:c}));});
+  if(!flat.length){document.getElementById('rbQ').textContent=emsg;buildList(ITEMS.filter(()=>false));return;}
+  if(relSeqIdx>=flat.length)relSeqIdx=0;if(relSeqIdx<0)relSeqIdx=flat.length-1;
+  const curPair=flat[relSeqIdx],P=curPair.P,kids=childrenForParent(P),pid=P.line||P.id;
+  const showRoads=new Set();
+  flat.forEach(f=>{if((relAll||relRevealed.has(f.c.id))&&f.c.roads)f.c.roads.forEach(r=>showRoads.add(r));});
+  DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);if(_scope&&!_scope.has(o.id))return;
+    if(o.id===pid)L2.setStyle({opacity:1,weight:6}).addTo(map);
+    else if(showRoads.has(o.id))L2.setStyle({opacity:.95,weight:5}).addTo(map);});
+  ITEMS.filter(it=>(it.type==='street'||it.type==='route')&&showRoads.has(it.streetId)).forEach(it=>{
+    const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:'',html:'<div class="mkwrap"><div class="mk mk-tag" style="background:'+colOf(it)+'">通</div></div>',iconSize:[26,26],iconAnchor:[13,13]})});
+    m.bindTooltip(it.name,{permanent:true,direction:'right',className:'nameicon',offset:[12,0]});m.addTo(markerGroup);});
+  kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const isCur=(c.id===curPair.c.id);
+    const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(isCur&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
+    if(rev){let ex=(c.type==='ramp'&&c.dir)?'（'+c.dir+'）':'';const rn=(c.roads||[]).map(id=>(DATA.find(x=>x.id===id)||{}).name).filter(Boolean);if(rn.length&&c.type!=='station')ex+='〔'+rn.join('・')+'〕';m.bindTooltip(c.name+ex,{permanent:true,direction:'top',className:'nameicon'});}
+    m.on('click',()=>{const gi=flat.findIndex(f=>f.c.id===c.id);if(gi>=0)relSeqIdx=gi;relRevealed.add(c.id);renderSeqTest();});
+    m.addTo(markerGroup);});
+  const label=(testType==='station')?'駅':(testType==='ramp'?'出入口':(P.kind==='expressway'?'出入口':'施設・交差点'));
+  const revd=relAll||relRevealed.has(curPair.c.id);
+  document.getElementById('rbQ').textContent='('+(relSeqIdx+1)+'/'+flat.length+') '+P.name+' の'+label+(revd?'：'+curPair.c.name+((curPair.c.type==='ramp'&&curPair.c.dir)?'（'+curPair.c.dir+'）':''):'　（「答え」でわかる）');
+  document.getElementById('rbAll').classList.toggle('on',relAll);
+  buildList(kids);
+}
+function relSeqPan(){const ps=relParentsCur();const flat=[];ps.forEach(P=>{childrenForParent(P).forEach(c=>flat.push(c));});const c=flat[relSeqIdx];if(c)try{map.panTo([c.lat,c.lon]);}catch(e){}}
+document.getElementById('ttRel').onclick=()=>{testType='related';['ttName','ttDraw','ttRamp','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRel').classList.add('on');relatedIdx=0;relSeqIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
+document.getElementById('ttRamp').onclick=()=>{testType='ramp';['ttName','ttDraw','ttRel','ttStn'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttRamp').classList.add('on');relatedIdx=0;relSeqIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
+document.getElementById('ttStn').onclick=()=>{testType='station';['ttName','ttDraw','ttRel','ttRamp'].forEach(id=>document.getElementById(id).classList.remove('on'));document.getElementById('ttStn').classList.add('on');relatedIdx=0;relSeqIdx=0;relRevealed=new Set();relFocus=null;relAll=false;render();};
+function relSeqCount(){const ps=relParentsCur();let n=0;ps.forEach(P=>{n+=childrenForParent(P).length;});return n;}
+function relSeqCurId(){const ps=relParentsCur();const flat=[];ps.forEach(P=>{childrenForParent(P).forEach(c=>flat.push(c));});return flat[relSeqIdx]?flat[relSeqIdx].id:null;}
+document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderSeqTest();};
+document.getElementById('rbAnswer').onclick=()=>{const id=relSeqCurId();if(id)relRevealed.add(id);renderSeqTest();relSeqPan();};
+document.getElementById('rbNext').onclick=()=>{const n=relSeqCount();if(!n)return;relSeqIdx=(relSeqIdx+1)%n;renderSeqTest();relSeqPan();};
+document.getElementById('rbPrev').onclick=()=>{const n=relSeqCount();if(!n)return;relSeqIdx=(relSeqIdx-1+n)%n;renderSeqTest();relSeqPan();};
 document.getElementById('pbSearch').onclick=()=>{const t=curTest();if(!t){toast('先にテストを選んでね');return;}openTestPicker(t);};
 document.getElementById('pbDone').onclick=()=>{pickMode=false;pickSel=null;render();};
 function tapDot(sid,i,p){if(drawResult)return;const key=sid+':'+i;const pos=drawSeq.map(d=>d.key).indexOf(key);if(pos>=0){drawSeq.splice(pos,1);}else{drawSeq.push({key,streetId:sid,idx:i,lat:p[1],lon:p[0]});}renderDrawTest();}
