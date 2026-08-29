@@ -168,7 +168,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v28</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v29</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -972,26 +972,33 @@ function renderRampTest(){
   document.getElementById('rbAll').classList.toggle('on',relAll);
   buildList(kids);
 }
-// ===== 駅名テスト（鉄道を選ぶ→その駅を全部出題。個別に項目追加不要） =====
-function stationChildrenAll(P){return ITEMS.filter(it=>it.type==='station'&&it.line===P.id);}
+// ===== 駅名テスト（鉄道を選ぶ→その駅を出題。紐付けが無くても賢く出す） =====
+function stationChildrenAll(P){return P.stations||ITEMS.filter(it=>it.type==='station'&&it.line===P.id);}
 function stationParents(){const t=curTest();const inTest=!!(t&&t.items.length);
-  const rails=DATA.filter(o=>o.kind==='railway'&&o.path&&o.path.length&&ITEMS.some(it=>it.type==='station'&&it.line===o.id));
-  if(!inTest)return rails;
-  const allow=new Set();
+  if(!inTest){return DATA.filter(o=>o.kind==='railway'&&o.path&&o.path.length&&ITEMS.some(it=>it.type==='station'&&it.line===o.id))
+    .map(o=>({id:o.id,name:o.name,line:o.id,stations:ITEMS.filter(it=>it.type==='station'&&it.line===o.id)}));}
+  const railIds=new Set(),free=[];
   t.items.forEach(id=>{const it=ITEMS.find(x=>x.id===id);if(!it)return;
-    if(it.type==='station'&&it.line)allow.add(it.line);
-    else if((it.type==='street'||it.type==='route')&&it.streetKind==='railway')allow.add(it.streetId);});
-  return rails.filter(o=>allow.has(o.id));}
+    if(it.type==='station'){if(it.line)railIds.add(it.line);else free.push(it);}
+    else if((it.type==='street'||it.type==='route')&&it.streetKind==='railway')railIds.add(it.streetId);});
+  const unlinked=ITEMS.filter(it=>it.type==='station'&&!it.line);
+  const groups=[];
+  railIds.forEach(rid=>{const o=DATA.find(x=>x.id===rid);if(!o)return;
+    let sts=ITEMS.filter(it=>it.type==='station'&&it.line===rid);
+    if(!sts.length&&railIds.size===1&&unlinked.length)sts=unlinked; // 鉄道1本＆未紐付け駅→その鉄道の駅とみなす
+    if(sts.length)groups.push({id:rid,name:o.name,line:rid,stations:sts});});
+  if(free.length&&!(railIds.size===1&&groups.length&&groups[0].stations===unlinked))groups.push({id:'_freeStn',name:'駅（未所属）',line:null,stations:free});
+  return groups;}
 function renderStationTest(){
   clearDrawLayers();document.getElementById('relBar').classList.add('on');
   markerGroup.clearLayers();connGroup.clearLayers();vertexGroup.clearLayers();dotGroup.clearLayers();
   const parents=stationParents();
   DATA.forEach(o=>{const L=lineLayers[o.id];if(L)map.removeLayer(L);});
-  if(!parents.length){document.getElementById('rbQ').textContent='駅のある鉄道がありません（鉄道を作り、駅を紐付けてね）';buildList(ITEMS.filter(()=>false));return;}
+  if(!parents.length){document.getElementById('rbQ').textContent='駅が出せません：編集モードで鉄道を選び「🔗この鉄道に駅を紐付け」で駅を登録するか、テストに駅を追加してください';buildList(ITEMS.filter(()=>false));return;}
   if(relatedIdx>=parents.length||relatedIdx<0)relatedIdx=0;
   const P=parents[relatedIdx],kids=stationChildrenAll(P);
   DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;map.removeLayer(L2);
-    if(o.id===P.id)L2.setStyle({opacity:1,weight:6}).addTo(map);});
+    if(o.id===P.line)L2.setStyle({opacity:1,weight:6}).addTo(map);});
   kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const foc=(relFocus===c.id);
     const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(foc&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:foc?1000:0});
     if(rev)m.bindTooltip(c.name,{permanent:true,direction:'top',className:'nameicon'});
