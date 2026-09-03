@@ -168,7 +168,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v30</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v31</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -392,7 +392,11 @@ function itemVisible(it){
 }
 function popupHtml(it,num,detail){const t=TYPE[it.type],done=store.learned[it.id],tod=store.today[it.id];
   let h='<div class="pp"><div class="pptype" style="color:'+colOf(it)+'">'+t.label+'　#'+num+'</div><b>'+it.name+'</b>'+(it.info?'<br><span class="ppi">'+it.info+'</span>':'');
-  if(mode==='test')return h+'</div>';
+  if(mode==='test'){ if(!detail)return h+'</div>';
+    if(it.roads&&it.roads.length)h+='<div class="pproads">つながる通り: '+it.roads.map(id=>{const r=DATA.find(x=>x.id===id);return r?esc(r.name):'?';}).join('、')+'</div>';
+    var mmt=store.memo[it.id]||'';h+='<div class="ppmemo">📝 '+(mmt?esc(mmt):'<span class="muted2">メモなし</span>')+'</div>';
+    h+='<div class="pplbl">写真・動画</div><div class="ppmedia" id="med_'+it.id+'"><span class="muted2">…</span></div>';
+    return h+'</div>'; }
   if(mode==='learn'&&!detail){var mm0=store.memo[it.id]||'';if(mm0)h+='<div class="ppmemo">📝 '+esc(mm0)+'</div>';h+='<div class="ppbtn"><button onclick="expandPopup(\''+it.id+'\')">詳細・編集</button></div>';return h+'</div>';}
   if(it.roads&&it.roads.length){h+='<div class="pproads">通る通り: '+it.roads.map(id=>{const r=DATA.find(x=>x.id===id);return r?esc(r.name):'?';}).join('、')+'</div>';}
   if(mode==='edit'&&it.placeIdx!=null){
@@ -842,7 +846,10 @@ function renderNameTest(){
     if(rev){let extra=(it.type==='ramp'&&it.dir)?'（'+it.dir+'）':'';const rn=roadNamesOf(it);if(rn.length)extra+='〔'+rn.join('・')+'〕';
       m.bindTooltip(it.name+extra,{permanent:true,direction:'top',className:'nameicon'});
       if(isCur&&it.type!=='street'&&it.type!=='route')(it.roads||[]).forEach(r=>showRoadN.add(r));}
-    m.on('click',()=>{if(nameIdx===i){nameReveal=!nameReveal;}else{nameIdx=i;nameReveal=false;}render();panPoint(it);});
+    m.on('click',()=>{
+      if(nameIdx===i){ if(!nameReveal){nameReveal=true;render();panPoint(it);if(it.type==='caution'||it.type==='avoid'||store.memo[it.id])openLearnPopup(it,true);} else {openLearnPopup(it,true);} }
+      else {nameIdx=i;nameReveal=false;render();panPoint(it);}
+    });
     m.addTo(markerGroup);});
   // 答えを開いた交差点・施設等の「形成する通り」に通り名ラベルを表示
   ITEMS.filter(it=>(it.type==='street'||it.type==='route')&&showRoadN.has(it.streetId)).forEach(it=>{
@@ -859,7 +866,7 @@ function renderNameTest(){
   document.getElementById('cDone').textContent=Object.keys(store.learned).length;
   document.getElementById('cTod').textContent=Object.keys(store.today).length;
 }
-document.getElementById('tbAnswer').onclick=()=>{nameReveal=true;const qs=ITEMS.filter(itemVisible);if(qs[nameIdx])panPoint(qs[nameIdx]);renderNameTest();};
+document.getElementById('tbAnswer').onclick=()=>{nameReveal=true;const qs=ITEMS.filter(itemVisible);const it=qs[nameIdx];if(it)panPoint(it);renderNameTest();if(it&&(it.type==='caution'||it.type==='avoid'||store.memo[it.id]))openLearnPopup(it,true);};
 document.getElementById('tbNext').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx<0)?0:(nameIdx+1)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
 document.getElementById('tbPrev').onclick=()=>{const qs=ITEMS.filter(itemVisible);if(qs.length){nameIdx=(nameIdx<0)?0:(nameIdx-1+qs.length)%qs.length;nameReveal=false;renderNameTest();panPoint(qs[nameIdx]);}};
 document.getElementById('tbAll').onclick=()=>{revealAll=!revealAll;renderNameTest();toast(revealAll?'全部の答えを表示（紙と照合）':'答えを隠しました');};
@@ -1031,7 +1038,7 @@ function renderSeqTest(){
   kids.forEach((c,i)=>{const num=i+1;c._num=num;const rev=relAll||relRevealed.has(c.id);const isCur=(c.id===curPair.c.id);
     const m=L.marker([c.lat,c.lon],{icon:L.divIcon({className:(isCur&&!rev)?'curq':'',html:shapeHtml(c,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:isCur?1000:0});
     if(rev){let ex=(c.type==='ramp'&&c.dir)?'（'+c.dir+'）':'';const rn=(c.roads||[]).map(id=>(DATA.find(x=>x.id===id)||{}).name).filter(Boolean);if(rn.length&&c.type!=='station')ex+='〔'+rn.join('・')+'〕';m.bindTooltip(c.name+ex,{permanent:true,direction:'top',className:'nameicon'});}
-    m.on('click',()=>{const gi=flat.findIndex(f=>f.c.id===c.id);if(gi>=0)relSeqIdx=gi;relRevealed.add(c.id);renderSeqTest();});
+    m.on('click',()=>{const gi=flat.findIndex(f=>f.c.id===c.id);const wasRev=relRevealed.has(c.id);if(gi>=0)relSeqIdx=gi;relRevealed.add(c.id);renderSeqTest();if(wasRev||c.type==='caution'||c.type==='avoid'||store.memo[c.id])openLearnPopup(c,true);});
     m.addTo(markerGroup);});
   const label=(testType==='station')?'駅':(testType==='ramp'?'出入口':(P.kind==='expressway'?'出入口':'施設・交差点'));
   const revd=relAll||relRevealed.has(curPair.c.id);
@@ -1046,7 +1053,7 @@ document.getElementById('ttStn').onclick=()=>{testType='station';['ttName','ttDr
 function relSeqCount(){const ps=relParentsCur();let n=0;ps.forEach(P=>{n+=childrenForParent(P).length;});return n;}
 function relSeqCurId(){const ps=relParentsCur();const flat=[];ps.forEach(P=>{childrenForParent(P).forEach(c=>flat.push(c));});return flat[relSeqIdx]?flat[relSeqIdx].id:null;}
 document.getElementById('rbAll').onclick=()=>{relAll=!relAll;renderSeqTest();};
-document.getElementById('rbAnswer').onclick=()=>{const id=relSeqCurId();if(id)relRevealed.add(id);renderSeqTest();relSeqPan();};
+document.getElementById('rbAnswer').onclick=()=>{const id=relSeqCurId();if(id)relRevealed.add(id);renderSeqTest();relSeqPan();const it=ITEMS.find(x=>x.id===id);if(it&&(it.type==='caution'||it.type==='avoid'||store.memo[it.id]))openLearnPopup(it,true);};
 document.getElementById('rbNext').onclick=()=>{const n=relSeqCount();if(!n)return;relSeqIdx=(relSeqIdx+1)%n;renderSeqTest();relSeqPan();};
 document.getElementById('rbPrev').onclick=()=>{const n=relSeqCount();if(!n)return;relSeqIdx=(relSeqIdx-1+n)%n;renderSeqTest();relSeqPan();};
 document.getElementById('pbSearch').onclick=()=>{const t=curTest();if(!t){toast('先にテストを選んでね');return;}openTestPicker(t);};
