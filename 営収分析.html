@@ -111,6 +111,10 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
   border-radius:6px; padding:1px 7px; font-size:11px; font-weight:600; box-shadow:none}
 .leaflet-tooltip.ev-tip::before{display:none}
 .ev-win{font-size:12px; color:var(--ink2)}
+.ride-num{display:flex; align-items:center; justify-content:center; width:22px; height:22px;
+  border-radius:50%; color:#fff; font-size:11px; font-weight:700; border:2px solid rgba(255,255,255,.8);
+  box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.leaflet-div-icon{background:transparent; border:none}
 .ev-win b{color:var(--ink)}
 @media(max-width:600px){ .chart-wrap{height:260px} #map{height:420px} main{padding:12px} }
 </style>
@@ -301,6 +305,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <button data-m="tanka">乗車地×客単価</button>
           <button data-m="od">OD(降車先)</button>
           <button data-m="allod">全乗降</button>
+          <button data-m="day">📅 日別×イベント</button>
         </div>
         <button class="icon-btn" id="odClear" style="padding:3px 8px">選択クリア</button>
         <div class="grp">
@@ -327,6 +332,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         </div>
         <span class="muted small" id="evNowLab"></span>
       </div>
+      <div class="kpis" id="mapDayKpi" style="display:none"></div>
       <div id="map"></div>
       <div class="row" style="margin-top:10px; align-items:flex-start">
         <div class="map-legend" id="mapLegend"></div>
@@ -863,6 +869,7 @@ function mapRides(){
 }
 function renderMap(){
   initMap(); if(!map) return; layerGroup.clearLayers();
+  document.getElementById('mapDayKpi').style.display='none';
   Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={};  // モード/条件変更でOD選択リセット
   if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
   const rides=mapRides().filter(r=> r.fromLat!=null);
@@ -896,6 +903,7 @@ function renderMap(){
     });
     legend.innerHTML='<b>OD(降車先)</b><br><span class="muted small">乗車エリアをタップで降車先(橙)を表示。選択中は黄。同じ所を再タップで消える。別の所を押せば足せる。「選択クリア」で全部消す。</span>';
   }
+  else if(mapMode==='day'){ renderDayMode(); }
   else { // allod: 全乗車地×降車地
     rides.forEach(r=>{ if(r.toLat==null) return;
       L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:1,opacity:.3}).addTo(layerGroup);
@@ -907,12 +915,96 @@ function renderMap(){
     legend.innerHTML='<b>全乗降</b><br><span class="muted small">青=乗車 / 橙=降車 / 線=その経路。全部いっぺんに表示。</span>';
   }
   // 外れ値マーカー(メモ付き)をどのモードでも重ねる
-  mapRides().filter(r=> r.fromLat!=null && (r.outlier||r.memo)).forEach(r=>{
-    L.circleMarker([r.fromLat,r.fromLng],{radius:9,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2})
-      .bindPopup(`<b>⚠ ${r.on} ${r.type||''}</b><br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
-  });
-  renderMemoList('mapMemoList');
+  if(mapMode!=='day'){
+    mapRides().filter(r=> r.fromLat!=null && (r.outlier||r.memo)).forEach(r=>{
+      L.circleMarker([r.fromLat,r.fromLng],{radius:9,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2})
+        .bindPopup(`<b>⚠ ${r.on} ${r.type||''}</b><br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
+    });
+    renderMemoList('mapMemoList');
+  }
   renderEvents();          // イベントは営収とは別レイヤで重ねる
+}
+
+/* ---------- 日別×イベント（その日の営収・乗降とイベントを一緒に見る） ---------- */
+function mapDay(){ return document.getElementById('evDate').value || todayStr(); }
+/* 一勤務(13時→翌12時)の並びに直した分。12時より前＝翌日側 */
+function shiftMin(m){ if(m==null) return null; const x=((m%1440)+1440)%1440; return x<720? x+1440 : x; }
+function daySelAbs(dateStr){                       // 「時刻で絞る」の時刻を勤務の並びに直す
+  const mo=evMoment(); const dd=dayDiff(mo.date, dateStr);
+  return dd===0 ? shiftMin(mo.min) : dd*1440 + mo.min;
+}
+function dayRides(dateStr){
+  const d=DB.find(x=>x.date===dateStr); if(!d) return [];
+  return (d.rides||[]).filter(r=> typeOK(r) && !isKuten(r))
+    .map(r=>Object.assign({_date:d.date}, r))
+    .sort((a,b)=> shiftMin(toMin(a.on)) - shiftMin(toMin(b.on)));
+}
+function renderDayMode(){
+  const date=mapDay(), day=DB.find(x=>x.date===date), rides=dayRides(date);
+  const legend=document.getElementById('mapLegend');
+  const timeOn=document.getElementById('evTimeOn').checked;
+  const sel=timeOn? daySelAbs(date) : null;
+  const HL=60;                                     // 強調する前後の分
+  let hit=0;
+  rides.forEach((r,i)=>{
+    if(r.fromLat==null) return;
+    const on=shiftMin(toMin(r.on));
+    const near = sel==null || Math.abs(on-sel)<=HL;
+    if(near && sel!=null) hit++;
+    const op = near? 1 : .18;
+    const col = r.outlier? cv('--s4') : cv('--s1');
+    L.marker([r.fromLat,r.fromLng],{opacity:op, icon:L.divIcon({className:'', iconSize:[22,22], iconAnchor:[11,11],
+      html:`<div class="ride-num" style="background:${col}">${i+1}</div>`})})
+      .bindPopup(`<b>${i+1}. ${r.on}〜${r.off} ${r.type||''}${r.outlier?' ⚠':''}</b><br>${esc(r.from)}<br>→ ${esc(r.to)}<br>${fmtYen(r.fare)}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`)
+      .addTo(layerGroup);
+    if(r.toLat!=null){
+      L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:op*.55}).addTo(layerGroup);
+      L.circleMarker([r.toLat,r.toLng],{radius:5,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:op*.8,weight:1,opacity:op})
+        .bindPopup(`${i+1}. 降車 ${r.off||''}<br>${esc(r.to)}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
+    }
+  });
+  // その日のKPI
+  const kpi=document.getElementById('mapDayKpi');
+  kpi.style.display='';
+  if(!day){ kpi.innerHTML=`<div class="kpi"><div class="lab">${date}</div><div class="val" style="font-size:15px">営収データなし</div></div>`; }
+  else{
+    const m=dayMetrics([day]);
+    kpi.innerHTML=[
+      [date+'('+wdayOf(date)+')'+(day.weather?' '+day.weather:''), fmtYen(+day.uriage||0)],
+      ['乗車数', rides.length+' 回'],
+      ['実車時間', fmtMin(m.jitsu)],
+      ['実車率', (m.jisRt?m.jisRt.toFixed(1):'-')+'<small>%</small>'],
+      ['客単価', fmtYen(m.tanka)],
+      ['イベント', (timeOn? shownEvents().length : EVENTS.filter(e=>e.date===date&&!e.hide).length)+' 件']
+    ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val" style="font-size:18px">${v}</div></div>`).join('');
+  }
+  legend.innerHTML='<b>📅 日別×イベント</b><br><span class="muted small">上の日付の営業を時刻順に番号付きで表示（青＝乗車 / 橙＝降車、⚠は外れ値）。<br>'+
+    (timeOn? `「時刻で絞る」ON：その時刻±${HL}分の営業だけ濃く出る（該当 ${hit}件）。` : 'イベントのピンと重ねて、どの時間にどこで拾ったか照らし合わせる。')+'</span>';
+  renderDayTimeline(date, rides, sel, HL);
+}
+/* 出庫(13時)をまたぐ時間帯は勤務の頭に寄せて並べる */
+function evSortT(w){ const a=shiftMin(w.from), b=shiftMin(w.to); return b<a? 780 : a; }
+/* 営業とイベントを時刻順に並べた表 */
+function renderDayTimeline(date, rides, sel, HL){
+  const el=document.getElementById('mapMemoList'); if(!el) return;
+  const rows=[];
+  rides.forEach((r,i)=>rows.push({t:shiftMin(toMin(r.on)), kind:'ride', html:
+    `<td>${r.on}</td><td>${i+1}</td><td style="text-align:left">${shortAddr(r.from)} → ${shortAddr(r.to)}</td>`+
+    `<td>${fmtYen(r.fare)}</td><td class="small" style="text-align:left">${(r.type||'')}${r.outlier?' ⚠':''} ${esc(r.memo)}</td>`}));
+  EVENTS.filter(e=>e.date===date).forEach(e=>{
+    evWindows(e).forEach(w=>rows.push({t:evSortT(w), kind:'ev', html:
+      `<td>${m2hm(w.from)}〜${m2hm(w.to)}</td><td>🎪</td><td style="text-align:left"><b>${esc(e.name)}</b> ${esc(e.venue||'')}</td>`+
+      `<td>—</td><td class="small" style="text-align:left">${esc(w.label)}</td>`}));
+  });
+  if(!rows.length){ el.innerHTML='<p class="muted small" style="margin:6px 0">この日の営業データもイベントも無い。</p>'; return; }
+  rows.sort((a,b)=>a.t-b.t);
+  el.innerHTML=`<h2 style="font-size:14px;margin:14px 0 8px">${date} の時系列 <span class="sub muted small">営業とイベントを一緒に並べたもの</span></h2>`+
+    `<table><thead><tr><th>時刻</th><th>#</th><th>内容</th><th>料金</th><th>メモ</th></tr></thead><tbody>`+
+    rows.map(r=>{
+      const near = sel==null || Math.abs(r.t-sel)<=HL;
+      const bg = r.kind==='ev'? 'background:rgba(213,81,129,.13);' : '';
+      return `<tr style="${bg}${near?'':'opacity:.35'}">${r.html}</tr>`;
+    }).join('')+`</tbody></table>`;
 }
 function showOD(a){
   if(!map) return;
@@ -1086,10 +1178,10 @@ function renderEvList(){
   }).join('');
   box.querySelectorAll('.evshow').forEach(c=>c.onchange=()=>{
     const ev=EVENTS.find(x=>x.id===c.dataset.id); if(!ev) return;
-    ev.hide=!c.checked; saveEvents(); renderEvents();
+    ev.hide=!c.checked; saveEvents(); evChanged();
   });
   box.querySelectorAll('.evdel').forEach(b=>b.onclick=()=>{
-    EVENTS=EVENTS.filter(x=>x.id!==b.dataset.id); saveEvents(); renderEvents();
+    EVENTS=EVENTS.filter(x=>x.id!==b.dataset.id); saveEvents(); evChanged();
   });
 }
 /* --- 座標取得 --- */
@@ -1106,8 +1198,11 @@ async function geocodeEvents(force){
     done++; if(st) st.textContent=`イベントの座標取得中… ${done}/${need.length}`;
   }
   saveEvents(); if(st) st.textContent='';
-  if(curTab==='map') renderEvents();
+  if(curTab==='map') evChanged();
 }
+/* 日付や時刻を動かしたとき。日別モードなら営収側も描き直す */
+function evChanged(){ if(mapMode==='day') renderMap(); else renderEvents(); }
+
 /* --- 配線 --- */
 function evWire(){
   const dsel=document.getElementById('evDate'), tsel=document.getElementById('evTime');
@@ -1115,21 +1210,21 @@ function evWire(){
   ['opPrepA','opPrepB','opInA','opInB','opOutA','opOutB'].forEach(id=>{
     const key=id.replace('op','').replace(/^(.)/,c=>c.toLowerCase());
     document.getElementById(id).value=EVOPT[key];
-    document.getElementById(id).onchange=e=>{ EVOPT[key]=+e.target.value||0; saveEvOpt(); renderEvents(); };
+    document.getElementById(id).onchange=e=>{ EVOPT[key]=+e.target.value||0; saveEvOpt(); evChanged(); };
   });
   document.getElementById('opReset').onclick=()=>{ EVOPT=Object.assign({},EVOPT_DEF); saveEvOpt();
     ['opPrepA','opPrepB','opInA','opInB','opOutA','opOutB'].forEach(id=>{
       const key=id.replace('op','').replace(/^(.)/,c=>c.toLowerCase());
       document.getElementById(id).value=EVOPT[key]; });
-    renderEvents(); };
-  document.getElementById('evOn').onchange=renderEvents;
-  document.getElementById('evTimeOn').onchange=renderEvents;
-  dsel.onchange=renderEvents;
+    evChanged(); };
+  document.getElementById('evOn').onchange=evChanged;
+  document.getElementById('evTimeOn').onchange=evChanged;
+  dsel.onchange=evChanged;
   tsel.onchange=()=>{ evTimeMode='fix';
     document.querySelectorAll('#evTimeMode button').forEach(b=>b.classList.toggle('active', b.dataset.t==='fix'));
-    document.getElementById('evTimeOn').checked=true; renderEvents(); };
-  document.getElementById('evToday').onclick=()=>{ dsel.value=todayStr(); renderEvents(); };
-  segWire('evTimeMode','t',v=>{ evTimeMode=v; if(v==='now') tsel.value=m2hm(nowMin()); renderEvents(); });
+    document.getElementById('evTimeOn').checked=true; evChanged(); };
+  document.getElementById('evToday').onclick=()=>{ dsel.value=todayStr(); evChanged(); };
+  segWire('evTimeMode','t',v=>{ evTimeMode=v; if(v==='now') tsel.value=m2hm(nowMin()); evChanged(); });
   document.getElementById('evImport').onclick=async()=>{
     const txt=document.getElementById('evBox').value.trim(); if(!txt) return;
     let obj; try{ obj=JSON.parse(txt); }catch(e){ alert('JSONが読めない: '+e.message); return; }
@@ -1144,7 +1239,7 @@ function evWire(){
     saveEvents(); document.getElementById('evBox').value='';
     document.getElementById('evOn').checked=true;
     if(arr.length && arr[0]){ const d=(EVENTS[EVENTS.length-1]||{}).date; if(d) document.getElementById('evDate').value=d; }
-    renderEvents();
+    evChanged();
     alert(n+'件 取り込んだ。座標を取得します。');
     await geocodeEvents(false);
   };
@@ -1152,7 +1247,7 @@ function evWire(){
   document.getElementById('evClearDay').onclick=()=>{
     const d=document.getElementById('evDate').value||todayStr();
     if(!confirm(d+' のイベントを全部消す?')) return;
-    EVENTS=EVENTS.filter(e=>e.date!==d); saveEvents(); renderEvents();
+    EVENTS=EVENTS.filter(e=>e.date!==d); saveEvents(); evChanged();
   };
   document.getElementById('evFmt').onclick=()=>{
     const b=document.getElementById('evFmtBox');
@@ -1181,7 +1276,7 @@ function evWire(){
     if(!document.getElementById('evOn').checked) return;
     if(evTimeMode!=='now') return;
     document.getElementById('evTime').value=m2hm(nowMin());
-    renderEvents();
+    evChanged();
   }, 30000);
 }
 
@@ -1252,7 +1347,14 @@ segWire('pGroup','g',v=>{pGroup=v; renderPeriod();});
 segWire('pMetric','m',v=>{pMetric=v; renderPeriod();});
 segWire('pAgg','a',v=>{pAgg=v; renderPeriod();});
 segWire('pView','v',v=>{pView=v; renderPeriod();});
-segWire('mapMode','m',v=>{mapMode=v; renderMap();});
+segWire('mapMode','m',v=>{ mapMode=v;
+  if(v==='day'){
+    const ds=document.getElementById('evDate');
+    if(!DB.some(x=>x.date===(ds.value||todayStr())) && DB.length){
+      ds.value=[...DB].map(x=>x.date).sort().pop();      // 営収データのある最新の日に寄せる
+    }
+  }
+  renderMap(); });
 document.getElementById('odClear').onclick=()=>{ Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={}; };
 // 時間帯セレクトを一勤務の並び(13時→翌12時)で用意
 (function(){
