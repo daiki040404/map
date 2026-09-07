@@ -65,7 +65,7 @@ main{padding:16px; max-width:1100px; margin:0 auto}
 .seg{display:inline-flex; background:var(--surface2); border-radius:8px; padding:2px; gap:2px}
 .seg button{background:transparent; border:none; color:var(--ink2); font-size:13px; padding:5px 11px; border-radius:6px}
 .seg button.active{background:var(--accent); color:#fff; font-weight:600}
-select,input[type=text],input[type=date],input[type=number],textarea{
+select,input[type=text],input[type=date],input[type=time],input[type=number],textarea{
   font-family:inherit; font-size:14px; background:var(--surface2); color:var(--ink);
   border:1px solid var(--border); border-radius:8px; padding:6px 8px;
 }
@@ -101,6 +101,17 @@ tr:hover td{background:var(--surface2)}
 .field label{font-size:12px; color:var(--muted)}
 code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size:12px}
 .gc-status{font-size:12px; color:var(--muted); margin-left:8px}
+/* ---- 今日のイベント ---- */
+.ev-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:7px 4px; border-bottom:1px solid var(--grid); font-size:13px}
+.ev-row .nm{font-weight:600; min-width:130px}
+.ev-badge{font-size:11px; padding:1px 8px; border-radius:20px; border:1px solid var(--border); color:var(--ink2); white-space:nowrap}
+.ev-badge.on{color:#fff; border-color:transparent; font-weight:600}
+.ev-badge.prep{background:var(--s4)} .ev-badge.in{background:var(--s3)} .ev-badge.out{background:var(--s2)}
+.leaflet-tooltip.ev-tip{background:var(--surface); color:var(--ink); border:1px solid var(--border);
+  border-radius:6px; padding:1px 7px; font-size:11px; font-weight:600; box-shadow:none}
+.leaflet-tooltip.ev-tip::before{display:none}
+.ev-win{font-size:12px; color:var(--ink2)}
+.ev-win b{color:var(--ink)}
 @media(max-width:600px){ .chart-wrap{height:260px} #map{height:420px} main{padding:12px} }
 </style>
 </head>
@@ -299,14 +310,60 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <button class="icon-btn" id="locBtn">📍 現在地</button>
         <span class="gc-status" id="gcStatus"></span>
       </div>
+      <!-- 今日のイベント（営収とは別レイヤ） -->
+      <div class="filters" id="evFilters">
+        <div class="grp">
+          <label class="small"><input type="checkbox" id="evOn"> 🎪 今日のイベント</label>
+          <input type="date" id="evDate" style="padding:4px 6px">
+          <button class="icon-btn" id="evToday" style="padding:3px 8px">今日</button>
+        </div>
+        <div class="grp">
+          <label class="small"><input type="checkbox" id="evTimeOn"> ⏰ 時刻で絞る</label>
+          <div class="seg" id="evTimeMode">
+            <button data-t="now" class="active">現在時刻</button>
+            <button data-t="fix">時間指定</button>
+          </div>
+          <input type="time" id="evTime" style="padding:4px 6px">
+        </div>
+        <span class="muted small" id="evNowLab"></span>
+      </div>
       <div id="map"></div>
       <div class="row" style="margin-top:10px; align-items:flex-start">
         <div class="map-legend" id="mapLegend"></div>
         <div class="note" style="flex:1; min-width:200px" id="mapHint">
-          「乗車地×客単価」で丸をタップすると件数と客単価が出る。「OD」でエリアをタップすると、そこで乗せた客の降車先が表示される。⚠マーカーは外れ値（タップでメモ）。
+          「乗車地×客単価」で丸をタップすると件数と客単価が出る。「OD」でエリアをタップすると、そこで乗せた客の降車先が表示される。⚠マーカーは外れ値（タップでメモ）。<br>
+          🎪イベントは営収とは別レイヤ。ピンの色＝いま該当している時間帯（<span style="color:var(--s4)">■</span>準備・設営 / <span style="color:var(--s3)">■</span>来場 / <span style="color:var(--s2)">■</span>終演・退場 / <span style="color:var(--s7)">■</span>時間外）。
         </div>
       </div>
       <div id="mapMemoList" style="margin-top:10px"></div>
+    </div>
+
+    <!-- イベント登録 -->
+    <div class="card">
+      <h2>🎪 今日のイベント <span class="sub" id="evCount"></span></h2>
+      <details id="evPaste">
+        <summary class="small muted" style="cursor:pointer">JSONを貼り付けて取り込む / 表示時間の設定</summary>
+        <p class="small muted" style="margin:8px 0 4px">イベント情報＋場所（住所か座標）をJSONで貼って「取り込む」。座標は住所から自動取得。</p>
+        <textarea id="evBox" placeholder='{"date":"2026-09-07","events":[{"name":"…","venue":"東京ドーム","address":"東京都文京区後楽1-3-61","open":"16:00","start":"18:00","end":"20:30"}]}'></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="icon-btn" id="evImport">取り込む</button>
+          <button class="icon-btn" id="evFmt">入力フォーマットを表示</button>
+          <button class="icon-btn" id="evRegc">座標を再取得</button>
+          <button class="icon-btn" id="evClearDay">この日を全消し</button>
+        </div>
+        <div id="evFmtBox" style="display:none; margin-top:10px"></div>
+        <div class="row" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--border)">
+          <div class="field"><label>準備・設営（開場の何分前〜何分前）</label>
+            <div class="row"><input type="number" id="opPrepA" style="width:80px"><span class="muted small">〜</span><input type="number" id="opPrepB" style="width:80px"></div></div>
+          <div class="field"><label>来場（開場の何分前〜開始の何分後）</label>
+            <div class="row"><input type="number" id="opInA" style="width:80px"><span class="muted small">〜</span><input type="number" id="opInB" style="width:80px"></div></div>
+          <div class="field"><label>終演・退場（終了の何分前〜何分後）</label>
+            <div class="row"><input type="number" id="opOutA" style="width:80px"><span class="muted small">〜</span><input type="number" id="opOutB" style="width:80px"></div></div>
+          <button class="icon-btn" id="opReset">初期値に戻す</button>
+        </div>
+        <p class="note">イベントごとに <code class="k">windows</code> を書けば、この設定より優先される。</p>
+      </details>
+      <div id="evList" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -395,18 +452,24 @@ const SEED = [{
 }];
 
 /* ---------- 保存 ---------- */
-const LS_KEY='taxi_eigyo_v2', LS_SEASON='taxi_seasons_v2', LS_GEO='taxi_geocache_v2';
+const LS_KEY='taxi_eigyo_v2', LS_SEASON='taxi_seasons_v2', LS_GEO='taxi_geocache_v2',
+      LS_EVENT='taxi_events_v1', LS_EVOPT='taxi_evopt_v1';
 let _fs=null, _uid=null, _pushT=null;   // クラウド同期の状態(先に宣言してTDZ回避)
 let DB = load(LS_KEY, null);
 if(!DB){ DB = SEED; save(); }
 let SEASONS = load(LS_SEASON, [{name:"お盆シーズン", start:"2026-08-08", end:"2026-08-17", excludes:[]}]);
 SEASONS.forEach(s=>{ if(!s.excludes) s.excludes=[]; });   // 旧データに除外欄を補完
 let GEO = load(LS_GEO, {});
+const EVOPT_DEF={prepA:300, prepB:120, inA:90, inB:30, outA:15, outB:90};
+let EVENTS = load(LS_EVENT, []);
+let EVOPT = Object.assign({}, EVOPT_DEF, load(LS_EVOPT, {}));
 
 function load(k,def){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DB)); pushCloud(); }
 function saveSeasons(){ localStorage.setItem(LS_SEASON, JSON.stringify(SEASONS)); }
 function saveGeo(){ localStorage.setItem(LS_GEO, JSON.stringify(GEO)); }
+function saveEvents(){ localStorage.setItem(LS_EVENT, JSON.stringify(EVENTS)); pushCloud(); }
+function saveEvOpt(){ localStorage.setItem(LS_EVOPT, JSON.stringify(EVOPT)); pushCloud(); }
 
 /* ---------- ユーティリティ ---------- */
 const WD=['日','月','火','水','木','金','土'];
@@ -849,6 +912,7 @@ function renderMap(){
       .bindPopup(`<b>⚠ ${r.on} ${r.type||''}</b><br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
   });
   renderMemoList('mapMemoList');
+  renderEvents();          // イベントは営収とは別レイヤで重ねる
 }
 function showOD(a){
   if(!map) return;
@@ -868,6 +932,257 @@ function mixSeq(t){ // 0..1 → 薄青→濃青
   const lo=[24,79,149], hi=[205,226,251]; // seqlo, seqhi
   const c=hi.map((h,i)=> Math.round(h+(lo[i]-h)*t));
   return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+/* ============================================================
+   今日のイベント（営収データとは別レイヤ）
+   ・JSONで貼り付け → 住所から座標を自動取得 → 地図にピン
+   ・「時刻で絞る」ON で、現在時刻/指定時刻に該当するイベントだけ表示
+     （準備・設営 / 来場 / 終演・退場 のうち、その時刻に当たるもの）
+   ============================================================ */
+let evLayer=null, evTimeMode='now', evTimer=null;
+
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function nowMin(){ const d=new Date(); return d.getHours()*60+d.getMinutes(); }
+function dayDiff(a,b){ return Math.round((new Date(a+'T00:00:00') - new Date(b+'T00:00:00'))/86400000); }
+function m2hm(m){ m=((Math.round(m)%1440)+1440)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+
+/* --- 取り込み時の正規化(英語キー・日本語キーどちらでもOK) --- */
+function normEvent(o, fallbackDate){
+  if(!o || typeof o!=='object') return null;
+  const g=(...ks)=>{ for(const k of ks){ if(o[k]!=null && o[k]!=='') return o[k]; } return undefined; };
+  const hm=v=>{ if(v==null||v==='') return undefined; let s=String(v).trim().replace(/[：]/g,':').replace(/時/,':').replace(/分/,'');
+    if(/^\d{1,2}$/.test(s)) s=s+':00';
+    const m=s.match(/(\d{1,2}):(\d{1,2})/); return m? (+m[1])+':'+String(+m[2]).padStart(2,'0') : undefined; };
+  const ev={
+    date:   String(g('date','日付','day') || fallbackDate || todayStr()).slice(0,10),
+    name:   String(g('name','title','名前','イベント','イベント名','公演名') || '(名称なし)'),
+    venue:  g('venue','place','会場','場所') || '',
+    address:g('address','addr','住所','所在地') || '',
+    open:   hm(g('open','doors','開場')),
+    start:  hm(g('start','begin','開始','開演','開始時間')),
+    end:    hm(g('end','finish','終了','終演','終了時間')),
+    note:   g('note','memo','備考','メモ','説明') || '',
+    cap:    +(g('capacity','cap','来場者','人数','動員')||0) || 0
+  };
+  const lat=g('lat','latitude','緯度'), lng=g('lng','lon','longitude','経度');
+  if(lat!=null && lng!=null){ ev.lat=+lat; ev.lng=+lng; }
+  const ws=g('windows','時間帯','需要');
+  if(Array.isArray(ws)){
+    ev.windows=ws.map(w=>({
+      label: w.label||w.name||w.名前||w.区分||'時間帯',
+      from : hm(w.from||w.start||w.開始),
+      to   : hm(w.to||w.end||w.終了),
+      kind : w.kind||''
+    })).filter(w=>w.from&&w.to);
+    if(!ev.windows.length) delete ev.windows;
+  }
+  if(!ev.address && !ev.venue && ev.lat==null) return null;
+  ev.id = ev.date+'|'+ev.name+'|'+(ev.venue||ev.address);
+  return ev;
+}
+
+/* --- 需要の時間帯（イベント日の0:00からの分。翌日にまたぐと1440超になる） --- */
+function evWindows(ev){
+  const T=v=>{ const m=toMin(v); return (m==null||isNaN(m))? null : m; };
+  const st=T(ev.start); let en=T(ev.end); const op=T(ev.open);
+  if(en!=null && st!=null && en<st) en+=1440;               // 終了が開始より前＝日跨ぎ
+  if(ev.windows && ev.windows.length){
+    return ev.windows.map(w=>{ let a=T(w.from), b=T(w.to); if(a==null||b==null) return null;
+      if(b<a) b+=1440; return {label:w.label, from:a, to:b, kind:w.kind||'in'}; }).filter(Boolean);
+  }
+  const out=[]; const base = (op!=null? op : st);
+  if(base!=null){
+    out.push({label:'準備・設営', kind:'prep', from:base-EVOPT.prepA, to:base-EVOPT.prepB});
+    out.push({label:'来場',       kind:'in',   from:base-EVOPT.inA,   to:(st!=null?st:base)+EVOPT.inB});
+  }
+  if(en!=null) out.push({label:'終演・退場', kind:'out', from:en-EVOPT.outA, to:en+EVOPT.outB});
+  return out.filter(w=>w.to>w.from);
+}
+
+/* --- 基準になる「いまの時刻」 --- */
+function evMoment(){
+  if(evTimeMode==='now' || !document.getElementById('evTime').value)
+    return {date: todayStr(), min: nowMin(), live:true};
+  const d=document.getElementById('evDate').value || todayStr();
+  return {date:d, min: toMin(document.getElementById('evTime').value)||0, live:false};
+}
+/* イベント日の0:00を基準にした、いまの時刻(分) */
+function evNowRel(ev){ const mo=evMoment(); return dayDiff(mo.date, ev.date)*1440 + mo.min; }
+function evActive(ev){ const t=evNowRel(ev); return evWindows(ev).filter(w=> t>=w.from && t<=w.to); }
+
+/* --- 表示対象のイベント --- */
+function shownEvents(){
+  const timeOn=document.getElementById('evTimeOn').checked;
+  const d=document.getElementById('evDate').value || todayStr();
+  let list=EVENTS.filter(e=>!e.hide);
+  if(timeOn){
+    // 日付は前後1日まで見て、いまの時刻に該当するものだけ（深夜の退場needsも拾える）
+    return list.filter(e=> Math.abs(dayDiff(e.date, evMoment().date))<=1 && evActive(e).length);
+  }
+  return list.filter(e=> e.date===d);
+}
+const EV_COLOR={prep:'--s4', in:'--s3', out:'--s2'};
+function evColor(ev){ const a=evActive(ev); return cv(a.length? (EV_COLOR[a[0].kind]||'--s5') : '--s7'); }
+
+/* --- 地図に描く --- */
+function renderEvents(){
+  updateEvLabel();
+  renderEvList();
+  initMap(); if(!map) return;
+  if(evLayer){ map.removeLayer(evLayer); evLayer=null; }
+  if(!document.getElementById('evOn').checked) return;
+  evLayer=L.layerGroup().addTo(map);
+  shownEvents().forEach(ev=>{
+    if(ev.lat==null||ev.lng==null) return;
+    const act=evActive(ev), col=evColor(ev);
+    const r = 9 + Math.min(ev.cap||0, 50000)/50000*7;
+    const wins=evWindows(ev).map(w=>{
+      const hit=act.some(a=>a.label===w.label);
+      return `${hit?'<b>▶ ':''}${esc(w.label)} ${m2hm(w.from)}〜${m2hm(w.to)}${hit?'</b>':''}`;
+    }).join('<br>');
+    L.circleMarker([ev.lat,ev.lng],{radius:r, color:col, fillColor:col, fillOpacity:.55, weight:3})
+      .bindTooltip(ev.name, {permanent:true, direction:'top', className:'ev-tip', offset:[0,-6]})
+      .bindPopup(`<b>🎪 ${esc(ev.name)}</b><br>${esc(ev.venue||ev.address)}`+
+        `<br>${ev.open?'開場 '+ev.open+' / ':''}${ev.start?'開始 '+ev.start:''}${ev.end?' / 終了 '+ev.end:''}`+
+        (ev.cap?`<br>動員 ${ev.cap.toLocaleString('ja-JP')}人`:'')+
+        `<hr style="border:none;border-top:1px solid #8884;margin:5px 0">${wins}`+
+        (ev.note?`<br><i>${esc(ev.note)}</i>`:''))
+      .addTo(evLayer);
+  });
+}
+function updateEvLabel(){
+  const lab=document.getElementById('evNowLab'); if(!lab) return;
+  const timeOn=document.getElementById('evTimeOn').checked;
+  const mo=evMoment();
+  const n=shownEvents().length;
+  lab.textContent = document.getElementById('evOn').checked
+    ? (timeOn? `${mo.date} ${m2hm(mo.min)} 時点で該当 ${n}件` : `${document.getElementById('evDate').value||todayStr()} のイベント ${n}件`)
+    : '';
+}
+/* --- 一覧 --- */
+function renderEvList(){
+  const box=document.getElementById('evList'); if(!box) return;
+  const d=document.getElementById('evDate').value || todayStr();
+  const timeOn=document.getElementById('evTimeOn').checked;
+  const list=EVENTS.filter(e=> timeOn? Math.abs(dayDiff(e.date,evMoment().date))<=1 : e.date===d)
+                   .sort((a,b)=> (a.date+(a.start||'')) < (b.date+(b.start||''))? -1:1);
+  document.getElementById('evCount').textContent = `登録 ${EVENTS.length}件`;
+  if(!list.length){ box.innerHTML='<p class="muted small" style="margin:6px 0">この日のイベントはまだ無い。上のJSON貼り付けから追加。</p>'; return; }
+  box.innerHTML=list.map((ev,i)=>{
+    const act=evActive(ev);
+    const badge = act.length
+      ? act.map(a=>`<span class="ev-badge on ${a.kind}">${esc(a.label)} 中</span>`).join(' ')
+      : '<span class="ev-badge">時間外</span>';
+    const wins=evWindows(ev).map(w=>`${esc(w.label)} ${m2hm(w.from)}〜${m2hm(w.to)}`).join(' ／ ');
+    return `<div class="ev-row">
+      <label class="small"><input type="checkbox" class="evshow" data-id="${esc(ev.id)}" ${ev.hide?'':'checked'}></label>
+      <span class="nm">${esc(ev.name)}</span>
+      <span class="small muted">${ev.date.slice(5)} ${esc(ev.venue||ev.address)}${ev.lat==null?' <span class="pill">座標なし</span>':''}</span>
+      ${badge}
+      <span class="ev-win" style="flex:1; min-width:200px">${wins||'<span class="muted">時間の指定なし</span>'}</span>
+      <button class="del evdel" data-id="${esc(ev.id)}">削除</button>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.evshow').forEach(c=>c.onchange=()=>{
+    const ev=EVENTS.find(x=>x.id===c.dataset.id); if(!ev) return;
+    ev.hide=!c.checked; saveEvents(); renderEvents();
+  });
+  box.querySelectorAll('.evdel').forEach(b=>b.onclick=()=>{
+    EVENTS=EVENTS.filter(x=>x.id!==b.dataset.id); saveEvents(); renderEvents();
+  });
+}
+/* --- 座標取得 --- */
+async function geocodeEvents(force){
+  const st=document.getElementById('gcStatus');
+  const need=EVENTS.filter(e=> force || e.lat==null);
+  if(!need.length) return;
+  let done=0;
+  for(const ev of need){
+    const addr=ev.address||ev.venue; if(!addr) continue;
+    let c=GEO[addr];
+    if(!c || force){ c=await gsi(addr); if(c){ GEO[addr]=c; saveGeo(); } await sleep(110); }
+    if(c){ ev.lat=c[1]; ev.lng=c[0]; }
+    done++; if(st) st.textContent=`イベントの座標取得中… ${done}/${need.length}`;
+  }
+  saveEvents(); if(st) st.textContent='';
+  if(curTab==='map') renderEvents();
+}
+/* --- 配線 --- */
+function evWire(){
+  const dsel=document.getElementById('evDate'), tsel=document.getElementById('evTime');
+  dsel.value=todayStr(); tsel.value=m2hm(nowMin());
+  ['opPrepA','opPrepB','opInA','opInB','opOutA','opOutB'].forEach(id=>{
+    const key=id.replace('op','').replace(/^(.)/,c=>c.toLowerCase());
+    document.getElementById(id).value=EVOPT[key];
+    document.getElementById(id).onchange=e=>{ EVOPT[key]=+e.target.value||0; saveEvOpt(); renderEvents(); };
+  });
+  document.getElementById('opReset').onclick=()=>{ EVOPT=Object.assign({},EVOPT_DEF); saveEvOpt();
+    ['opPrepA','opPrepB','opInA','opInB','opOutA','opOutB'].forEach(id=>{
+      const key=id.replace('op','').replace(/^(.)/,c=>c.toLowerCase());
+      document.getElementById(id).value=EVOPT[key]; });
+    renderEvents(); };
+  document.getElementById('evOn').onchange=renderEvents;
+  document.getElementById('evTimeOn').onchange=renderEvents;
+  dsel.onchange=renderEvents;
+  tsel.onchange=()=>{ evTimeMode='fix';
+    document.querySelectorAll('#evTimeMode button').forEach(b=>b.classList.toggle('active', b.dataset.t==='fix'));
+    document.getElementById('evTimeOn').checked=true; renderEvents(); };
+  document.getElementById('evToday').onclick=()=>{ dsel.value=todayStr(); renderEvents(); };
+  segWire('evTimeMode','t',v=>{ evTimeMode=v; if(v==='now') tsel.value=m2hm(nowMin()); renderEvents(); });
+  document.getElementById('evImport').onclick=async()=>{
+    const txt=document.getElementById('evBox').value.trim(); if(!txt) return;
+    let obj; try{ obj=JSON.parse(txt); }catch(e){ alert('JSONが読めない: '+e.message); return; }
+    let arr=[], fb=document.getElementById('evDate').value||todayStr();
+    if(Array.isArray(obj)) arr=obj;
+    else if(Array.isArray(obj.events)){ arr=obj.events; fb=obj.date||fb; }
+    else if(Array.isArray(obj.イベント)){ arr=obj.イベント; fb=obj.date||obj.日付||fb; }
+    else arr=[obj];
+    let n=0;
+    arr.forEach(o=>{ const ev=normEvent(o, fb); if(!ev) return;
+      EVENTS=EVENTS.filter(x=>x.id!==ev.id); EVENTS.push(ev); n++; });
+    saveEvents(); document.getElementById('evBox').value='';
+    document.getElementById('evOn').checked=true;
+    if(arr.length && arr[0]){ const d=(EVENTS[EVENTS.length-1]||{}).date; if(d) document.getElementById('evDate').value=d; }
+    renderEvents();
+    alert(n+'件 取り込んだ。座標を取得します。');
+    await geocodeEvents(false);
+  };
+  document.getElementById('evRegc').onclick=()=>geocodeEvents(true);
+  document.getElementById('evClearDay').onclick=()=>{
+    const d=document.getElementById('evDate').value||todayStr();
+    if(!confirm(d+' のイベントを全部消す?')) return;
+    EVENTS=EVENTS.filter(e=>e.date!==d); saveEvents(); renderEvents();
+  };
+  document.getElementById('evFmt').onclick=()=>{
+    const b=document.getElementById('evFmtBox');
+    b.style.display = b.style.display==='none'?'':'none';
+    b.innerHTML=`<textarea readonly style="min-height:260px">${esc(JSON.stringify({
+      date:"2026-09-07",
+      events:[
+        {name:"◯◯ LIVE TOUR", venue:"東京ドーム", address:"東京都文京区後楽1丁目3-61",
+         open:"16:00", start:"18:00", end:"20:30", capacity:45000, note:"アリーナ公演"},
+        {name:"◯◯展", venue:"東京ビッグサイト", address:"東京都江東区有明3丁目11-1",
+         start:"10:00", end:"17:00",
+         windows:[{label:"搬入・設営", from:"05:00", to:"08:00"},
+                  {label:"来場", from:"09:00", to:"11:00"},
+                  {label:"帰り", from:"16:30", to:"18:30"}]},
+        {name:"ナイター", venue:"明治神宮野球場", lat:35.6759, lng:139.7170, start:"18:00", end:"21:00"}
+      ]
+    },null,2))}</textarea>
+    <p class="small muted"><code class="k">address</code>があれば座標は自動取得（<code class="k">lat</code>/<code class="k">lng</code>直接指定も可）。<br>
+    <code class="k">open</code>開場 / <code class="k">start</code>開始 / <code class="k">end</code>終了 を入れると、準備・来場・退場の時間帯を自動で作る。<br>
+    <code class="k">windows</code> を書けばその時間帯をそのまま使う。日本語キー（名前・会場・住所・開場・開始・終了）でもOK。</p>`;
+  };
+  // 「現在時刻」で見ているときは毎分更新
+  if(evTimer) clearInterval(evTimer);
+  evTimer=setInterval(()=>{
+    if(curTab!=='map') return;
+    if(!document.getElementById('evOn').checked) return;
+    if(evTimeMode!=='now') return;
+    document.getElementById('evTime').value=m2hm(nowMin());
+    renderEvents();
+  }, 30000);
 }
 
 /* ---------- ジオコーディング(住所→座標, 地理院) ---------- */
@@ -1132,22 +1447,26 @@ async function cloudLoad(uid){ _uid=uid;
     const d=doc.exists? doc.data():null;
     if(d && d.days){ DB=d.days; localStorage.setItem(LS_KEY,JSON.stringify(DB));
       if(d.seasons){ SEASONS=d.seasons; saveSeasons(); }
-      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); geocodeAll(false);
+      if(d.events){ EVENTS=d.events; localStorage.setItem(LS_EVENT,JSON.stringify(EVENTS)); }
+      if(d.evopt){ EVOPT=Object.assign({},EVOPT_DEF,d.evopt); localStorage.setItem(LS_EVOPT,JSON.stringify(EVOPT)); }
+      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); geocodeAll(false); geocodeEvents(false);
     } else {
       pushCloud();   // クラウドにまだ新スキーマが無ければ、この端末のデータを初期反映
     }
   }catch(e){ console.warn(e); }
 }
 function pushCloud(){ if(!_fs||!_uid) return; clearTimeout(_pushT);
-  _pushT=setTimeout(()=>{ _fs.collection(CLOUD_COLLECTION).doc(_uid).set({days:DB, seasons:SEASONS, updated:Date.now()},{merge:true}).catch(()=>{}); },700);
+  _pushT=setTimeout(()=>{ _fs.collection(CLOUD_COLLECTION).doc(_uid).set({days:DB, seasons:SEASONS, events:EVENTS, evopt:EVOPT, updated:Date.now()},{merge:true}).catch(()=>{}); },700);
 }
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 
 /* ---------- 起動 ---------- */
 refreshSeasonSelectors();
 refreshDateSelector();
+evWire();
 renderCurrent();
 geocodeAll(false);
+geocodeEvents(false);
 initCloud();
 </script>
 </body>
