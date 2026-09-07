@@ -353,6 +353,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <textarea id="evBox" placeholder='{"date":"2026-09-07","events":[{"name":"…","venue":"東京ドーム","address":"東京都文京区後楽1-3-61","open":"16:00","start":"18:00","end":"20:30"}]}'></textarea>
         <div class="row" style="margin-top:8px">
           <button class="icon-btn" id="evImport">取り込む</button>
+          <button class="icon-btn" id="evCopy">イベントをJSONでコピー(控え)</button>
           <button class="icon-btn" id="evFmt">入力フォーマットを表示</button>
           <button class="icon-btn" id="evRegc">座標を再取得</button>
           <button class="icon-btn" id="evClearDay">この日を全消し</button>
@@ -460,7 +461,7 @@ const SEED = [{
 /* ---------- 保存 ---------- */
 const LS_KEY='taxi_eigyo_v2', LS_SEASON='taxi_seasons_v2', LS_GEO='taxi_geocache_v2',
       LS_EVENT='taxi_events_v1', LS_EVOPT='taxi_evopt_v1';
-let _fs=null, _uid=null, _pushT=null;   // クラウド同期の状態(先に宣言してTDZ回避)
+let _fs=null, _uid=null, _pushT=null, _cloudRead=false, _lastPush=0;   // クラウド同期の状態(先に宣言してTDZ回避)
 let DB = load(LS_KEY, null);
 if(!DB){ DB = SEED; save(); }
 let SEASONS = load(LS_SEASON, [{name:"お盆シーズン", start:"2026-08-08", end:"2026-08-17", excludes:[]}]);
@@ -1071,6 +1072,8 @@ function normEvent(o, fallbackDate){
   }
   if(!ev.address && !ev.venue && ev.lat==null) return null;
   ev.id = ev.date+'|'+ev.name+'|'+(ev.venue||ev.address);
+  // undefinedの項目は消す（Firestoreはundefinedを受け付けず、同期が丸ごと失敗するため）
+  Object.keys(ev).forEach(k=>{ if(ev[k]===undefined) delete ev[k]; });
   return ev;
 }
 
@@ -1160,7 +1163,16 @@ function renderEvList(){
   const list=EVENTS.filter(e=> timeOn? Math.abs(dayDiff(e.date,evMoment().date))<=1 : e.date===d)
                    .sort((a,b)=> (a.date+(a.start||'')) < (b.date+(b.start||''))? -1:1);
   document.getElementById('evCount').textContent = `登録 ${EVENTS.length}件`;
-  if(!list.length){ box.innerHTML='<p class="muted small" style="margin:6px 0">この日のイベントはまだ無い。上のJSON貼り付けから追加。</p>'; return; }
+  if(!list.length){
+    // 「消えた」と勘違いしないように、他の日に入っているぶんを出す
+    const others=[...new Set(EVENTS.map(e=>e.date))].sort().reverse();
+    box.innerHTML='<p class="muted small" style="margin:6px 0">この日のイベントは無い。'+
+      (others.length? '登録済み: '+others.slice(0,10).map(dt=>
+        `<button class="icon-btn evjump" data-d="${dt}" style="padding:2px 8px;margin:2px">${dt} (${EVENTS.filter(e=>e.date===dt).length})</button>`).join('')
+        : '上のJSON貼り付けから追加。')+'</p>';
+    box.querySelectorAll('.evjump').forEach(b=>b.onclick=()=>{ document.getElementById('evDate').value=b.dataset.d; evChanged(); });
+    return;
+  }
   box.innerHTML=list.map((ev,i)=>{
     const act=evActive(ev);
     const badge = act.length
@@ -1242,6 +1254,13 @@ function evWire(){
     evChanged();
     alert(n+'件 取り込んだ。座標を取得します。');
     await geocodeEvents(false);
+  };
+  document.getElementById('evCopy').onclick=()=>{
+    const d=document.getElementById('evDate').value||todayStr();
+    const mine=EVENTS.filter(e=>e.date===d);
+    const out=JSON.stringify({date:d, events:(mine.length?mine:EVENTS)},null,2);
+    navigator.clipboard.writeText(out).then(()=>alert((mine.length?d+' の':'全部の')+'イベントJSONをコピーした'),
+      ()=>{ document.getElementById('evBox').value=out; alert('コピーできなかったので貼り付け欄に出した'); });
   };
   document.getElementById('evRegc').onclick=()=>geocodeEvents(true);
   document.getElementById('evClearDay').onclick=()=>{
@@ -1547,18 +1566,53 @@ async function initCloud(){
 async function cloudLoad(uid){ _uid=uid;
   try{ const doc=await _fs.collection(CLOUD_COLLECTION).doc(uid).get();
     const d=doc.exists? doc.data():null;
-    if(d && d.days){ DB=d.days; localStorage.setItem(LS_KEY,JSON.stringify(DB));
-      if(d.seasons){ SEASONS=d.seasons; saveSeasons(); }
-      if(d.events){ EVENTS=d.events; localStorage.setItem(LS_EVENT,JSON.stringify(EVENTS)); }
+    // 中身が空のクラウドでこの端末のデータを消さない。日・イベントは両方を残す形で合流させる
+    if(d && Array.isArray(d.days) && d.days.length){
+      DB=mergeByKey(d.days, Array.isArray(DB)?DB:[], x=>x.date).sort((a,b)=>a.date<b.date?-1:1);
+      localStorage.setItem(LS_KEY,JSON.stringify(DB));
+      if(Array.isArray(d.seasons) && d.seasons.length){ SEASONS=d.seasons; SEASONS.forEach(s=>{ if(!s.excludes) s.excludes=[]; }); localStorage.setItem(LS_SEASON,JSON.stringify(SEASONS)); }
+      if(Array.isArray(d.events)){
+        EVENTS=mergeByKey(d.events, Array.isArray(EVENTS)?EVENTS:[], x=>x.id);
+        localStorage.setItem(LS_EVENT,JSON.stringify(EVENTS));
+      }
       if(d.evopt){ EVOPT=Object.assign({},EVOPT_DEF,d.evopt); localStorage.setItem(LS_EVOPT,JSON.stringify(EVOPT)); }
-      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); geocodeAll(false); geocodeEvents(false);
+      _cloudRead=true;
+      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector();
+      pushCloud();                       // 合流した結果をクラウドにも戻す
+      geocodeAll(false); geocodeEvents(false);
     } else {
-      pushCloud();   // クラウドにまだ新スキーマが無ければ、この端末のデータを初期反映
+      _cloudRead=true;
+      pushCloud();   // クラウドがまだ空なら、この端末のデータを初期反映
     }
-  }catch(e){ console.warn(e); }
+  }catch(e){ console.warn('cloudLoad', e); syncBadge('⚠ 読み込み失敗'); }
+  finally{ _cloudRead=true; }
 }
-function pushCloud(){ if(!_fs||!_uid) return; clearTimeout(_pushT);
-  _pushT=setTimeout(()=>{ _fs.collection(CLOUD_COLLECTION).doc(_uid).set({days:DB, seasons:SEASONS, events:EVENTS, evopt:EVOPT, updated:Date.now()},{merge:true}).catch(()=>{}); },700);
+/* 主(クラウド)を優先しつつ、片方にしか無いものは捨てない */
+function mergeByKey(primary, extra, keyOf){
+  const out=[], seen=new Set();
+  (primary||[]).forEach(x=>{ if(!x) return; const k=keyOf(x); if(k==null||seen.has(k)) return; seen.add(k); out.push(x); });
+  (extra||[]).forEach(x=>{ if(!x) return; const k=keyOf(x); if(k==null||seen.has(k)) return; seen.add(k); out.push(x); });
+  return out;
+}
+function syncBadge(t){ const b=document.getElementById('syncBadge'); if(b) b.textContent=t; }
+function pushCloud(){
+  if(!_fs || !_uid || !_cloudRead) return;      // クラウドを読み終わる前に上書きしない
+  clearTimeout(_pushT);
+  const go=()=>{
+    _lastPush=Date.now();
+    let payload;
+    // JSONを通すことで undefined を落とす（Firestoreはundefinedを受け付けない）
+    try{ payload=JSON.parse(JSON.stringify({days:DB, seasons:SEASONS, events:EVENTS, evopt:EVOPT, updated:Date.now()})); }
+    catch(e){ console.warn('sync payload', e); syncBadge('⚠ 同期できず'); return; }
+    if(!Array.isArray(payload.days)){ syncBadge('⚠ 同期できず'); return; }
+    try{
+      _fs.collection(CLOUD_COLLECTION).doc(_uid).set(payload,{merge:true})
+        .then(()=>syncBadge('☁ 同期ON'))
+        .catch(e=>{ console.warn('sync', e); syncBadge('⚠ 同期エラー'); });
+    }catch(e){ console.warn('sync', e); syncBadge('⚠ 同期エラー'); }
+  };
+  // 座標取得中などで保存が連続しても、5秒に1回は必ず書き込む(待たされ続けて未同期のままになるのを防ぐ)
+  if(Date.now()-_lastPush > 5000) go(); else _pushT=setTimeout(go,700);
 }
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); }); }
 
