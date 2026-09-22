@@ -308,8 +308,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <div class="filters">
         <div class="seg" id="mapMode">
           <button data-m="heat" class="active">乗車ヒート</button>
-          <button data-m="tanka">乗車地×客単価</button>
-          <button data-m="od">OD(降車先)</button>
+          <button data-m="tanka">乗車地×客単価＋降車先</button>
           <button data-m="allod">全乗降</button>
           <button data-m="day">📅 日別×イベント</button>
         </div>
@@ -345,7 +344,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <div class="row" style="margin-top:10px; align-items:flex-start">
         <div class="map-legend" id="mapLegend"></div>
         <div class="note" style="flex:1; min-width:200px" id="mapHint">
-          「乗車地×客単価」で丸をタップすると件数と客単価が出る。「OD」でエリアをタップすると、そこで乗せた客の降車先が表示される。⚠マーカーは外れ値（タップでメモ）。<br>
+          「乗車地×客単価＋降車先」で丸をタップすると、客単価・件数のポップアップと、そこで乗せた客の降車先(橙の点・線)が一緒に出る。もう一度タップで消える。⚠マーカーは外れ値（タップでメモ）。<br>
           🎪イベントは営収とは別レイヤ。ピンの色＝いま該当している時間帯（<span style="color:var(--s4)">■</span>準備・設営 / <span style="color:var(--s3)">■</span>来場 / <span style="color:var(--s2)">■</span>終演・退場 / <span style="color:var(--s7)">■</span>時間外）。
         </div>
       </div>
@@ -905,26 +904,18 @@ function renderMap(){
     legend.innerHTML='<b>乗車ヒート</b><div class="legend-bar"></div><span class="muted small">薄い＝少ない / 濃い＝よく拾う</span>';
   }
   else if(mapMode==='tanka'){
-    // 乗車地を100m格子に集約
+    // 乗車地を100m格子に集約（客単価＋その格子で乗せた客の降車先を一緒に持つ）
     const g={};
-    rides.forEach(r=>{ const k=roundKey(r.fromLat,r.fromLng); (g[k]=g[k]||{lat:r.fromLat,lng:r.fromLng,fare:0,n:0}); g[k].fare+=(+r.fare||0); g[k].n++; });
+    rides.forEach(r=>{ const k=roundKey(r.fromLat,r.fromLng); (g[k]=g[k]||{lat:r.fromLat,lng:r.fromLng,fare:0,n:0,rides:[]}); g[k].fare+=(+r.fare||0); g[k].n++; g[k].rides.push(r); });
     const arr=Object.values(g); const max=Math.max(1,...arr.map(a=>a.fare/a.n));
     arr.forEach(a=>{ const avg=a.fare/a.n; const t=avg/max;
-      L.circleMarker([a.lat,a.lng],{radius:8+Math.min(a.n,8)*2, color:mixSeq(t), fillColor:mixSeq(t), fillOpacity:.75, weight:1})
-        .bindPopup(`<b>客単価 ${fmtYen(avg)}</b><br>件数 ${a.n}件<br>売上計 ${fmtYen(a.fare)}`).addTo(layerGroup);
-    });
-    legend.innerHTML='<b>乗車地×客単価</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)</span>';
-  }
-  else if(mapMode==='od'){
-    const g={};
-    rides.forEach(r=>{ const k=roundKey(r.fromLat,r.fromLng); (g[k]=g[k]||{lat:r.fromLat,lng:r.fromLng,n:0,rides:[]}); g[k].n++; g[k].rides.push(r); });
-    Object.values(g).forEach(a=>{
-      const mk=L.circleMarker([a.lat,a.lng],{radius:7+Math.min(a.n,8)*2,color:cv('--s1'),fillColor:cv('--s1'),fillOpacity:.7,weight:1})
-        .bindPopup(`乗車 ${a.n}件<br><span class="muted">タップで降車先を表示/非表示</span>`);
+      const nDrop=a.rides.filter(r=>r.toLat!=null).length;
+      const mk=L.circleMarker([a.lat,a.lng],{radius:8+Math.min(a.n,8)*2, color:mixSeq(t), fillColor:mixSeq(t), fillOpacity:.75, weight:1})
+        .bindPopup(`<b>客単価 ${fmtYen(avg)}</b><br>件数 ${a.n}件 / 売上計 ${fmtYen(a.fare)}<br><span class="muted">タップで降車先(橙)を表示/非表示（${nDrop}件）</span>`);
       mk.on('click',()=>showOD(a));
       mk.addTo(layerGroup);
     });
-    legend.innerHTML='<b>OD(降車先)</b><br><span class="muted small">乗車エリアをタップで降車先(橙)を表示。選択中は黄。同じ所を再タップで消える。別の所を押せば足せる。「選択クリア」で全部消す。</span>';
+    legend.innerHTML='<b>乗車地×客単価＋降車先</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)。丸をタップすると、そこで乗せた客の降車先(橙)が線でつながって出る。もう一度タップで消える。別の丸も押せば足せる。「選択クリア」で全部消す。</span>';
   }
   else if(mapMode==='day'){ renderDayMode(); }
   else { // allod: 全乗車地×降車地
