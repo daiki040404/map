@@ -317,6 +317,11 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <label class="chip">時間</label>
           <select id="mapHFrom"></select><span class="muted small">〜</span><select id="mapHTo"></select>
         </div>
+        <div class="grp">
+          <label class="chip">客カテゴリ</label>
+          <select id="mapCat"><option value="">全て</option></select>
+          <button class="icon-btn" id="mapCatAdd" style="padding:3px 8px" title="新しいカテゴリを作る">＋</button>
+        </div>
         <button class="icon-btn" id="locBtn">📍 現在地</button>
         <button class="icon-btn" id="oriBtn">🧭 N固定</button>
         <button class="icon-btn" id="fsBtn">⛶ 全画面</button>
@@ -345,6 +350,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <div class="map-legend" id="mapLegend"></div>
         <div class="note" style="flex:1; min-width:200px" id="mapHint">
           「乗車地×客単価＋降車先」で丸をタップすると、客単価・件数のポップアップと、そこで乗せた客の降車先(橙の点・線)が一緒に出る。もう一度タップで消える。⚠マーカーは外れ値（タップでメモ）。<br>
+          🏷「客カテゴリ」を選ぶと、その客だけを地図に表示（例: 台風客・電車遅延客・○○イベント終わり客）。カテゴリはデータタブの各乗車、または「＋」で新規作成。データタブの各乗車で客を分類できる。<br>
           🎪イベントは営収とは別レイヤ。ピンの色＝いま該当している時間帯（<span style="color:var(--s4)">■</span>準備・設営 / <span style="color:var(--s3)">■</span>来場 / <span style="color:var(--s2)">■</span>終演・退場 / <span style="color:var(--s7)">■</span>時間外）。
         </div>
       </div>
@@ -467,7 +473,7 @@ const SEED = [{
 
 /* ---------- 保存 ---------- */
 const LS_KEY='taxi_eigyo_v2', LS_SEASON='taxi_seasons_v2', LS_GEO='taxi_geocache_v2',
-      LS_EVENT='taxi_events_v1', LS_EVOPT='taxi_evopt_v1';
+      LS_EVENT='taxi_events_v1', LS_EVOPT='taxi_evopt_v1', LS_CAT='taxi_cats_v1';
 let _fs=null, _uid=null, _pushT=null, _cloudRead=false, _lastPush=0;   // クラウド同期の状態(先に宣言してTDZ回避)
 let DB = load(LS_KEY, null);
 if(!DB){ DB = SEED; save(); }
@@ -477,6 +483,9 @@ let GEO = load(LS_GEO, {});
 const EVOPT_DEF={prepA:300, prepB:120, inA:90, inB:30, outA:15, outB:90};
 let EVENTS = load(LS_EVENT, []);
 let EVOPT = Object.assign({}, EVOPT_DEF, load(LS_EVOPT, {}));
+let CATS = load(LS_CAT, []);   // 客カテゴリのマスター（例: 台風客, 電車遅延客, ○○イベント終わり客）
+if(!Array.isArray(CATS)) CATS=[];
+syncCatsFromRides();           // 既存rideに付いてるcatも取り込む(自己修復)
 
 function load(k,def){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch(e){ return def; } }
 function save(){ localStorage.setItem(LS_KEY, JSON.stringify(DB)); pushCloud(); }
@@ -484,6 +493,22 @@ function saveSeasons(){ localStorage.setItem(LS_SEASON, JSON.stringify(SEASONS))
 function saveGeo(){ localStorage.setItem(LS_GEO, JSON.stringify(GEO)); }
 function saveEvents(){ localStorage.setItem(LS_EVENT, JSON.stringify(EVENTS)); pushCloud(); }
 function saveEvOpt(){ localStorage.setItem(LS_EVOPT, JSON.stringify(EVOPT)); pushCloud(); }
+function saveCats(){ localStorage.setItem(LS_CAT, JSON.stringify(CATS)); pushCloud(); }
+/* rideに使われているcatをマスターに取り込む（他端末で作ったカテゴリも拾う） */
+function syncCatsFromRides(){
+  let changed=false;
+  (Array.isArray(DB)?DB:[]).forEach(d=>(d.rides||[]).forEach(r=>{
+    const c=(r.cat||'').trim();
+    if(c && !CATS.includes(c)){ CATS.push(c); changed=true; }
+  }));
+  return changed;
+}
+/* 新しいカテゴリを追加（重複はしない）。追加できたらtrue */
+function addCat(name){
+  name=(name||'').trim(); if(!name) return false;
+  if(CATS.includes(name)) return false;
+  CATS.push(name); saveCats(); return true;
+}
 
 /* ---------- ユーティリティ ---------- */
 const WD=['日','月','火','水','木','金','土'];
@@ -496,13 +521,28 @@ function fmtMin(n){ n=Math.round(n); if(n<60) return n+'分'; return Math.floor(
 function shukkoHour(d){ const m=toMin(d.shukko); return m==null? null : Math.floor(m/60); }
 function shortAddr(a){ return (a||'').replace(/^東京都/,''); }
 function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+/* カテゴリ用<option>群（未分類＋既存カテゴリ）。selはいま選択中の値 */
+function catOptions(sel){
+  return `<option value=""${!sel?' selected':''}>未分類</option>`+
+    CATS.map(c=>`<option${c===sel?' selected':''}>${esc(c)}</option>`).join('');
+}
 function renderMemoList(elId){
   const el=document.getElementById(elId); if(!el) return;
+  const notes=scopedDays().filter(d=>d.note).sort((a,b)=>a.date<b.date?1:-1);
   const rs=scopedRides().filter(r=>r.memo || r.outlier);
-  if(!rs.length){ el.innerHTML='<p class="muted small" style="margin:6px 0">該当する営業なし</p>'; return; }
-  el.innerHTML=`<table><thead><tr><th>日付</th><th>時刻</th><th>種別</th><th>乗車地→降車地</th><th>料金</th><th>メモ</th></tr></thead><tbody>`+
-    rs.map(r=>`<tr><td>${r._date.slice(5)}(${r._wday})</td><td>${r.on}</td><td>${(r.type||'')}${r.outlier?' ⚠':''}</td><td class="small" style="text-align:left">${shortAddr(r.from)}→${shortAddr(r.to)}</td><td>${fmtYen(r.fare)}</td><td class="small" style="text-align:left">${esc(r.memo)}</td></tr>`).join('')+
-    `</tbody></table>`;
+  if(!rs.length && !notes.length){ el.innerHTML='<p class="muted small" style="margin:6px 0">該当する営業なし</p>'; return; }
+  let html='';
+  if(notes.length){
+    html+=`<div style="margin:2px 0 12px">`+
+      notes.map(d=>`<div class="small" style="padding:6px 0;border-bottom:1px solid var(--line);text-align:left"><b>📝 ${d.date.slice(5)}(${wdayOf(d.date)})</b>${d.weather?' ・'+d.weather:''} — 営収${fmtYen(+d.uriage||0)}<br>${esc(d.note).replace(/\n/g,'<br>')}</div>`).join('')+
+      `</div>`;
+  }
+  if(rs.length){
+    html+=`<table><thead><tr><th>日付</th><th>時刻</th><th>種別</th><th>乗車地→降車地</th><th>料金</th><th>メモ</th></tr></thead><tbody>`+
+      rs.map(r=>`<tr><td>${r._date.slice(5)}(${r._wday})</td><td>${r.on}</td><td>${(r.type||'')}${r.outlier?' ⚠':''}</td><td class="small" style="text-align:left">${shortAddr(r.from)}→${shortAddr(r.to)}</td><td>${fmtYen(r.fare)}</td><td class="small" style="text-align:left">${esc(r.memo)}</td></tr>`).join('')+
+      `</tbody></table>`;
+  }
+  el.innerHTML=html;
 }
 
 /* 空転判定: 同時刻または1分で終わってる=実際は乗せてない */
@@ -881,13 +921,22 @@ function initMap(){
   }catch(e){}
 }
 function roundKey(lat,lng){ return lat.toFixed(3)+','+lng.toFixed(3); } // ~100m格子
+let mapCatFilter='';   // '' = 全カテゴリ
 function mapRides(){
   const iF=SHIFT_HOURS.indexOf(+document.getElementById('mapHFrom').value);
   const iT=SHIFT_HOURS.indexOf(+document.getElementById('mapHTo').value);
   return scopedRides().filter(r=>{   // 曜日は共通フィルタ(scopedRides)で反映済み
+    if(mapCatFilter && (r.cat||'')!==mapCatFilter) return false;   // 客カテゴリ絞り込み
     const ip=SHIFT_HOURS.indexOf(pickupHour(r));
     return ip>=iF && ip<=iT;
   });
+}
+/* 地図のカテゴリ絞り込みプルダウンを、いまのCATSで作り直す */
+function refreshCatFilter(){
+  const sel=document.getElementById('mapCat'); if(!sel) return;
+  const cur=mapCatFilter;
+  sel.innerHTML='<option value="">全て</option>'+CATS.map(c=>`<option${c===cur?' selected':''}>${esc(c)}</option>`).join('');
+  if(cur && !CATS.includes(cur)){ mapCatFilter=''; sel.value=''; }
 }
 function renderMap(){
   initMap(); if(!map) return; layerGroup.clearLayers();
@@ -922,17 +971,20 @@ function renderMap(){
     rides.forEach(r=>{ if(r.toLat==null) return;
       L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:1,opacity:.3}).addTo(layerGroup);
       L.circleMarker([r.fromLat,r.fromLng],{radius:5,color:cv('--s1'),fillColor:cv('--s1'),fillOpacity:.75,weight:1})
-        .bindPopup(`乗車 ${r.on} ${r.type||''}<br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
+        .bindPopup(`乗車 ${r.on} ${r.type||''}<br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
       L.circleMarker([r.toLat,r.toLng],{radius:5,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.75,weight:1})
-        .bindPopup(`降車 ${r.off||''}<br>${r.to}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
+        .bindPopup(`降車 ${r.off||''}<br>${r.to}<br>${fmtYen(r.fare)}${r.cat?'<br>🏷 '+esc(r.cat):''}`).addTo(layerGroup);
     });
     legend.innerHTML='<b>全乗降</b><br><span class="muted small">青=乗車 / 橙=降車 / 線=その経路。全部いっぺんに表示。</span>';
+  }
+  if(mapCatFilter && mapMode!=='day'){   // カテゴリ絞り込み中はバッジと件数を先頭に出す
+    legend.innerHTML=`<div style="margin-bottom:6px"><span class="pill">🏷 ${esc(mapCatFilter)}</span> <span class="muted small">この客だけ ${rides.length}件 表示中</span></div>`+legend.innerHTML;
   }
   // 外れ値マーカー(メモ付き)をどのモードでも重ねる
   if(mapMode!=='day'){
     mapRides().filter(r=> r.fromLat!=null && (r.outlier||r.memo)).forEach(r=>{
       L.circleMarker([r.fromLat,r.fromLng],{radius:9,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2})
-        .bindPopup(`<b>⚠ ${r.on} ${r.type||''}</b><br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
+        .bindPopup(`<b>⚠ ${r.on} ${r.type||''}</b><br>${r.from}<br>→ ${r.to}<br>${fmtYen(r.fare)}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(layerGroup);
     });
     renderMemoList('mapMemoList');
   }
@@ -1029,9 +1081,9 @@ function showOD(a){
     if(r.toLat==null) return;
     L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.6}).addTo(lg);
     L.circleMarker([r.toLat,r.toLng],{radius:7,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1})
-      .bindPopup(`降車: ${r.to}<br>${fmtYen(r.fare)} / ${r.type||''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(lg);
+      .bindPopup(`降車: ${r.to}<br>${fmtYen(r.fare)} / ${r.type||''}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(lg);
   });
-  L.circleMarker([a.lat,a.lng],{radius:10,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2}).addTo(lg); // 選択中の乗車地(黄)
+  L.circleMarker([a.lat,a.lng],{radius:10,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2,interactive:false}).addTo(lg); // 選択中の乗車地(黄)。interactive:falseで2回目のタップを下の丸に通す
   odActive[key]=lg;
 }
 function mixSeq(t){ // 0..1 → 薄青→濃青
@@ -1388,6 +1440,17 @@ segWire('mapMode','m',v=>{ mapMode=v;
   }
   renderMap(); });
 document.getElementById('odClear').onclick=()=>{ Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={}; };
+// 客カテゴリ絞り込み
+document.getElementById('mapCat').onchange=e=>{ mapCatFilter=e.target.value; renderMap(); };
+document.getElementById('mapCatAdd').onclick=()=>{
+  const name=(prompt('新しいカテゴリ名（例: 台風客 / ○○イベント終わり客 / 電車遅延客）')||'').trim();
+  if(!name) return;
+  addCat(name);                          // マスターに追加（既にあれば何もしない）
+  mapCatFilter=name; refreshCatFilter();  // 追加したカテゴリで絞る
+  document.getElementById('mapCat').value=name;
+  if(curTab==='data') renderDataTab();    // データタブの選択肢も更新
+  renderMap();
+};
 // 時間帯セレクトを一勤務の並び(13時→翌12時)で用意
 (function(){
   const opts=SHIFT_HOURS.map(h=>`<option value="${h}">${h}時</option>`).join('');
@@ -1524,19 +1587,24 @@ function renderDataTab(){
         <option value="">未設定</option>
         ${['晴れ','曇り','雨','雪'].map(w=>`<option ${d.weather===w?'selected':''}>${w}</option>`).join('')}
       </select></div>`;
-    const rides=wsel+(d.rides||[]).map((r,i)=>{
+    const dnote=`<div class="ride-edit"><span class="small" style="min-width:88px">営業メモ</span>
+      <textarea class="dn" data-date="${d.date}" placeholder="この営業についての覚え書き（道路・天気・イベント・気づき など）" style="flex:1; min-width:200px; min-height:46px; resize:vertical">${esc(d.note)}</textarea></div>`;
+    const rides=wsel+dnote+(d.rides||[]).map((r,i)=>{
       const kuten=isKuten(r);
       return `<div class="ride-edit" data-date="${d.date}" data-i="${i}">
         <span class="small" style="min-width:88px">${r.on}〜${r.off}${kuten?' <span class="pill">空転</span>':''}</span>
         <span class="small" style="flex:1; min-width:150px">${shortAddr(r.from)}→${shortAddr(r.to)}</span>
         <span class="small" style="min-width:96px">${fmtYen(+r.fare||0)} ${r.type||''}</span>
         <label class="small"><input type="checkbox" class="ol" ${r.outlier?'checked':''}> 外れ値</label>
-        <input type="text" class="mm" placeholder="メモ" value="${esc(r.memo)}" style="flex:2; min-width:160px">
+        <select class="cat" style="min-width:130px" title="客カテゴリ">${catOptions(r.cat)}<option value="__new__">＋新規カテゴリ…</option></select>
+        <input type="text" class="mm" placeholder="メモ" value="${esc(r.memo)}" style="flex:2; min-width:150px">
       </div>`;
     }).join('');
-    return `<details class="day-det"><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
+    return `<details class="day-det"><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
   }).join('');
   list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=DB.find(x=>x.date===sel.dataset.date); if(day){ day.weather=e.target.value; save(); renderDataTab(); renderCurrent(); } }; });
+  // 営業メモ（その日の営業まるごとに対するメモ）
+  list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=DB.find(x=>x.date===t.dataset.date); if(day){ day.note=e.target.value.trim(); save(); renderCurrent(); } }; });
   // 削除
   list.querySelectorAll('.del').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm(b.dataset.d+' を削除?')){ DB=DB.filter(x=>x.date!==b.dataset.d); save(); refreshDateSelector(); renderDataTab(); renderCurrent(); } });
   // 外れ値・メモ編集
@@ -1546,6 +1614,18 @@ function renderDataTab(){
     const r=day.rides[i];
     row.querySelector('.ol').onchange=e=>{ r.outlier=e.target.checked; save(); };
     row.querySelector('.mm').onchange=e=>{ r.memo=e.target.value.trim(); save(); };
+    const cs=row.querySelector('.cat');
+    if(cs) cs.onchange=e=>{
+      const v=e.target.value;
+      if(v==='__new__'){
+        const name=(prompt('新しいカテゴリ名（例: 台風客 / ○○イベント終わり客 / 電車遅延客）')||'').trim();
+        if(name){ addCat(name); r.cat=name; } // マスターに無ければ追加して割当
+        save(); renderDataTab(); refreshCatFilter();      // 選択肢を更新
+      }else{
+        r.cat=v; save();
+        if(curTab==='map') renderMap();
+      }
+    };
   });
 }
 document.getElementById('importBtn').onclick=async()=>{
@@ -1557,6 +1637,7 @@ document.getElementById('importBtn').onclick=async()=>{
   DB.sort((a,b)=>a.date<b.date?-1:1); save();
   document.getElementById('pasteBox').value='';
   alert(n+'日 取り込んだ。座標を取得します。');
+  syncCatsFromRides(); saveCats(); refreshCatFilter();
   refreshDateSelector(); renderDataTab(); await geocodeAll(false); renderCurrent();
 };
 document.getElementById('copyBtn').onclick=()=>{
@@ -1649,8 +1730,10 @@ async function cloudLoad(uid){ _uid=uid;
         localStorage.setItem(LS_EVENT,JSON.stringify(EVENTS));
       }
       if(d.evopt){ EVOPT=Object.assign({},EVOPT_DEF,d.evopt); localStorage.setItem(LS_EVOPT,JSON.stringify(EVOPT)); }
+      if(Array.isArray(d.cats)){ d.cats.forEach(c=>{ if(c && !CATS.includes(c)) CATS.push(c); }); }
+      syncCatsFromRides(); localStorage.setItem(LS_CAT,JSON.stringify(CATS));
       _cloudRead=true;
-      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector();
+      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); refreshCatFilter();
       pushCloud();                       // 合流した結果をクラウドにも戻す
       geocodeAll(false); geocodeEvents(false);
     } else {
@@ -1675,7 +1758,7 @@ function pushCloud(){
     _lastPush=Date.now();
     let payload;
     // JSONを通すことで undefined を落とす（Firestoreはundefinedを受け付けない）
-    try{ payload=JSON.parse(JSON.stringify({days:DB, seasons:SEASONS, events:EVENTS, evopt:EVOPT, updated:Date.now()})); }
+    try{ payload=JSON.parse(JSON.stringify({days:DB, seasons:SEASONS, events:EVENTS, evopt:EVOPT, cats:CATS, updated:Date.now()})); }
     catch(e){ console.warn('sync payload', e); syncBadge('⚠ 同期できず'); return; }
     if(!Array.isArray(payload.days)){ syncBadge('⚠ 同期できず'); return; }
     try{
@@ -1692,6 +1775,7 @@ function loadScript(src){ return new Promise((res,rej)=>{ const s=document.creat
 /* ---------- 起動 ---------- */
 refreshSeasonSelectors();
 refreshDateSelector();
+refreshCatFilter();
 evWire();
 renderCurrent();
 geocodeAll(false);
