@@ -95,6 +95,24 @@ tr:hover td{background:var(--surface2)}
 .map-legend{font-size:12px; line-height:1.7; background:var(--surface); padding:8px 10px; border-radius:8px; border:1px solid var(--border)}
 .legend-bar{height:10px; border-radius:5px; background:linear-gradient(90deg,var(--seqhi),var(--seqlo)); margin:4px 0}
 .pill{display:inline-block; font-size:11px; padding:1px 7px; border-radius:20px; border:1px solid var(--border); color:var(--ink2); margin-left:4px}
+/* 乗車地タップのポップアップ(縮小に合わせて.od-bodyのfont-sizeを変えると全体がem基準で連動) */
+.od-pop .leaflet-popup-content{margin:8px 10px}
+.od-body{font-size:14px; line-height:1.5; color:var(--ink)}
+.od-body .od-h{font-size:1em; margin-bottom:.4em; padding-bottom:.3em; border-bottom:1px solid var(--border)}
+.od-body .muted{color:var(--ink2)}
+.od-line{font-size:.92em; padding:.15em 0; border-bottom:1px dashed var(--grid)}
+.od-t{color:var(--ink2)}
+.od-tag{display:inline-block; font-size:.82em; padding:0 .5em; border-radius:1em; border:1px solid var(--border); color:var(--ink2)}
+.od-tip{margin-top:.5em; font-size:.8em; color:var(--ink2)}
+.od-edit{padding:.35em 0; border-bottom:1px dashed var(--grid); display:flex; flex-direction:column; gap:.3em}
+.od-edit .od-sub{font-size:.85em; color:var(--ink2)}
+.od-body select,.od-body input,.od-body textarea{font-size:.9em; padding:.3em .4em; border-radius:.4em; border:1px solid var(--border); background:var(--surface); color:var(--ink); width:100%; box-sizing:border-box}
+.od-body textarea{resize:vertical; min-height:2.4em}
+.od-mgr{margin-top:.5em; padding-top:.5em; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:.35em}
+.od-mgr-row{display:flex; gap:.35em; align-items:center}
+.od-mgr-row input,.od-mgr-row select{flex:1}
+.od-body button{font-size:.88em; padding:.3em .7em; border-radius:.4em; border:1px solid var(--border); background:var(--surface2); color:var(--ink); cursor:pointer; white-space:nowrap; width:auto}
+.od-body button:hover{background:var(--accent); color:#fff; border-color:var(--accent)}
 .season-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--grid)}
 .season-row .name{font-weight:600; min-width:120px}
 .del{color:var(--s8); background:transparent; border:none; font-size:13px}
@@ -509,6 +527,14 @@ function addCat(name){
   if(CATS.includes(name)) return false;
   CATS.push(name); saveCats(); return true;
 }
+/* カテゴリを削除。マスターから消し、付いている全rideの分類も外す */
+function deleteCat(name){
+  name=(name||'').trim(); if(!name) return;
+  CATS=CATS.filter(c=>c!==name);
+  (Array.isArray(DB)?DB:[]).forEach(d=>(d.rides||[]).forEach(r=>{ if(r.cat===name) delete r.cat; }));
+  saveCats(); save();
+  if(mapCatFilter===name) mapCatFilter='';
+}
 
 /* ---------- ユーティリティ ---------- */
 const WD=['日','月','火','水','木','金','土'];
@@ -589,7 +615,7 @@ function scopedRides(){
     if(!typeOK(r)) return;
     if(isKuten(r)) return;               // 空転は除外
     if(!outlierOK(r)) return;            // 外れ値モード
-    out.push(Object.assign({_date:d.date,_wday:wdayOf(d.date)}, r));
+    out.push(Object.assign({_date:d.date,_wday:wdayOf(d.date),_ref:r}, r)); // _ref=元のDBオブジェクト(地図上の編集を保存するため)
   }));
   return out;
 }
@@ -899,7 +925,9 @@ function drawCompare(){
 }
 
 /* ---------- 地図 ---------- */
-let map, layerGroup, heatLayer, odActive={}, mapMode='heat';
+let map, layerGroup, heatLayer, mapMode='heat';
+/* 乗車地タップの3状態サイクル: 0=乗車地のみ / 1=降車地+金額 / 2=メモ・カテゴリ編集 */
+let odState={}, odLayer={}, odPopupObj=null, odCurKey=null, odCurAgg=null, odCurMode=null;
 function initMap(){
   if(map || !window.L) return;
   const canRotate = typeof L.Map!=='undefined' && typeof L.Map.prototype.setBearing==='function';
@@ -908,6 +936,7 @@ function initMap(){
   map=L.map('map',opts).setView([35.70,139.65],11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
   layerGroup=L.layerGroup().addTo(map);
+  map.on('zoomend', ()=>{ applyPopupScale(); if(odPopupObj){ try{odPopupObj.update();}catch(e){} } });   // 縮小に合わせてポップアップも縮める
   // 地図の上に浮くボタン(全画面でも使える): 向き / 現在地 / 全画面
   try{
     const ctl=document.createElement('div'); ctl.id='mapCtl';
@@ -941,7 +970,7 @@ function refreshCatFilter(){
 function renderMap(){
   initMap(); if(!map) return; layerGroup.clearLayers();
   document.getElementById('mapDayKpi').style.display='none';
-  Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={};  // モード/条件変更でOD選択リセット
+  closeAllOD();  // モード/条件変更でOD選択リセット
   if(heatLayer){ map.removeLayer(heatLayer); heatLayer=null; }
   const rides=mapRides().filter(r=> r.fromLat!=null);
   const legend=document.getElementById('mapLegend');
@@ -958,13 +987,11 @@ function renderMap(){
     rides.forEach(r=>{ const k=roundKey(r.fromLat,r.fromLng); (g[k]=g[k]||{lat:r.fromLat,lng:r.fromLng,fare:0,n:0,rides:[]}); g[k].fare+=(+r.fare||0); g[k].n++; g[k].rides.push(r); });
     const arr=Object.values(g); const max=Math.max(1,...arr.map(a=>a.fare/a.n));
     arr.forEach(a=>{ const avg=a.fare/a.n; const t=avg/max;
-      const nDrop=a.rides.filter(r=>r.toLat!=null).length;
-      const mk=L.circleMarker([a.lat,a.lng],{radius:8+Math.min(a.n,8)*2, color:mixSeq(t), fillColor:mixSeq(t), fillOpacity:.75, weight:1})
-        .bindPopup(`<b>客単価 ${fmtYen(avg)}</b><br>件数 ${a.n}件 / 売上計 ${fmtYen(a.fare)}<br><span class="muted">タップで降車先(橙)を表示/非表示（${nDrop}件）</span>`);
-      mk.on('click',()=>showOD(a));
+      const mk=L.circleMarker([a.lat,a.lng],{radius:8+Math.min(a.n,8)*2, color:mixSeq(t), fillColor:mixSeq(t), fillOpacity:.75, weight:1});
+      mk.on('click',()=>cycleOD(a));   // 1回目=降車地+金額 / 2回目=メモ・カテゴリ編集 / 3回目=最初に戻る
       mk.addTo(layerGroup);
     });
-    legend.innerHTML='<b>乗車地×客単価＋降車先</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)。丸をタップすると、そこで乗せた客の降車先(橙)が線でつながって出る。もう一度タップで消える。別の丸も押せば足せる。「選択クリア」で全部消す。</span>';
+    legend.innerHTML='<b>乗車地×客単価＋降車先</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)。丸をタップ：1回目＝降車地＋金額、2回目＝メモ・カテゴリ編集、3回目＝最初に戻る。表示は地図を縮めると自動で小さくなる。「選択クリア」で全部消す。</span>';
   }
   else if(mapMode==='day'){ renderDayMode(); }
   else { // allod: 全乗車地×降車地
@@ -1072,19 +1099,112 @@ function renderDayTimeline(date, rides, sel, HL){
       return `<tr style="${bg}${near?'':'opacity:.35'}">${r.html}</tr>`;
     }).join('')+`</tbody></table>`;
 }
-function showOD(a){
-  if(!map) return;
-  const key=roundKey(a.lat,a.lng);
-  if(odActive[key]){ map.removeLayer(odActive[key]); delete odActive[key]; return; } // 同じ所を再タップで消す
+/* すべてのOD表示(線・降車点・ポップアップ)を消して最初の状態に戻す */
+function closeAllOD(){
+  Object.keys(odLayer).forEach(k=>{ try{ map&&map.removeLayer(odLayer[k]); }catch(e){} });
+  odLayer={}; odState={}; odCurKey=null; odCurAgg=null; odCurMode=null;
+  if(odPopupObj){
+    try{ map&&map.closePopup(odPopupObj); }catch(e){}
+    try{ odPopupObj.remove(); }catch(e){}
+    try{ const c=odPopupObj.getElement&&odPopupObj.getElement(); if(c&&c.parentNode) c.parentNode.removeChild(c); }catch(e){}
+    odPopupObj=null;
+  }
+}
+/* 乗車地の降車先(線・橙点・黄ハイライト)レイヤを作る。橙点はinteractive:falseで乗車地タップを邪魔しない */
+function buildODLayer(a){
   const lg=L.layerGroup().addTo(map);
   a.rides.forEach(r=>{
     if(r.toLat==null) return;
-    L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.6}).addTo(lg);
-    L.circleMarker([r.toLat,r.toLng],{radius:7,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1})
-      .bindPopup(`降車: ${r.to}<br>${fmtYen(r.fare)} / ${r.type||''}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`).addTo(lg);
+    L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.55,interactive:false}).addTo(lg);
+    L.circleMarker([r.toLat,r.toLng],{radius:6,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1,interactive:false}).addTo(lg);
   });
-  L.circleMarker([a.lat,a.lng],{radius:10,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2,interactive:false}).addTo(lg); // 選択中の乗車地(黄)。interactive:falseで2回目のタップを下の丸に通す
-  odActive[key]=lg;
+  L.circleMarker([a.lat,a.lng],{radius:10,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2,interactive:false}).addTo(lg); // 選択中(黄)
+  return lg;
+}
+/* 乗車地タップ: 0→1(降車地+金額)→2(メモ・カテゴリ編集)→0(最初に戻る) の3サイクル */
+function cycleOD(a){
+  if(!map) return;
+  const key=roundKey(a.lat,a.lng);
+  if(odCurKey && odCurKey!==key) closeAllOD();   // 別の乗車地を押したら前のは片付ける(画面をすっきり)
+  const s=((odState[key]||0)+1)%3;
+  odState[key]=s; odCurKey=key; odCurAgg=a;
+  if(s===0){ closeAllOD(); return; }             // 3回目=最初の状態
+  if(!odLayer[key]) odLayer[key]=buildODLayer(a);
+  openODPopup(a, s===1?'info':'edit');
+}
+/* 縮小率に応じたポップアップの拡大率(ズームが小さい=縮小してるほど小さく) */
+function popupScale(){
+  const z = map? map.getZoom() : 13;
+  return Math.max(0.5, Math.min(1.1, 0.5 + (z-11)*0.12));   // z11で0.5、z16で1.1
+}
+/* 開いているODポップアップの文字・幅を今の縮小率に合わせる */
+function applyPopupScale(){
+  const el=document.querySelector('.od-pop .od-body'); if(!el) return;
+  const sc=popupScale();
+  el.style.fontSize=(14*sc).toFixed(1)+'px';
+  el.style.maxWidth=(230*sc).toFixed(0)+'px';
+}
+function odInfoHTML(a){
+  const avg=a.fare/a.n;
+  const rows=a.rides.map(r=>`<div class="od-line"><span class="od-t">${r.on||''}</span> → ${esc(shortAddr(r.to))||'(降車地なし)'} <b>${fmtYen(r.fare)}</b>${r.cat?' <span class="od-tag">🏷'+esc(r.cat)+'</span>':''}</div>`).join('');
+  return `<div class="od-body"><div class="od-h">🚕 ${esc(shortAddr(a.rides[0].from))}<br><b>客単価 ${fmtYen(avg)}</b>・${a.n}件・計${fmtYen(a.fare)}</div>${rows}<div class="od-tip">もう一度タップ → メモ・カテゴリ編集</div></div>`;
+}
+function odEditHTML(a){
+  const rides=a.rides.map((r,i)=>`
+    <div class="od-edit" data-i="${i}">
+      <div class="od-sub"><span class="od-t">${r.on||''}</span> → ${esc(shortAddr(r.to))} ${fmtYen(r.fare)}</div>
+      <select class="od-cat">${catOptions(r.cat)}</select>
+      <textarea class="od-memo" placeholder="メモ" rows="2">${esc(r.memo)}</textarea>
+    </div>`).join('');
+  const mgr=`<div class="od-mgr">
+      <div class="od-mgr-row"><input class="od-newcat" placeholder="新カテゴリ名（例: 台風客）"><button class="od-addcat" type="button">＋作成</button></div>
+      <div class="od-mgr-row"><select class="od-delcat"><option value="">カテゴリを削除…</option>${CATS.map(c=>`<option>${esc(c)}</option>`).join('')}</select><button class="od-docdel" type="button">削除</button></div>
+    </div>`;
+  return `<div class="od-body"><div class="od-h"><b>メモ・カテゴリ</b> <span class="muted">${esc(shortAddr(a.rides[0].from))}</span></div>${rides}${mgr}<div class="od-tip">もう一度タップ → 最初に戻る</div></div>`;
+}
+function openODPopup(a, mode){
+  odCurMode=mode;
+  const html = mode==='info'? odInfoHTML(a) : odEditHTML(a);
+  if(!odPopupObj) odPopupObj=L.popup({autoClose:false,closeOnClick:false,autoPan:true,maxWidth:400,className:'od-pop'});
+  odPopupObj.setLatLng([a.lat,a.lng]).setContent(html).openOn(map);
+  applyPopupScale();
+  const cont=odPopupObj.getElement();
+  if(cont && L.DomEvent){ L.DomEvent.disableClickPropagation(cont); L.DomEvent.disableScrollPropagation(cont); }
+  if(mode==='edit') wireODEdit(a);
+}
+/* 編集ポップアップ内の操作を配線(メモ・カテゴリ・新規作成・削除)。編集は_ref経由でDB本体に保存 */
+function wireODEdit(a){
+  const cont=odPopupObj && odPopupObj.getElement(); if(!cont) return;
+  cont.querySelectorAll('.od-edit').forEach(row=>{
+    const i=+row.dataset.i; const r=a.rides[i]; if(!r) return;
+    const tgt=r._ref||r;                       // 元のDBオブジェクトに書く
+    const cs=row.querySelector('.od-cat');
+    cs.onchange=e=>{ const v=e.target.value; tgt.cat=v||undefined; r.cat=v; if(!v){ delete tgt.cat; } save(); };
+    const mm=row.querySelector('.od-memo');
+    mm.onchange=e=>{ const v=e.target.value.trim(); tgt.memo=v||undefined; r.memo=v; if(!v){ delete tgt.memo; } save(); };
+  });
+  const addBtn=cont.querySelector('.od-addcat');
+  if(addBtn) addBtn.onclick=()=>{
+    const inp=cont.querySelector('.od-newcat'); const name=(inp.value||'').trim();
+    if(!name) return;
+    addCat(name); refreshCatFilter();
+    openODPopup(a,'edit');                      // 選択肢を作り直して開き直す
+  };
+  const delBtn=cont.querySelector('.od-docdel');
+  if(delBtn) delBtn.onclick=()=>{
+    const sel=cont.querySelector('.od-delcat'); const name=(sel.value||'').trim();
+    if(!name) return;
+    if(!confirm('カテゴリ「'+name+'」を削除します。この客に付いていた分類も外れます。よろしい？')) return;
+    deleteCat(name); refreshCatFilter();
+    // 消したカテゴリがこの集計の各rideに付いていたらコピー側も外す
+    a.rides.forEach(r=>{ if(r.cat===name) r.cat=undefined; });
+    openODPopup(a,'edit');
+  };
+}
+function mixSeq(t){ // 0..1 → 薄青→濃青
+  const lo=[24,79,149], hi=[205,226,251]; // seqlo, seqhi
+  const c=hi.map((h,i)=> Math.round(h+(lo[i]-h)*t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 function mixSeq(t){ // 0..1 → 薄青→濃青
   const lo=[24,79,149], hi=[205,226,251]; // seqlo, seqhi
@@ -1439,7 +1559,7 @@ segWire('mapMode','m',v=>{ mapMode=v;
     }
   }
   renderMap(); });
-document.getElementById('odClear').onclick=()=>{ Object.values(odActive).forEach(lg=>{ try{map.removeLayer(lg);}catch(e){} }); odActive={}; };
+document.getElementById('odClear').onclick=()=>{ closeAllOD(); };
 // 客カテゴリ絞り込み
 document.getElementById('mapCat').onchange=e=>{ mapCatFilter=e.target.value; renderMap(); };
 document.getElementById('mapCatAdd').onclick=()=>{
