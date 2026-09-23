@@ -115,6 +115,13 @@ tr:hover td{background:var(--surface2)}
 .od-mgr-row input,.od-mgr-row select{flex:1; min-width:0}
 .od-body button{font-size:.86em; padding:.25em .55em; border-radius:.4em; border:1px solid var(--border); background:var(--surface2); color:var(--ink); cursor:pointer; white-space:nowrap; width:auto; flex:0 0 auto}
 .od-body button:hover{background:var(--accent); color:#fff; border-color:var(--accent)}
+/* 情報ラベル(降車地・日付・単価)。複数出るのでコンパクト＆縮小連動。地図コンテナの--od-scで拡縮 */
+.leaflet-tooltip.od-lab{font-size:calc(11px * var(--od-sc,1)); line-height:1.35; padding:.25em .5em;
+  background:rgba(20,20,20,.86); color:#fff; border:none; border-radius:.45em; box-shadow:0 1px 4px rgba(0,0,0,.4);
+  max-width:none; white-space:nowrap; opacity:.96}
+.leaflet-tooltip.od-lab::before{display:none}   /* 吹き出しの三角は消す(すっきり) */
+.od-lab-row{padding:.05em 0}
+.od-lab-row b{color:#ffd479}
 .season-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--grid)}
 .season-row .name{font-weight:600; min-width:120px}
 .del{color:var(--s8); background:transparent; border:none; font-size:13px}
@@ -140,6 +147,11 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
 .ride-num{display:flex; align-items:center; justify-content:center; width:22px; height:22px;
   border-radius:50%; color:#fff; font-size:11px; font-weight:700; border:2px solid rgba(255,255,255,.8);
   box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+/* 営業ルートの番号ピン。時間は番号の右に小さく出す（アンカーは番号中心なので絶対配置でズレさせない） */
+.ride-pin{position:relative; width:22px; height:22px}
+.ride-time{position:absolute; left:25px; top:50%; transform:translateY(-50%); white-space:nowrap;
+  font-size:11px; font-weight:600; line-height:1; padding:2px 5px; border-radius:4px;
+  background:rgba(20,20,20,.82); color:#fff; box-shadow:0 0 0 1px rgba(0,0,0,.3)}
 .leaflet-div-icon{background:transparent; border:none}
 .ev-win b{color:var(--ink)}
 @media(max-width:600px){ .chart-wrap{height:260px} #map{height:420px} main{padding:12px} }
@@ -332,10 +344,6 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <button data-m="tanka">乗車地×客単価＋降車先</button>
           <button data-m="allod">全乗降</button>
           <button data-m="day">営業ルート</button>
-        </div>
-        <div class="grp" id="routeDateWrap" style="display:none">
-          <label class="chip">日付</label>
-          <select id="routeDate"><option value="">日付を選ぶ…</option></select>
         </div>
         <button class="icon-btn" id="odClear" style="padding:3px 8px">選択クリア</button>
         <div class="grp">
@@ -933,8 +941,10 @@ function drawCompare(){
 
 /* ---------- 地図 ---------- */
 let map, layerGroup, heatLayer, mapMode='heat';
-/* 乗車地タップの3状態サイクル: 0=乗車地のみ / 1=降車地+金額 / 2=メモ・カテゴリ編集 */
-let odState={}, odLayer={}, odPopupObj=null, odCurKey=null, odCurAgg=null, odCurMode=null;
+/* 乗車地タップの3状態サイクル: 0=乗車地のみ / 1=降車地・日付・単価(情報。複数同時に出せる) / 2=メモ・カテゴリ編集(1つだけ)
+   odState[key]=0/1/2, odLayer[key]=OD線レイヤ(状態≥1), odLabel[key]=情報ラベル(状態1),
+   odAgg[key]=集計オブジェクト, odEditKey=編集中の1つ, odEditPopup=編集ポップアップ(1つ) */
+let odState={}, odLayer={}, odLabel={}, odAgg={}, odEditKey=null, odEditAgg=null, odEditPopup=null;
 function initMap(){
   if(map || !window.L) return;
   const canRotate = typeof L.Map!=='undefined' && typeof L.Map.prototype.setBearing==='function';
@@ -943,7 +953,8 @@ function initMap(){
   map=L.map('map',opts).setView([35.70,139.65],11);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(map);
   layerGroup=L.layerGroup().addTo(map);
-  map.on('zoomend', ()=>{ applyPopupScale(); });   // 縮小に合わせてポップアップも縮める（update含む）
+  map.getContainer().style.setProperty('--od-sc', popupScale().toFixed(3));
+  map.on('zoomend', ()=>{ applyMapScale(); });   // 縮小に合わせて情報ラベル・編集ポップアップも縮める
   // 地図の上に浮くボタン(全画面でも使える): 向き / 現在地 / 全画面
   try{
     const ctl=document.createElement('div'); ctl.id='mapCtl';
@@ -973,14 +984,6 @@ function refreshCatFilter(){
   const cur=mapCatFilter;
   sel.innerHTML='<option value="">全て</option>'+CATS.map(c=>`<option${c===cur?' selected':''}>${esc(c)}</option>`).join('');
   if(cur && !CATS.includes(cur)){ mapCatFilter=''; sel.value=''; }
-}
-/* 営業ルート用の日付ドロップダウンを、データのある日で作り直す（新しい順）。選択は空(未選択)を既定に */
-function refreshRouteDate(){
-  const sel=document.getElementById('routeDate'); if(!sel) return;
-  const cur=sel.value;
-  const dates=[...new Set((Array.isArray(DB)?DB:[]).map(d=>d.date))].filter(Boolean).sort((a,b)=>a<b?1:-1);
-  sel.innerHTML='<option value="">日付を選ぶ…</option>'+dates.map(dt=>`<option value="${dt}"${dt===cur?' selected':''}>${dt}(${wdayOf(dt)})</option>`).join('');
-  if(cur && !dates.includes(cur)) sel.value='';   // 消えた日付が選ばれていたら未選択に戻す
 }
 function renderMap(){
   initMap(); if(!map) return; layerGroup.clearLayers();
@@ -1014,7 +1017,7 @@ function renderMap(){
       mk.on('click',()=>cycleOD(a));   // 1回目=降車地+金額 / 2回目=メモ・カテゴリ編集 / 3回目=最初に戻る
       mk.addTo(layerGroup);
     });
-    legend.innerHTML='<b>乗車地×客単価＋降車先</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)。丸をタップ：1回目＝降車地＋金額、2回目＝メモ・カテゴリ編集、3回目＝最初に戻る。表示は地図を縮めると自動で小さくなる。「選択クリア」で全部消す。</span>';
+    legend.innerHTML='<b>乗車地×客単価＋降車先</b><div class="legend-bar"></div><span class="muted small">丸の大きさ＝件数 / 色＝客単価(濃い=高い)。丸をタップ：1回目＝降車地・日付・単価、2回目＝メモ・カテゴリ編集、3回目＝消す。情報は何個でも同時に出せる（編集は1つだけ／別の丸を押すと編集中のは情報表示に戻る）。地図を縮めると表示も小さくなる。「選択クリア」で全部消す。</span>';
   }
   else if(mapMode==='day'){ renderDayMode(); }
   else { // allod: 全乗車地×降車地
@@ -1058,11 +1061,11 @@ function dayRides(dateStr){
 function renderDayMode(){
   const legend=document.getElementById('mapLegend');
   const kpi=document.getElementById('mapDayKpi');
-  const date=document.getElementById('routeDate').value;   // 専用の日付セレクタ（イベント日付とは無関係）
+  const date=document.getElementById('fDate').value;   // 上部の既存「日付」フィルタを使う（イベント日付とは無関係）
   // 日付が未選択のときは何も描かず、案内だけ出す（選んで初めて表示）
   if(!date){
     kpi.style.display='none';
-    legend.innerHTML='<b>営業ルート</b><br><span class="muted small">上の「日付」を選ぶと、その日の営業ルート（乗せた順番）を表示します。</span>';
+    legend.innerHTML='<b>営業ルート</b><br><span class="muted small">上の絞り込みの「日付」で日を選ぶと、その日の営業ルート（乗せた順番）を表示します。</span>';
     const ml=document.getElementById('mapMemoList'); if(ml) ml.innerHTML='';
     return;
   }
@@ -1070,8 +1073,8 @@ function renderDayMode(){
   rides.forEach((r,i)=>{
     if(r.fromLat==null) return;
     const col = r.outlier? cv('--s4') : cv('--s1');
-    L.marker([r.fromLat,r.fromLng],{icon:L.divIcon({className:'', iconSize:[22,22], iconAnchor:[11,11],
-      html:`<div class="ride-num" style="background:${col}">${i+1}</div>`})})
+    L.marker([r.fromLat,r.fromLng],{zIndexOffset:100, icon:L.divIcon({className:'', iconSize:[22,22], iconAnchor:[11,11],
+      html:`<div class="ride-pin"><span class="ride-num" style="background:${col}">${i+1}</span><span class="ride-time">${r.on||''}</span></div>`})})
       .bindPopup(`<b>${i+1}. ${r.on}〜${r.off} ${r.type||''}${r.outlier?' ⚠':''}</b><br>${esc(r.from)}<br>→ ${esc(r.to)}<br>${fmtYen(r.fare)}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`)
       .addTo(layerGroup);
     if(r.toLat!=null){
@@ -1110,64 +1113,101 @@ function renderDayTimeline(date, rides){
     `<table><thead><tr><th>時刻</th><th>#</th><th>乗車地 → 降車地</th><th>料金</th><th>種別・メモ</th></tr></thead><tbody>`+
     rows.map(r=>`<tr>${r.html}</tr>`).join('')+`</tbody></table>`;
 }
-/* すべてのOD表示(線・降車点・ポップアップ)を消して最初の状態に戻す */
+/* Leafletのオーバーレイ(ポップアップ/ツールチップ)をDOMごと確実に消す */
+function removeOverlay(o){
+  if(!o) return;
+  try{ map&&map.removeLayer(o); }catch(e){}
+  try{ o.remove(); }catch(e){}
+  try{ const c=o.getElement&&o.getElement(); if(c&&c.parentNode) c.parentNode.removeChild(c); }catch(e){}
+}
+/* すべてのOD表示(線・降車点・情報ラベル・編集ポップアップ)を消して最初の状態に戻す */
 function closeAllOD(){
   Object.keys(odLayer).forEach(k=>{ try{ map&&map.removeLayer(odLayer[k]); }catch(e){} });
-  odLayer={}; odState={}; odCurKey=null; odCurAgg=null; odCurMode=null;
-  if(odPopupObj){
-    try{ map&&map.closePopup(odPopupObj); }catch(e){}
-    try{ odPopupObj.remove(); }catch(e){}
-    try{ const c=odPopupObj.getElement&&odPopupObj.getElement(); if(c&&c.parentNode) c.parentNode.removeChild(c); }catch(e){}
-    odPopupObj=null;
-  }
+  Object.keys(odLabel).forEach(k=>{ removeOverlay(odLabel[k]); });
+  odLayer={}; odLabel={}; odState={}; odAgg={};
+  closeEdit();
+}
+/* 編集ポップアップ(1つだけ)を閉じる */
+function closeEdit(){
+  if(odEditPopup){ removeOverlay(odEditPopup); odEditPopup=null; }
+  odEditKey=null; odEditAgg=null;
 }
 /* 乗車地の降車先(線・橙点・黄ハイライト)レイヤを作る。橙点はinteractive:falseで乗車地タップを邪魔しない */
 function buildODLayer(a){
   const lg=L.layerGroup().addTo(map);
   a.rides.forEach(r=>{
     if(r.toLat==null) return;
-    L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.55,interactive:false}).addTo(lg);
+    L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.5,interactive:false}).addTo(lg);
     L.circleMarker([r.toLat,r.toLng],{radius:6,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1,interactive:false}).addTo(lg);
   });
   L.circleMarker([a.lat,a.lng],{radius:10,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2,interactive:false}).addTo(lg); // 選択中(黄)
   return lg;
 }
-/* 乗車地タップ: 0→1(降車地+金額)→2(メモ・カテゴリ編集)→0(最初に戻る) の3サイクル */
+/* 情報ラベル(降車地・日付・単価)。複数同時に出せる。コンパクト＆縮小で小さくなる */
+function odLabelHTML(a){
+  return a.rides.map(r=>{
+    const dt=(r._date||'').slice(5);
+    return `<div class="od-lab-row">${dt?dt+'('+wdayOf(r._date)+') ':''}<b>${fmtYen(r.fare)}</b> → ${esc(shortAddr(r.to))||'(降車地なし)'}${r.cat?' 🏷'+esc(r.cat):''}</div>`;
+  }).join('');
+}
+function showInfoLabel(a,key){
+  if(odLabel[key]) return;
+  const tt=L.tooltip({permanent:true, direction:'top', offset:[0,-9], className:'od-lab', interactive:false, opacity:1})
+    .setLatLng([a.lat,a.lng]).setContent(odLabelHTML(a));
+  tt.addTo(map); odLabel[key]=tt;
+}
+function hideInfoLabel(key){ if(odLabel[key]){ removeOverlay(odLabel[key]); delete odLabel[key]; } }
+/* 乗車地keyを状態sにする。s: 0=消す / 1=情報ラベル / 2=編集ポップアップ */
+function setODState(a,key,s){
+  odState[key]=s; odAgg[key]=a;
+  if(s===0){
+    if(odLayer[key]){ try{ map.removeLayer(odLayer[key]); }catch(e){} delete odLayer[key]; }
+    hideInfoLabel(key);
+    if(odEditKey===key) closeEdit();
+    delete odState[key]; delete odAgg[key];
+    return;
+  }
+  if(!odLayer[key]) odLayer[key]=buildODLayer(a);
+  if(s===1){
+    if(odEditKey===key) closeEdit();       // 編集→情報に落ちるとき
+    showInfoLabel(a,key);
+  } else {                                  // s===2 編集
+    hideInfoLabel(key);
+    odEditKey=key; odEditAgg=a;
+    if(!odEditPopup) odEditPopup=L.popup({autoClose:false,closeOnClick:false,autoPan:true,className:'od-pop'});
+    odEditPopup.setLatLng([a.lat,a.lng]).setContent(odEditHTML(a)).openOn(map);
+    applyMapScale();                        // 幅調整＋配線
+  }
+}
+/* 乗車地タップ: 0→1(降車地・日付・単価)→2(メモ・カテゴリ編集)→0。
+   ・情報表示(1)は複数同時に残せる。
+   ・編集(2)は1つだけ。別の乗車地を押したら、編集中のものは情報表示(1)に落とす。 */
 function cycleOD(a){
   if(!map) return;
   const key=roundKey(a.lat,a.lng);
-  if(odCurKey && odCurKey!==key) closeAllOD();   // 別の乗車地を押したら前のは片付ける(画面をすっきり)
+  if(odEditKey && odEditKey!==key){ setODState(odAgg[odEditKey], odEditKey, 1); }  // 編集中の別の丸→情報表示へ
   const s=((odState[key]||0)+1)%3;
-  odState[key]=s; odCurKey=key; odCurAgg=a;
-  if(s===0){ closeAllOD(); return; }             // 3回目=最初の状態
-  if(!odLayer[key]) odLayer[key]=buildODLayer(a);
-  openODPopup(a, s===1?'info':'edit');
+  setODState(a,key,s);
 }
-/* 縮小率に応じたポップアップの拡大率(ズームが小さい=縮小してるほど小さく) */
+/* 縮小率に応じた拡大率(ズームが小さい=縮小してるほど小さく) */
 function popupScale(){
   const z = map? map.getZoom() : 13;
-  return Math.max(0.5, Math.min(1.1, 0.5 + (z-11)*0.12));   // z11で0.5、z16で1.1
+  return Math.max(0.45, Math.min(1.0, 0.45 + (z-11)*0.11));
 }
-/* 開いているODポップアップの文字・幅を今の縮小率に合わせる。
-   コンテナにCSS変数を置くのでupdate()後も縮小が保たれる（＝ズームしても大きく戻らない）。 */
-function applyPopupScale(){
-  if(!odPopupObj) return;
+/* 情報ラベルと編集ポップアップを今の縮小率に合わせる。
+   縮小率は地図コンテナのCSS変数(--od-sc)に置くので、ラベル・ポップアップ全部に効く。 */
+function applyMapScale(){
+  if(!map) return;
   const sc=popupScale();
-  const cont=odPopupObj.getElement();
-  if(cont) cont.style.setProperty('--od-sc', sc.toFixed(3));
-  odPopupObj.options.maxWidth=Math.round((odCurMode==='edit'?190:180)*sc);   // 幅も縮める＝他の丸を隠さない
-  odPopupObj.options.minWidth=Math.round(80*sc);
-  try{ odPopupObj.update(); }catch(e){}
-  if(cont && L.DomEvent){ L.DomEvent.disableClickPropagation(cont); L.DomEvent.disableScrollPropagation(cont); }
-  if(odCurMode==='edit' && odCurAgg) wireODEdit(odCurAgg);   // update()でDOMが作り直されるので配線し直す
-}
-function odInfoHTML(a){
-  // 1回目タップ＝日付・時間・値段（乗せた1件ずつ）
-  const rows=a.rides.map(r=>{
-    const dt=(r._date||'').slice(5);   // MM-DD
-    return `<div class="od-line"><span class="od-t">${dt}${dt?'(':''}${dt?wdayOf(r._date):''}${dt?') ':''}${r.on||''}</span> <b>${fmtYen(r.fare)}</b>${r.cat?' <span class="od-tag">🏷'+esc(r.cat)+'</span>':''}<br><span class="muted">→ ${esc(shortAddr(r.to))||'(降車地なし)'}</span></div>`;
-  }).join('');
-  return `<div class="od-body"><div class="od-h">🚕 ${esc(shortAddr(a.rides[0].from))}</div>${rows}<div class="od-tip">もう一度タップ → メモ・カテゴリ編集</div></div>`;
+  map.getContainer().style.setProperty('--od-sc', sc.toFixed(3));
+  if(odEditPopup){
+    odEditPopup.options.maxWidth=Math.round(190*sc);
+    odEditPopup.options.minWidth=Math.round(80*sc);
+    try{ odEditPopup.update(); }catch(e){}
+    const c=odEditPopup.getElement();
+    if(c && L.DomEvent){ L.DomEvent.disableClickPropagation(c); L.DomEvent.disableScrollPropagation(c); }
+    if(odEditAgg) wireODEdit(odEditAgg);    // update()でDOMが作り直されるので配線し直す
+  }
 }
 function odEditHTML(a){
   const rides=a.rides.map((r,i)=>`
@@ -1182,16 +1222,11 @@ function odEditHTML(a){
     </details>`;
   return `<div class="od-body"><div class="od-h"><b>メモ・カテゴリ</b></div>${rides}${mgr}<div class="od-tip">もう一度タップ → 最初に戻る</div></div>`;
 }
-function openODPopup(a, mode){
-  odCurMode=mode; odCurAgg=a;
-  const html = mode==='info'? odInfoHTML(a) : odEditHTML(a);
-  if(!odPopupObj) odPopupObj=L.popup({autoClose:false,closeOnClick:false,autoPan:true,className:'od-pop'});
-  odPopupObj.setLatLng([a.lat,a.lng]).setContent(html).openOn(map);
-  applyPopupScale();   // スケール適用＋(編集なら)配線もこの中で行う
-}
+/* 編集ポップアップの中身を作り直して開き直す(カテゴリ追加・削除の後) */
+function reopenEdit(a){ if(odEditPopup){ odEditPopup.setContent(odEditHTML(a)); applyMapScale(); } }
 /* 編集ポップアップ内の操作を配線(メモ・カテゴリ・新規作成・削除)。編集は_ref経由でDB本体に保存 */
 function wireODEdit(a){
-  const cont=odPopupObj && odPopupObj.getElement(); if(!cont) return;
+  const cont=odEditPopup && odEditPopup.getElement(); if(!cont) return;
   cont.querySelectorAll('.od-edit').forEach(row=>{
     const i=+row.dataset.i; const r=a.rides[i]; if(!r) return;
     const tgt=r._ref||r;                       // 元のDBオブジェクトに書く
@@ -1205,7 +1240,7 @@ function wireODEdit(a){
     const inp=cont.querySelector('.od-newcat'); const name=(inp.value||'').trim();
     if(!name) return;
     addCat(name); refreshCatFilter();
-    openODPopup(a,'edit');                      // 選択肢を作り直して開き直す
+    reopenEdit(a);                              // 選択肢を作り直して開き直す
   };
   const delBtn=cont.querySelector('.od-docdel');
   if(delBtn) delBtn.onclick=()=>{
@@ -1213,15 +1248,9 @@ function wireODEdit(a){
     if(!name) return;
     if(!confirm('カテゴリ「'+name+'」を削除します。この客に付いていた分類も外れます。よろしい？')) return;
     deleteCat(name); refreshCatFilter();
-    // 消したカテゴリがこの集計の各rideに付いていたらコピー側も外す
-    a.rides.forEach(r=>{ if(r.cat===name) r.cat=undefined; });
-    openODPopup(a,'edit');
+    a.rides.forEach(r=>{ if(r.cat===name) r.cat=undefined; });  // コピー側も外す
+    reopenEdit(a);
   };
-}
-function mixSeq(t){ // 0..1 → 薄青→濃青
-  const lo=[24,79,149], hi=[205,226,251]; // seqlo, seqhi
-  const c=hi.map((h,i)=> Math.round(h+(lo[i]-h)*t));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
 }
 function mixSeq(t){ // 0..1 → 薄青→濃青
   const lo=[24,79,149], hi=[205,226,251]; // seqlo, seqhi
@@ -1568,13 +1597,8 @@ segWire('pGroup','g',v=>{pGroup=v; renderPeriod();});
 segWire('pMetric','m',v=>{pMetric=v; renderPeriod();});
 segWire('pAgg','a',v=>{pAgg=v; renderPeriod();});
 segWire('pView','v',v=>{pView=v; renderPeriod();});
-segWire('mapMode','m',v=>{ mapMode=v;
-  // 営業ルートモードのときだけ専用の日付セレクタを出す（自動では日付を入れない＝選ぶまで表示しない）
-  document.getElementById('routeDateWrap').style.display = (v==='day')? '' : 'none';
-  renderMap(); });
+segWire('mapMode','m',v=>{ mapMode=v; renderMap(); });
 document.getElementById('odClear').onclick=()=>{ closeAllOD(); };
-// 営業ルートの日付選択（選んで初めて表示）
-document.getElementById('routeDate').onchange=()=>{ renderMap(); };
 // 客カテゴリ絞り込み
 document.getElementById('mapCat').onchange=e=>{ mapCatFilter=e.target.value; renderMap(); };
 document.getElementById('mapCatAdd').onclick=()=>{
@@ -1772,7 +1796,7 @@ document.getElementById('importBtn').onclick=async()=>{
   DB.sort((a,b)=>a.date<b.date?-1:1); save();
   document.getElementById('pasteBox').value='';
   alert(n+'日 取り込んだ。座標を取得します。');
-  syncCatsFromRides(); saveCats(); refreshCatFilter(); refreshRouteDate();
+  syncCatsFromRides(); saveCats(); refreshCatFilter();
   refreshDateSelector(); renderDataTab(); await geocodeAll(false); renderCurrent();
 };
 document.getElementById('copyBtn').onclick=()=>{
@@ -1868,7 +1892,7 @@ async function cloudLoad(uid){ _uid=uid;
       if(Array.isArray(d.cats)){ d.cats.forEach(c=>{ if(c && !CATS.includes(c)) CATS.push(c); }); }
       syncCatsFromRides(); localStorage.setItem(LS_CAT,JSON.stringify(CATS));
       _cloudRead=true;
-      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); refreshCatFilter(); refreshRouteDate();
+      renderCurrent(); refreshSeasonSelectors(); refreshDateSelector(); refreshCatFilter();
       pushCloud();                       // 合流した結果をクラウドにも戻す
       geocodeAll(false); geocodeEvents(false);
     } else {
@@ -1911,7 +1935,6 @@ function loadScript(src){ return new Promise((res,rej)=>{ const s=document.creat
 refreshSeasonSelectors();
 refreshDateSelector();
 refreshCatFilter();
-refreshRouteDate();
 evWire();
 renderCurrent();
 geocodeAll(false);
