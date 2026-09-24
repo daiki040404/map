@@ -65,7 +65,7 @@
 <body>
 <div class="wrap">
   <h1>タクシー勤務管理</h1>
-  <p class="sub">記録する月（年月）を選んで、毎月の勤務を残せます。始業・終業を「日付＋時刻」で選ぶと拘束時間を自動計算（翌日終業もそのまま正しく計算）。月間拘束の残り・1出番あたりの拘束時間・平均運転時間・営収の平均も出ます。</p>
+  <p class="sub">記録する月（年月）を選んで、毎月の勤務を残せます。始業・終業を「日付＋時刻」で選ぶと拘束時間を自動計算（翌日終業もそのまま正しく計算）。月間拘束時間の残り・残り出番1出番あたりの拘束時間・平均運転時間・営収の平均も出ます。</p>
 
   <div class="card">
     <p class="sec-title">全端末で同期（Googleログイン）</p>
@@ -115,9 +115,9 @@
     </div>
 
     <div class="stats">
-      <div class="stat hl"><div class="k">拘束 合計 / 上限</div><div class="v" id="sumBind">—</div></div>
-      <div class="stat" id="remainCard"><div class="k">月間拘束 残り</div><div class="v" id="remainBind">—</div></div>
-      <div class="stat warn"><div class="k">1出番あたりの拘束時間</div><div class="v" id="perShiftBind">—</div></div>
+      <div class="stat hl"><div class="k">拘束時間合計 / 上限</div><div class="v" id="sumBind">—</div></div>
+      <div class="stat" id="remainCard"><div class="k">月間拘束時間　残り</div><div class="v" id="remainBind">—</div></div>
+      <div class="stat warn"><div class="k">残り出番：1出番あたりの拘束時間</div><div class="v" id="perShiftBind">—</div></div>
       <div class="stat"><div class="k">平均運転時間</div><div class="v" id="avgDrive">—</div></div>
       <div class="stat rev"><div class="k">平均営収（目標）</div><div class="v" id="avgTgt">—</div></div>
       <div class="stat rev"><div class="k">平均営収（実績）</div><div class="v" id="avgAct">—</div></div>
@@ -332,7 +332,7 @@ function recalc(){
   document.getElementById('avgTgt').textContent = lastTgtAvg!=null ? fmtYen(lastTgtAvg) : '—';
   document.getElementById('avgAct').textContent = lastActAvg!=null ? fmtYen(lastActAvg) : '—';
 
-  /* 1出番あたりの拘束時間 ＝ 残りの拘束 ÷ 残りの出番数 */
+  /* 残り出番：1出番あたりの拘束時間 ＝ 残りの拘束 ÷ 残りの出番数 */
   var totalShifts = parseInt(document.getElementById('shiftCount').value,10) || 13;
   var remainShifts = totalShifts - bindCount;
   var perEl = document.getElementById('perShiftBind');
@@ -608,9 +608,9 @@ function exportCSV(){
   var remainShifts = totalShifts - bindCnt;
   lines.push('');
   lines.push('月タイプ,'+ limit +'時間');
-  lines.push('拘束合計,'+ fmtHM(totalBind));
-  lines.push('月間拘束残り,'+ fmtHM(limit*60 - totalBind));
-  lines.push('1出番あたりの拘束時間,'+ (remainShifts>0 ? fmtHM((limit*60 - totalBind)/remainShifts) : ''));
+  lines.push('拘束時間合計,'+ fmtHM(totalBind));
+  lines.push('月間拘束時間 残り,'+ fmtHM(limit*60 - totalBind));
+  lines.push('残り出番：1出番あたりの拘束時間,'+ (remainShifts>0 ? fmtHM((limit*60 - totalBind)/remainShifts) : ''));
   lines.push('平均運転時間,'+ (driveCnt>0 ? fmtHM(totalDrive/driveCnt) : ''));
   lines.push('平均営収(目標),'+ lastT);
   lines.push('平均営収(実績),'+ lastA);
