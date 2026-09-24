@@ -65,7 +65,7 @@
 <body>
 <div class="wrap">
   <h1>タクシー勤務管理</h1>
-  <p class="sub">記録する月（年月）を選んで、毎月の勤務を残せます。始業・終業を「日付＋時刻」で選ぶと拘束時間を自動計算（翌日終業もそのまま正しく計算）。月間拘束の残り・運転時間の平均・営収の平均も出ます。</p>
+  <p class="sub">記録する月（年月）を選んで、毎月の勤務を残せます。始業・終業を「日付＋時刻」で選ぶと拘束時間を自動計算（翌日終業もそのまま正しく計算）。月間拘束の残り・1出番あたりの拘束時間・平均運転時間・営収の平均も出ます。</p>
 
   <div class="card">
     <p class="sec-title">全端末で同期（Googleログイン）</p>
@@ -117,8 +117,8 @@
     <div class="stats">
       <div class="stat hl"><div class="k">拘束 合計 / 上限</div><div class="v" id="sumBind">—</div></div>
       <div class="stat" id="remainCard"><div class="k">月間拘束 残り</div><div class="v" id="remainBind">—</div></div>
-      <div class="stat"><div class="k">運転 現在の平均</div><div class="v" id="avgDrive">—</div></div>
-      <div class="stat warn"><div class="k">残り出番の必要運転/出番</div><div class="v" id="needDrive">—</div></div>
+      <div class="stat warn"><div class="k">1出番あたりの拘束時間</div><div class="v" id="perShiftBind">—</div></div>
+      <div class="stat"><div class="k">平均運転時間</div><div class="v" id="avgDrive">—</div></div>
       <div class="stat rev"><div class="k">平均営収（目標）</div><div class="v" id="avgTgt">—</div></div>
       <div class="stat rev"><div class="k">平均営収（実績）</div><div class="v" id="avgAct">—</div></div>
     </div>
@@ -265,8 +265,8 @@ function recalc(){
   var targetMin = parseTime(document.getElementById('target').value);
   if(targetMin==null) targetMin = 870;
   var rows = document.querySelectorAll('#rows tr');
-  var totalBindMin = 0, totalDriveMin = 0, driveCount = 0;
-  var totalRev = 0, revCount = 0, cumBindMin = 0;
+  var totalBindMin = 0, totalDriveMin = 0, driveCount = 0, bindCount = 0;
+  var cumBindMin = 0;
   var lastTgtAvg = null;
   var runActSum = 0, runActCount = 0, lastActAvg = null;
 
@@ -285,6 +285,7 @@ function recalc(){
     if(b && b.valid){
       totalBindMin += b.mins;
       cumBindMin += b.mins;
+      bindCount++;
       bindCell.textContent = fmtHM(b.mins);
       bindCell.className = 'calc bind';
       var remMin = limit*60 - cumBindMin;
@@ -303,9 +304,8 @@ function recalc(){
     }
     var dv = parseTime(driveStr);
     if(dv!=null){ totalDriveMin += dv; driveCount++; }
-    var rv = parseFloat(revStr);
-    if(!isNaN(rv)){ totalRev += rv; revCount++; }
 
+    var rv = parseFloat(revStr);
     var tg = parseFloat(tgtStr);
     if(!isNaN(tg)){
       lastTgtAvg = (runActSum + tg) / (runActCount + 1);
@@ -332,28 +332,18 @@ function recalc(){
   document.getElementById('avgTgt').textContent = lastTgtAvg!=null ? fmtYen(lastTgtAvg) : '—';
   document.getElementById('avgAct').textContent = lastActAvg!=null ? fmtYen(lastActAvg) : '—';
 
+  /* 1出番あたりの拘束時間 ＝ 残りの拘束 ÷ 残りの出番数 */
   var totalShifts = parseInt(document.getElementById('shiftCount').value,10) || 13;
-  var remainingShifts = totalShifts - driveCount;
-  var need = document.getElementById('needDrive');
+  var remainShifts = totalShifts - bindCount;
+  var perEl = document.getElementById('perShiftBind');
   var note = document.getElementById('needNote');
-  var tH = fmtHM(targetMin);
-  if(driveCount === 0){
-    need.textContent = '—';
-    note.textContent = '運転時間を入力すると、残り出番で1出番あたり何時間運転すれば目標平均('+tH+')に届くか表示します。';
-  } else if(remainingShifts <= 0){
-    need.textContent = '—';
-    var avgMin = totalDriveMin/driveCount;
-    note.textContent = '全出番が入力済み。最終的な平均運転時間は ' + fmtHM(avgMin) + ' '
-      + (avgMin >= targetMin ? '（目標達成）' : '（目標に ' + fmtHM(targetMin-avgMin) + ' 不足）');
+  if(remainShifts > 0){
+    var per = remainTotalMin / remainShifts;
+    perEl.textContent = fmtHM(per);
+    note.textContent = '残りの拘束（'+fmtHM(remainTotalMin)+'）を残り'+remainShifts+'出番で割った、1出番あたりに使える拘束時間です。';
   } else {
-    var requiredMin = (targetMin*totalShifts - totalDriveMin) / remainingShifts;
-    if(requiredMin <= 0){
-      need.textContent = '0時間でOK';
-      note.textContent = 'すでに目標達成ペース。残り'+remainingShifts+'出番は0時間でも平均'+tH+'を超えます。';
-    } else {
-      need.textContent = fmtHM(requiredMin);
-      note.textContent = '残り'+remainingShifts+'出番すべてで、1出番あたり平均 約'+fmtHM(requiredMin)+' 以上の運転が必要（目標平均'+tH+'）。';
-    }
+    perEl.textContent = '—';
+    note.textContent = '全'+totalShifts+'出番ぶんの拘束が入力済みです。この月の拘束合計は '+fmtHM(totalBindMin)+'（上限 '+limit+'時間）。';
   }
 }
 
@@ -590,7 +580,7 @@ function exportCSV(){
   var lines = [];
   lines.push('対象月,'+ (SEL?monthLabel(SEL):''));
   lines.push('出番,始業,終業,拘束時間,運転時間,目標営収(円),実績営収(円),平均営収(目標),平均営収(実績),この時点の拘束残り');
-  var cum = 0, totalBind = 0, totalDrive = 0, driveCnt = 0;
+  var cum = 0, totalBind = 0, totalDrive = 0, driveCnt = 0, bindCnt = 0;
   var lastT = '';
   var runA = 0, runAc = 0, lastA = '';
   rows.forEach(function(tr, i){
@@ -602,7 +592,7 @@ function exportCSV(){
     var b = bindMinutes(start, end);
     var bindStr = '', remainStr = '';
     if(b && b.valid){
-      totalBind += b.mins; cum += b.mins;
+      totalBind += b.mins; cum += b.mins; bindCnt++;
       bindStr = fmtHM(b.mins);
       remainStr = fmtHM(limit*60 - cum);
     }
@@ -614,11 +604,14 @@ function exportCSV(){
     if(!isNaN(rv)){ runA += rv; runAc++; avgAstr = Math.round(runA/runAc); lastA = avgAstr; }
     lines.push([ (i+1), fmtDT(start), fmtDT(end), bindStr, (drive||''), (tgtStr||''), (revStr||''), avgTstr, avgAstr, remainStr ].join(','));
   });
+  var totalShifts = parseInt(document.getElementById('shiftCount').value,10) || 13;
+  var remainShifts = totalShifts - bindCnt;
   lines.push('');
   lines.push('月タイプ,'+ limit +'時間');
   lines.push('拘束合計,'+ fmtHM(totalBind));
   lines.push('月間拘束残り,'+ fmtHM(limit*60 - totalBind));
-  lines.push('運転平均,'+ (driveCnt>0 ? fmtHM(totalDrive/driveCnt) : ''));
+  lines.push('1出番あたりの拘束時間,'+ (remainShifts>0 ? fmtHM((limit*60 - totalBind)/remainShifts) : ''));
+  lines.push('平均運転時間,'+ (driveCnt>0 ? fmtHM(totalDrive/driveCnt) : ''));
   lines.push('平均営収(目標),'+ lastT);
   lines.push('平均営収(実績),'+ lastA);
   var csv = '﻿' + lines.join('\r\n');
