@@ -48,6 +48,10 @@
   .cdot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none;}
   .cx{border:0;background:transparent;color:#9ca3af;font-size:16px;cursor:pointer;line-height:1;padding:0 0 0 2px;}
   .catempty{font-size:12.5px;color:var(--sub);margin-bottom:6px;}
+  .undobar{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:12.5px;border-radius:10px;
+    padding:8px 11px;margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:space-between;}
+  .undobar button{border:1px solid #fdba74;background:#fff;color:#9a3412;border-radius:8px;
+    padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer;flex:none;}
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;background:#fff;scroll-margin-top:10px;}
   .seg.todo{background:var(--todobg);border-color:#e2d4ff;}
@@ -142,7 +146,8 @@
       <input type="text" id="newCat" placeholder="例：睡眠 / 筋トレ / 読書 / 仕事の勉強" style="flex:1;min-width:150px">
       <button class="btn mini" id="addCat">追加</button>
     </div>
-    <p class="hint">ここで作ったカテゴリを各ブロックで選べます。削除しても記録済みのデータは残ります。</p>
+    <div id="catUndo" class="undobar" style="display:none"></div>
+    <p class="hint">ここで作ったカテゴリを各ブロックで選べます。間違えて消したら、すぐ下に出る「元に戻す」で戻せます。</p>
   </div>
 
   <!-- メモ -->
@@ -215,7 +220,8 @@
     <p class="cardhead">📊 記録して比較</p>
     <div class="btnrow"><button class="btn mini" id="saveRecord">📌 この回を記録</button></div>
     <div class="rec-scroll"><div id="records"></div></div>
-    <p class="hint">「この回を記録」で、開始日・カテゴリ別合計を保存。下の表で過去と比べられます。行の🗑で削除。</p>
+    <div id="recUndo" class="undobar" style="display:none"></div>
+    <p class="hint">「この回を記録」で、開始日・カテゴリ別合計を保存。下の表で過去と比べられます。行の🗑で削除、消したら「元に戻す」で戻せます。</p>
   </div>
 
   <p class="foot">
@@ -229,19 +235,20 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-/* 独立アプリ用のキー（タクシー版とは別枠） */
 const LAST_KEY="routine_last_v1";
 const PRESET_KEY="routine_presets_v1";
 const CAT_KEY="routine_categories_v1";
 const RECORDS_KEY="routine_records_v1";
 const NEWCAT="__new__";
 const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
-const CLOUD_COLLECTION="taxiShift";   // 同じユーザー文書だが、 routine フィールドにだけ保存（ルール追加不要）
+const CLOUD_COLLECTION="taxiShift";
 const CLOUD_FIELD="routine";
 const PALETTE=['#2563eb','#0f9d6b','#f97316','#7c3aed','#db2777','#0891b2','#ca8a04','#4f46e5','#16a34a','#dc2626','#2dd4bf','#e11d48'];
 
 let categories=[];
 let records=[];
+let lastCat=null;   // 取り消し用（カテゴリ）
+let lastRec=null;   // 取り消し用（記録）
 
 const state={
   out:"06:00", startDate:"", defMin:60,
@@ -504,12 +511,14 @@ function scrollToFirstIncomplete(force){
   if(target) target.scrollIntoView({block:"start"});
 }
 
-/* カテゴリ管理 */
+/* カテゴリ管理 + 取り消し */
 function renderCatChips(){
   const box=$("#catChips");
   if(!categories.length){ box.innerHTML='<div class="catempty">まだカテゴリがありません。下の欄で追加してください（例：睡眠 / 筋トレ）。</div>'; return; }
   box.innerHTML=categories.map((c,i)=>`<span class="catchip"><span class="cdot" style="background:${catColor(c)}"></span>${esc(c)}<button class="cx" data-delcat="${i}" title="削除">×</button></span>`).join("");
 }
+function showCatUndo(name){ const b=$("#catUndo"); b.innerHTML=`<span>カテゴリ「${esc(name)}」を削除しました</span><button data-undocat="1">元に戻す</button>`; b.style.display="flex"; }
+function hideCatUndo(){ $("#catUndo").style.display="none"; }
 $("#addCat").addEventListener("click",()=>{
   const v=$("#newCat").value.trim(); if(!v) return;
   if(categories.indexOf(v)>=0){ alert("同じカテゴリが既にあります"); return; }
@@ -518,12 +527,22 @@ $("#addCat").addEventListener("click",()=>{
 $("#newCat").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#addCat").click(); }});
 $("#catChips").addEventListener("click",e=>{
   const i=e.target.dataset.delcat; if(i===undefined) return;
-  const name=categories[+i];
-  if(!confirm(`カテゴリ「${name}」を削除しますか？\n（ブロックや記録に入っている分はそのまま残ります）`)) return;
-  categories.splice(+i,1); saveCategories(); renderCatChips(); render();
+  const idx=+i; const name=categories[idx];
+  if(!confirm(`カテゴリ「${name}」を削除しますか？（元に戻せます）`)) return;
+  lastCat={name, index:idx};
+  categories.splice(idx,1); saveCategories(); renderCatChips(); render();
+  showCatUndo(name);
+});
+$("#catUndo").addEventListener("click",e=>{
+  if(e.target.dataset.undocat===undefined) return;
+  if(lastCat){
+    const {name,index}=lastCat;
+    if(categories.indexOf(name)<0){ categories.splice(Math.min(index,categories.length),0,name); saveCategories(); }
+    lastCat=null; hideCatUndo(); renderCatChips(); render(); toast(`「${name}」を戻しました`);
+  }
 });
 
-/* 記録 */
+/* 記録 + 取り消し */
 function renderRecords(){
   const box=$("#records");
   if(!records.length){ box.innerHTML='<div class="rec-empty">まだ記録がありません。上の「📌 この回を記録」で保存できます。</div>'; return; }
@@ -541,17 +560,28 @@ function renderRecords(){
   h+='</tbody></table>';
   box.innerHTML=h;
 }
+function showRecUndo(rec){ const b=$("#recUndo"); b.innerHTML=`<span>記録（${esc(rec.date||"")}）を削除しました</span><button data-undorec="1">元に戻す</button>`; b.style.display="flex"; }
+function hideRecUndo(){ $("#recUndo").style.display="none"; }
 $("#saveRecord").addEventListener("click",()=>{
   const r=compute();
   if(r.total<=0){ alert("記録する時間がありません（ブロックの時間を入れてください）"); return; }
   const date=state.startDate||$("#startDate").value||todayStr();
   const rec={id:genId(), date, start:state.out, name:state.flowName||"", totals:{...r.totals}, total:r.total, savedAt:Date.now()};
-  records.unshift(rec); saveRecords(); renderRecords(); toast(`記録しました（${date}）`);
+  records.unshift(rec); saveRecords(); renderRecords(); hideRecUndo(); toast(`記録しました（${date}）`);
 });
 $("#records").addEventListener("click",e=>{
   const id=e.target.dataset.delrec; if(id===undefined) return;
-  if(!confirm("この記録を削除しますか？")) return;
-  records=records.filter(x=>x.id!==id); saveRecords(); renderRecords(); toast("記録を削除しました");
+  const rec=records.find(x=>x.id===id); if(!rec) return;
+  if(!confirm("この記録を削除しますか？（元に戻せます）")) return;
+  lastRec=JSON.parse(JSON.stringify(rec));
+  records=records.filter(x=>x.id!==id); saveRecords(); renderRecords(); showRecUndo(rec);
+});
+$("#recUndo").addEventListener("click",e=>{
+  if(e.target.dataset.undorec===undefined) return;
+  if(lastRec){
+    if(!records.some(x=>x.id===lastRec.id)){ records.unshift(lastRec); saveRecords(); }
+    lastRec=null; hideRecUndo(); renderRecords(); toast("記録を戻しました");
+  }
 });
 
 /* ブロック/入力 */
