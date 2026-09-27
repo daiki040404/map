@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ルーティン時間トラッカー</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --ink:#1f2430; --sub:#6b7280;
+    --line:#e5e7eb; --accent:#7c3aed; --todobg:#f6f2fe; --done:#16a34a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
+    -webkit-text-size-adjust:100%;}
+  .wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
+  h1{font-size:19px;margin:4px 0 2px;}
+  .lead{color:var(--sub);font-size:13px;margin:0 0 16px;line-height:1.6;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  .fld{display:flex;flex-direction:column;gap:5px;}
+  label{font-size:12px;color:var(--sub);font-weight:600;}
+  input[type=time],input[type=date],input[type=number],input[type=text],select,textarea{font-size:16px;padding:9px 10px;
+    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;font-family:inherit;}
+  textarea{min-height:64px;resize:vertical;line-height:1.5;}
+  input[type=number]{width:96px;}
+  input[type=time]{width:130px;}
+  input[type=date]{width:160px;}
+  .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;
+    cursor:pointer;background:var(--accent);color:#fff;}
+  .btn.sec{background:#eef0f4;color:#374151;}
+  .btn.mini{padding:7px 11px;font-size:13px;}
+  .btn.google{background:#fff;color:#3c4043;border:1px solid #dadce0;display:inline-flex;align-items:center;gap:9px;}
+  .btn:disabled{opacity:.42;cursor:not-allowed;}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .divider{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px;}
+
+  .cardhead{font-size:13px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
+  .authstat{font-size:12.5px;color:var(--sub);margin-bottom:10px;}
+  .authstat b{color:var(--ink);}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#9ca3af;}
+  .dot.on{background:var(--done);}
+  .gicon{width:18px;height:18px;display:inline-block;flex:none;}
+
+  .catchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;
+    padding:6px 11px;margin:0 7px 7px 0;font-size:13px;font-weight:700;background:#fff;}
+  .cdot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none;}
+  .cx{border:0;background:transparent;color:#9ca3af;font-size:16px;cursor:pointer;line-height:1;padding:0 0 0 2px;}
+  .catempty{font-size:12.5px;color:var(--sub);margin-bottom:6px;}
+
+  .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;background:#fff;scroll-margin-top:10px;}
+  .seg.todo{background:var(--todobg);border-color:#e2d4ff;}
+  .seg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .seg-head-left{display:flex;align-items:center;gap:9px;flex:1;min-width:0;}
+  .blockdone{width:22px;height:22px;flex:none;accent-color:var(--done);cursor:pointer;}
+  .seg.collapsed{opacity:.5;}
+  .seg.collapsed .seg-ctrl,.seg.collapsed .tasks-wrap,.seg.collapsed .todo-title{display:none;}
+  .catsel{width:auto;min-width:140px;max-width:100%;font-weight:700;}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
+  .tag.todo{background:var(--accent);}
+  .clock{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .dur{font-size:12px;color:var(--sub);margin-top:3px;}
+  .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
+    padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
+  .seg-ctrl .fld label{font-size:11px;}
+  .eq{align-self:center;color:var(--sub);font-size:13px;font-weight:800;padding-bottom:9px;}
+  .memo{flex:1 1 100%;}
+  .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
+  .seg-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;
+    padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#374151;line-height:1;}
+  .del{background:transparent;border:0;color:#9ca3af;font-size:17px;cursor:pointer;line-height:1;padding:0 2px;}
+
+  .todo-title{font-size:15px;font-weight:700;margin-top:8px;}
+  .tasks-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
+  .tasks-head{font-size:11px;color:var(--sub);font-weight:700;margin-bottom:7px;}
+  .tasks{display:flex;flex-direction:column;gap:7px;}
+  .task{display:flex;align-items:center;gap:9px;}
+  .task input[type=checkbox]{width:21px;height:21px;flex:none;accent-color:var(--accent);}
+  .task-text{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
+  .task.done .task-text{text-decoration:line-through;color:#9ca3af;background:#fafafa;}
+  .task-input{width:100%;border:1px dashed #cbb9f0;border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
+
+  .summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
+  .pill{flex:1;min-width:120px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+  .pill .k{font-size:11px;color:var(--sub);font-weight:600;display:flex;align-items:center;gap:6px;}
+  .pill .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .pill.hi{background:#f3ecff;border-color:#e2d4ff;}
+
+  .rec-scroll{overflow-x:auto;}
+  .rec-table{border-collapse:collapse;font-size:12.5px;margin-top:8px;min-width:100%;}
+  .rec-table th,.rec-table td{border:1px solid var(--line);padding:6px 9px;text-align:right;white-space:nowrap;}
+  .rec-table th{background:#f8fafc;font-weight:700;}
+  .rec-table th:first-child,.rec-table td:first-child{text-align:left;position:sticky;left:0;background:#fff;}
+  .rec-table th:first-child{background:#f8fafc;}
+  .rec-table .rcdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+  .rec-del{border:0;background:transparent;color:#c2410c;cursor:pointer;font-size:15px;}
+  .rec-empty{font-size:12.5px;color:var(--sub);margin-top:8px;}
+
+  .saved{background:#e7f7f0;border:1px solid #c7ecdd;color:#0f7a52;font-size:12.5px;
+    border-radius:10px;padding:8px 11px;margin-top:8px;display:none;}
+  details{margin-top:6px;} summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:600;}
+  .settings{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
+  .foot{color:var(--sub);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.6;}
+  .curflow{font-size:12px;color:var(--sub);margin-top:8px;}
+  .curflow b{color:var(--ink);}
+  .filebtn{display:inline-flex;align-items:center;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ルーティン時間トラッカー</h1>
+  <p class="lead">開始時刻を入れてブロックを並べるだけ。各ブロックにカテゴリ（睡眠・筋トレ・読書など自分で作成）を選ぶと、カテゴリ別の合計時間が出ます。開始日ごとに記録して、過去と表で比べられます。Googleログインで全端末に同期（タクシーの勤務管理とは別データ）。</p>
+
+  <!-- アカウント同期 -->
+  <div class="card">
+    <p class="cardhead">☁️ アカウント同期</p>
+    <div class="authstat" id="authStatus"><span class="dot"></span>読み込み中…</div>
+    <div id="authForm">
+      <div class="btnrow">
+        <button class="btn google mini" id="btnGoogle">
+          <svg class="gicon" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Googleでログイン
+        </button>
+      </div>
+    </div>
+    <div id="authLoggedIn" style="display:none">
+      <div class="btnrow">
+        <button class="btn sec mini" id="btnLogout">ログアウト</button>
+        <button class="btn sec mini" id="btnSyncNow">今すぐ同期</button>
+      </div>
+    </div>
+    <p class="hint">東京マップやタクシー管理と同じGoogleアカウントでログインでき、全端末で同期します。データは他アプリとは別枠で保存されます。</p>
+  </div>
+
+  <!-- カテゴリ -->
+  <div class="card">
+    <p class="cardhead">🏷️ カテゴリ</p>
+    <div id="catChips"></div>
+    <div class="row" style="gap:8px">
+      <input type="text" id="newCat" placeholder="例：睡眠 / 筋トレ / 読書 / 仕事の勉強" style="flex:1;min-width:150px">
+      <button class="btn mini" id="addCat">追加</button>
+    </div>
+    <p class="hint">ここで作ったカテゴリを各ブロックで選べます。削除しても記録済みのデータは残ります。</p>
+  </div>
+
+  <!-- メモ -->
+  <div class="card">
+    <p class="cardhead">📝 今日のメモ</p>
+    <textarea id="dayMemo" placeholder="例：今日は早起き。午前に筋トレ→勉強、夜に読書。"></textarea>
+  </div>
+
+  <!-- ひな形 -->
+  <div class="card">
+    <p class="cardhead">💾 保存したルーティン（ひな形）</p>
+    <div class="row" style="gap:8px">
+      <select id="presetSel" style="flex:1;min-width:150px"><option value="">— 保存したルーティンを選ぶ —</option></select>
+      <button class="btn sec mini" id="loadPreset">読込</button>
+      <button class="btn sec mini" id="delPreset">削除</button>
+    </div>
+    <div id="curFlow" class="curflow"></div>
+    <div class="divider">
+      <div class="row" style="gap:10px">
+        <div class="fld" style="flex:1;min-width:150px"><label>名前</label><input type="text" id="presetName" placeholder="例：平日ルーティン"></div>
+        <div class="fld" style="flex:1;min-width:150px"><label>分類（任意）</label><select id="catSel"></select></div>
+      </div>
+      <div class="row" id="catNewRow" style="gap:10px;margin-top:8px;display:none">
+        <div class="fld" style="flex:1;min-width:150px"><label>新しい分類名</label><input type="text" id="catNew" placeholder="例：平日 / 休日"></div>
+      </div>
+      <div class="btnrow" style="margin-top:10px">
+        <button class="btn mini" id="btnUpdate" disabled>選択中を上書き更新</button>
+        <button class="btn sec mini" id="btnSaveNew">新規として保存</button>
+      </div>
+    </div>
+    <div class="row divider" style="gap:8px">
+      <button class="btn sec mini" id="exportJson">⬆ JSONで書き出し</button>
+      <label class="btn sec mini filebtn">⬇ JSONを読み込み<input type="file" id="importJson" accept="application/json,.json" style="display:none"></label>
+    </div>
+    <div class="saved" id="savedMsg"></div>
+    <p class="hint">よく使う組み方を「ひな形」として保存・呼び出しできます（記録とは別物）。</p>
+  </div>
+
+  <!-- 開始 + ブロック追加 -->
+  <div class="card">
+    <div class="row">
+      <div class="fld"><label>開始日</label><input type="date" id="startDate"></div>
+      <div class="fld"><label>開始時刻</label><input type="time" id="startTime" value="06:00"></div>
+    </div>
+    <div class="btnrow" style="margin-top:10px">
+      <button class="btn mini" id="addBlock">＋ ブロック</button>
+      <button class="btn sec mini" id="addTodo">＋ やること</button>
+      <button class="btn sec mini" id="addTodoTop">↑ やること(先頭)</button>
+      <button class="btn sec mini" id="jumpTodo">↧ 未完了へ</button>
+      <button class="btn sec mini" id="reset">初期化</button>
+    </div>
+    <details>
+      <summary>設定</summary>
+      <div class="settings">
+        <div class="fld"><label>ブロックの初期の長さ（分）</label><input type="number" inputmode="numeric" id="defMin" value="60" min="0" step="5"></div>
+      </div>
+      <p class="hint">各ブロックの「＋ブロック」「＋リスト」でその下に挿入できます。</p>
+    </details>
+  </div>
+
+  <div id="sched"></div>
+
+  <div class="card">
+    <p class="cardhead">⏱️ このルーティンの合計</p>
+    <div class="summary" id="summary"></div>
+  </div>
+
+  <!-- 記録して比較 -->
+  <div class="card">
+    <p class="cardhead">📊 記録して比較</p>
+    <div class="btnrow"><button class="btn mini" id="saveRecord">📌 この回を記録</button></div>
+    <div class="rec-scroll"><div id="records"></div></div>
+    <p class="hint">「この回を記録」で、開始日・カテゴリ別合計を保存。下の表で過去と比べられます。行の🗑で削除。</p>
+  </div>
+
+  <p class="foot">
+    ブロックの左上チェックで「完了」（畳まれます）。次に開くと未完了の位置まで自動スクロール。<br>
+    時間は「分」でも「終了時刻」でも入力OK。カテゴリはブロックのプルダウンで選びます。
+  </p>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+/* 独立アプリ用のキー（タクシー版とは別枠） */
+const LAST_KEY="routine_last_v1";
+const PRESET_KEY="routine_presets_v1";
+const CAT_KEY="routine_categories_v1";
+const RECORDS_KEY="routine_records_v1";
+const NEWCAT="__new__";
+const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
+const CLOUD_COLLECTION="taxiShift";   // 同じユーザー文書だが、 routine フィールドにだけ保存（ルール追加不要）
+const CLOUD_FIELD="routine";
+const PALETTE=['#2563eb','#0f9d6b','#f97316','#7c3aed','#db2777','#0891b2','#ca8a04','#4f46e5','#16a34a','#dc2626','#2dd4bf','#e11d48'];
+
+let categories=[];
+let records=[];
+
+const state={
+  out:"06:00", startDate:"", defMin:60,
+  dayMemo:"",
+  flowName:"", flowCat:"", currentId:null,
+  segments:[]
+};
+function defaultSegments(){ state.segments=[ mkBlock(), mkBlock(), mkBlock() ]; }
+function mkBlock(){ return {type:'block', cat:(categories[0]||""), min:state.defMin, memo:"", tasks:[], done:false}; }
+function mkTodo(){ return {type:'todo', title:"", tasks:[], done:false}; }
+
+function genId(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function stamp(){ const d=new Date(); return d.getFullYear()+pad2(d.getMonth()+1)+pad2(d.getDate())+"_"+pad2(d.getHours())+pad2(d.getMinutes()); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function hashStr(s){ let h=0; for(let i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))>>>0; } return h; }
+function catColor(name){ if(!name) return "#9ca3af"; const i=categories.indexOf(name); return PALETTE[(i>=0?i:hashStr(name))%PALETTE.length]; }
+
+function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } }
+function storeSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function getCategories(){ const c=storeGet(CAT_KEY); return Array.isArray(c)?c:[]; }
+function saveCategories(){ storeSet(CAT_KEY, categories); scheduleSync(); }
+function getRecords(){ const r=storeGet(RECORDS_KEY); return Array.isArray(r)?r:[]; }
+function saveRecords(){ storeSet(RECORDS_KEY, records); scheduleSync(); }
+
+function snapshot(){
+  return {out:state.out, startDate:state.startDate, defMin:state.defMin, dayMemo:state.dayMemo,
+          segments:JSON.parse(JSON.stringify(state.segments))};
+}
+function normTasks(a){ return Array.isArray(a)?a.map(t=>({text:(t&&t.text)||"",done:!!(t&&t.done)})):[]; }
+function normSeg(x){
+  if(!x||typeof x!=="object") return null;
+  if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks), done:!!x.done};
+  let cat=x.cat||"";
+  if(!cat && x.type==='work') cat="営業";
+  if(!cat && x.type==='break') cat="休憩";
+  return {type:'block', cat:cat, min:x.min||0, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done};
+}
+function applySnapshot(s){
+  if(!s) return false;
+  state.out=s.out??"06:00";
+  state.startDate=s.startDate||state.startDate||"";
+  state.defMin=s.defMin??60;
+  state.dayMemo=s.dayMemo||"";
+  let segs=Array.isArray(s.segments)?s.segments:[];
+  segs=segs.map(normSeg).filter(Boolean);
+  state.segments=segs.length?segs:[];
+  if(!state.segments.length) defaultSegments();
+  addCategoriesFromSegments();
+  return true;
+}
+function addCategoriesFromSegments(){
+  let changed=false;
+  state.segments.forEach(s=>{ if(s.type==='block' && s.cat && categories.indexOf(s.cat)<0){ categories.push(s.cat); changed=true; } });
+  if(changed) saveCategories();
+}
+function persistLast(){
+  const snap=snapshot();
+  snap.flowName=state.flowName; snap.flowCat=state.flowCat; snap.currentId=state.currentId;
+  storeSet(LAST_KEY, snap);
+  scheduleSync();
+}
+
+function getPresets(){ const p=storeGet(PRESET_KEY); return (p&&typeof p==="object")?p:{}; }
+function savePresets(p){ storeSet(PRESET_KEY,p); scheduleSync(); }
+function presetCats(){ return [...new Set(Object.values(getPresets()).map(x=>x.cat||"").filter(c=>c!==""))].sort(); }
+
+function refreshPresetList(sel){
+  const p=getPresets(); const el=$("#presetSel");
+  const cur = sel!==undefined ? sel : el.value;
+  el.innerHTML='<option value="">— 保存したルーティンを選ぶ —</option>';
+  const groups={};
+  Object.values(p).forEach(it=>{ const c=it.cat||"（分類なし）"; (groups[c]=groups[c]||[]).push(it); });
+  Object.keys(groups).sort().forEach(c=>{
+    const og=document.createElement("optgroup"); og.label=c;
+    groups[c].sort((a,b)=>a.name.localeCompare(b.name)).forEach(it=>{
+      const o=document.createElement("option"); o.value=it.id; o.textContent=it.name; og.appendChild(o);
+    });
+    el.appendChild(og);
+  });
+  if(cur && p[cur]) el.value=cur;
+  refreshCatSel($("#catSel").value);
+}
+function refreshCatSel(selVal){
+  const sel=$("#catSel"); const cats=presetCats();
+  const want = selVal!==undefined ? selVal : sel.value;
+  sel.innerHTML="";
+  const on=document.createElement("option"); on.value=""; on.textContent="（分類なし）"; sel.appendChild(on);
+  cats.forEach(c=>{ const o=document.createElement("option"); o.value=c; o.textContent=c; sel.appendChild(o); });
+  const nw=document.createElement("option"); nw.value=NEWCAT; nw.textContent="＋ 新しい分類…"; sel.appendChild(nw);
+  if(want===NEWCAT) sel.value=NEWCAT;
+  else if(cats.indexOf(want)>=0) sel.value=want;
+  else sel.value="";
+  togglePcatNew();
+}
+function togglePcatNew(){
+  const isNew=$("#catSel").value===NEWCAT;
+  $("#catNewRow").style.display=isNew?"flex":"none";
+  if(isNew) setTimeout(()=>$("#catNew").focus(),0);
+}
+function effectivePcat(){ const v=$("#catSel").value; return v===NEWCAT?$("#catNew").value.trim():v; }
+function setPcatUI(cat){
+  refreshCatSel(cat);
+  if(cat && presetCats().indexOf(cat)<0){ $("#catSel").value=NEWCAT; togglePcatNew(); $("#catNew").value=cat; }
+  else $("#catNew").value="";
+}
+
+function toast(msg){
+  const t=$("#savedMsg"); t.textContent="✓ "+msg; t.style.display="block";
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2600);
+}
+function updateCurFlow(){
+  const c=$("#curFlow");
+  if(state.currentId){
+    c.innerHTML=`編集中：<b>${esc(state.flowName||"（名前なし）")}</b>`+(state.flowCat?`（${esc(state.flowCat)}）`:"")+' <span style="color:#0f7a52">● 保存済み</span>';
+  }else{ c.innerHTML='編集中：<b>新規（未保存）</b>'; }
+  $("#btnUpdate").disabled = !state.currentId;
+}
+function syncInputs(){
+  $("#startTime").value=state.out;
+  $("#startDate").value=state.startDate||todayStr();
+  state.startDate=$("#startDate").value;
+  $("#defMin").value=state.defMin;
+  $("#dayMemo").value=state.dayMemo;
+}
+
+function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
+function hm(t){ let m=((t%1440)+1440)%1440; return pad2(Math.floor(m/60))+":"+pad2(m%60); }
+function fmtClock(base,el){ let total=base+el, day=Math.floor(total/1440); let pre=day<=0?"":(day===1?"翌 ":`+${day}日 `); return pre+hm(total); }
+function fmtDur(min){ min=Math.round(min); const h=Math.floor(min/60), m=min%60; if(h&&m) return `${h}時間${m}分`; if(h) return `${h}時間`; return `${m}分`; }
+
+function compute(){
+  const base=toMin(state.out)??0;
+  let elapsed=0; const rows=[]; const totals={};
+  state.segments.forEach((s,idx)=>{
+    if(s.type==='block'){
+      const min=Math.max(0,s.min||0);
+      rows.push({type:'block', idx, start:elapsed, dur:min});
+      const c=s.cat||"（未分類）";
+      totals[c]=(totals[c]||0)+min;
+      elapsed+=min;
+    }else{ rows.push({type:'todo', idx}); }
+  });
+  return {base, rows, endElapsed:elapsed, total:elapsed, totals};
+}
+function orderedCats(totals){
+  const order=categories.filter(c=>totals[c]!==undefined);
+  Object.keys(totals).forEach(c=>{ if(order.indexOf(c)<0) order.push(c); });
+  return order;
+}
+
+function segButtons(idx){
+  return `<div class="seg-btns">
+    <button class="chip" data-addblock="${idx}" title="下にブロックを挿入">＋ブロック</button>
+    <button class="chip" data-addtodo="${idx}" title="下にやることを挿入">＋リスト</button>
+    <button class="del" data-del="${idx}" title="このブロックを削除">🗑</button>
+  </div>`;
+}
+function doneBox(idx){ return `<input type="checkbox" class="blockdone" data-blockdone data-idx="${idx}" ${state.segments[idx].done?'checked':''} title="完了にする">`; }
+function memoField(idx){ return `<div class="fld memo"><label>メモ</label>
+  <input type="text" value="${esc(state.segments[idx].memo)}" data-k="memo" data-idx="${idx}" placeholder="メモ"></div>`; }
+function catOptions(current){
+  const set=[...categories];
+  if(current && set.indexOf(current)<0) set.push(current);
+  let o=`<option value="">（カテゴリ未選択）</option>`;
+  set.forEach(c=>{ o+=`<option value="${esc(c)}" ${c===current?'selected':''}>${esc(c)}</option>`; });
+  return o;
+}
+function taskList(idx){
+  const seg=state.segments[idx];
+  const items=(seg.tasks||[]).map((t,ti)=>`
+    <div class="task ${t.done?'done':''}">
+      <input type="checkbox" data-done data-idx="${idx}" data-ti="${ti}" ${t.done?'checked':''}>
+      <input type="text" class="task-text" value="${esc(t.text)}" data-k="tasktext" data-idx="${idx}" data-ti="${ti}" placeholder="項目">
+      <button class="del" data-deltask data-idx="${idx}" data-ti="${ti}" title="項目を削除">🗑</button>
+    </div>`).join("");
+  return `<div class="tasks-wrap"><div class="tasks-head">✔ チェックリスト</div>
+    <div class="tasks">${items}
+      <div class="task-add"><input type="text" class="task-input" data-addtask data-idx="${idx}" placeholder="＋ 項目を入力してEnter"></div>
+    </div></div>`;
+}
+
+function render(){
+  const r=compute();
+  const S=$("#sched");
+  const ae=document.activeElement;
+  let fk=null, fx=null, ss=null, se=null;
+  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['min','blockend'].indexOf(ae.dataset.k)>=0){
+    fk=ae.dataset.k; fx=ae.dataset.idx;
+    try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
+  }
+  S.innerHTML="";
+  r.rows.forEach(row=>{
+    if(row.type==='block'){
+      const seg=state.segments[row.idx];
+      const color=catColor(seg.cat);
+      const el=document.createElement("div"); el.className="seg block"+(seg.done?" collapsed":"");
+      el.style.borderLeft="4px solid "+color;
+      const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
+      el.innerHTML=`
+        <div class="seg-top">
+          <div class="seg-head-left">${doneBox(row.idx)}
+            <select class="catsel" data-k="cat" data-idx="${row.idx}" style="border-color:${color}">${catOptions(seg.cat)}</select>
+          </div>
+          <div style="text-align:right">
+            <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
+            <div class="dur">${fmtDur(row.dur)}</div>
+          </div>
+        </div>
+        <div class="seg-ctrl">
+          <div class="fld"><label>時間（分）</label>
+            <input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="min" data-idx="${row.idx}"></div>
+          <div class="eq">=</div>
+          <div class="fld"><label>終了時刻</label>
+            <input type="time" value="${plannedEnd}" data-k="blockend" data-start="${row.start}" data-idx="${row.idx}">
+            <span class="hint">分↔時刻どちらでもOK</span></div>
+          ${segButtons(row.idx)}
+          ${memoField(row.idx)}
+        </div>
+        ${taskList(row.idx)}`;
+      S.appendChild(el);
+    }else{
+      const seg=state.segments[row.idx];
+      const el=document.createElement("div"); el.className="seg todo"+(seg.done?" collapsed":"");
+      el.innerHTML=`
+        <div class="seg-top">
+          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag todo">やること</span></div>
+          ${segButtons(row.idx)}
+        </div>
+        <input type="text" class="todo-title" value="${esc(seg.title)}" data-k="title" data-idx="${row.idx}" placeholder="タイトル（例：起床ルーティン / 準備）">
+        ${taskList(row.idx)}`;
+      S.appendChild(el);
+    }
+  });
+
+  const end=document.createElement("div");
+  end.className="seg kiko"; end.style.background="#111827"; end.style.borderColor="#111827";
+  end.innerHTML=`<div class="seg-top"><div><span class="tag" style="background:#fff;color:#111827">終了</span></div>
+    <div class="clock" style="color:#fff">${fmtClock(r.base,r.endElapsed)}</div></div>`;
+  S.appendChild(end);
+
+  if(fk!==null){ const el=S.querySelector(`[data-k="${fk}"][data-idx="${fx}"]`); if(el){ el.focus(); if(ss!==null){ try{ el.setSelectionRange(ss,se); }catch(e){} } } }
+
+  const cats=orderedCats(r.totals);
+  let pills=`<div class="pill hi"><div class="k">終了時刻</div><div class="v">${fmtClock(r.base,r.endElapsed)}</div></div>
+    <div class="pill"><div class="k">合計時間</div><div class="v">${fmtDur(r.total)}</div></div>`;
+  cats.forEach(c=>{ pills+=`<div class="pill"><div class="k"><span class="cdot" style="background:${catColor(c)}"></span>${esc(c)}</div><div class="v">${fmtDur(r.totals[c])}</div></div>`; });
+  $("#summary").innerHTML=pills;
+
+  persistLast();
+}
+
+function scrollToFirstIncomplete(force){
+  const anyDone=state.segments.some(s=>s.done);
+  if(!force && !anyDone) return;
+  const S=$("#sched"); const segs=[...S.querySelectorAll(".seg")];
+  let target=segs.find(el=>!el.classList.contains("collapsed") && !el.classList.contains("kiko"));
+  if(!target) target=S.querySelector(".seg.kiko");
+  if(target) target.scrollIntoView({block:"start"});
+}
+
+/* カテゴリ管理 */
+function renderCatChips(){
+  const box=$("#catChips");
+  if(!categories.length){ box.innerHTML='<div class="catempty">まだカテゴリがありません。下の欄で追加してください（例：睡眠 / 筋トレ）。</div>'; return; }
+  box.innerHTML=categories.map((c,i)=>`<span class="catchip"><span class="cdot" style="background:${catColor(c)}"></span>${esc(c)}<button class="cx" data-delcat="${i}" title="削除">×</button></span>`).join("");
+}
+$("#addCat").addEventListener("click",()=>{
+  const v=$("#newCat").value.trim(); if(!v) return;
+  if(categories.indexOf(v)>=0){ alert("同じカテゴリが既にあります"); return; }
+  categories.push(v); saveCategories(); $("#newCat").value=""; renderCatChips(); render();
+});
+$("#newCat").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); $("#addCat").click(); }});
+$("#catChips").addEventListener("click",e=>{
+  const i=e.target.dataset.delcat; if(i===undefined) return;
+  const name=categories[+i];
+  if(!confirm(`カテゴリ「${name}」を削除しますか？\n（ブロックや記録に入っている分はそのまま残ります）`)) return;
+  categories.splice(+i,1); saveCategories(); renderCatChips(); render();
+});
+
+/* 記録 */
+function renderRecords(){
+  const box=$("#records");
+  if(!records.length){ box.innerHTML='<div class="rec-empty">まだ記録がありません。上の「📌 この回を記録」で保存できます。</div>'; return; }
+  const colSet=[...categories];
+  records.forEach(rec=>{ Object.keys(rec.totals||{}).forEach(c=>{ if(colSet.indexOf(c)<0) colSet.push(c); }); });
+  const rows=[...records].sort((a,b)=> (b.date||"").localeCompare(a.date||"") || (b.savedAt||0)-(a.savedAt||0));
+  let h='<table class="rec-table"><thead><tr><th>開始日</th>';
+  colSet.forEach(c=>{ h+=`<th><span class="rcdot" style="background:${catColor(c)}"></span>${esc(c)}</th>`; });
+  h+='<th>合計</th><th></th></tr></thead><tbody>';
+  rows.forEach(rec=>{
+    h+=`<tr><td>${esc(rec.date||"")}${rec.name?'<br><span style="color:#6b7280">'+esc(rec.name)+'</span>':''}</td>`;
+    colSet.forEach(c=>{ const v=(rec.totals&&rec.totals[c])||0; h+=`<td>${v?fmtDur(v):'-'}</td>`; });
+    h+=`<td>${fmtDur(rec.total||0)}</td><td><button class="rec-del" data-delrec="${rec.id}" title="この記録を削除">🗑</button></td></tr>`;
+  });
+  h+='</tbody></table>';
+  box.innerHTML=h;
+}
+$("#saveRecord").addEventListener("click",()=>{
+  const r=compute();
+  if(r.total<=0){ alert("記録する時間がありません（ブロックの時間を入れてください）"); return; }
+  const date=state.startDate||$("#startDate").value||todayStr();
+  const rec={id:genId(), date, start:state.out, name:state.flowName||"", totals:{...r.totals}, total:r.total, savedAt:Date.now()};
+  records.unshift(rec); saveRecords(); renderRecords(); toast(`記録しました（${date}）`);
+});
+$("#records").addEventListener("click",e=>{
+  const id=e.target.dataset.delrec; if(id===undefined) return;
+  if(!confirm("この記録を削除しますか？")) return;
+  records=records.filter(x=>x.id!==id); saveRecords(); renderRecords(); toast("記録を削除しました");
+});
+
+/* ブロック/入力 */
+$("#dayMemo").addEventListener("input",e=>{state.dayMemo=e.target.value;persistLast();});
+$("#startTime").addEventListener("input",e=>{state.out=e.target.value;render();});
+$("#startDate").addEventListener("input",e=>{state.startDate=e.target.value;persistLast();});
+$("#defMin").addEventListener("input",e=>{state.defMin=Math.max(0,+e.target.value||0);persistLast();});
+$("#addBlock").addEventListener("click",()=>{state.segments.push(mkBlock());render();});
+$("#addTodo").addEventListener("click",()=>{state.segments.push(mkTodo());render();});
+$("#addTodoTop").addEventListener("click",()=>{state.segments.unshift(mkTodo());render();});
+$("#jumpTodo").addEventListener("click",()=>scrollToFirstIncomplete(true));
+$("#reset").addEventListener("click",()=>{
+  if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（カテゴリ・保存・記録は消えません）")) return;
+  state.flowName=""; state.flowCat=""; state.currentId=null; state.dayMemo="";
+  defaultSegments(); $("#presetName").value=""; setPcatUI(""); syncInputs(); updateCurFlow(); render();
+});
+
+$("#sched").addEventListener("input",e=>{
+  const t=e.target; const x=t.dataset.idx, k=t.dataset.k;
+  if(x===undefined||k===undefined) return;
+  const s=state.segments[+x];
+  if(k==="memo"){ s.memo=t.value; persistLast(); return; }
+  if(k==="title"){ s.title=t.value; persistLast(); return; }
+  if(k==="tasktext"){ const ti=+t.dataset.ti; if(s.tasks&&s.tasks[ti]){ s.tasks[ti].text=t.value; persistLast(); } return; }
+  if(k==="cat"){ s.cat=t.value; render(); return; }
+  if(k==="min"){ s.min=Math.max(0,+t.value||0); }
+  else if(k==="blockend"){
+    const endClock=toMin(t.value); if(endClock===null){ render(); return; }
+    const base=toMin(state.out)||0; const startElapsed=+t.dataset.start||0;
+    const startClock=((base+startElapsed)%1440+1440)%1440;
+    s.min=((endClock-startClock)%1440+1440)%1440;
+  }
+  render();
+});
+$("#sched").addEventListener("change",e=>{
+  const t=e.target;
+  if(t.dataset.blockdone!==undefined){ const idx=+t.dataset.idx; if(state.segments[idx]){ state.segments[idx].done=t.checked; } render(); return; }
+  if(t.dataset.done!==undefined){
+    const idx=+t.dataset.idx, ti=+t.dataset.ti; const s=state.segments[idx];
+    if(s&&s.tasks&&s.tasks[ti]){ s.tasks[ti].done=t.checked; }
+    const row=t.closest(".task"); if(row) row.classList.toggle("done",t.checked); persistLast();
+  }
+});
+$("#sched").addEventListener("keydown",e=>{
+  if(e.key==="Enter" && e.target.dataset.addtask!==undefined){
+    e.preventDefault();
+    const idx=+e.target.dataset.idx; const val=e.target.value.trim(); if(!val) return;
+    const s=state.segments[idx]; s.tasks=s.tasks||[]; s.tasks.push({text:val,done:false}); render();
+    const inp=$("#sched").querySelector(`[data-addtask][data-idx="${idx}"]`); if(inp) inp.focus();
+  }
+});
+$("#sched").addEventListener("click",e=>{
+  const t=e.target;
+  if(t.dataset.del!==undefined){ if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); } }
+  else if(t.dataset.deltask!==undefined){ const idx=+t.dataset.idx, ti=+t.dataset.ti; if(state.segments[idx]&&state.segments[idx].tasks){ state.segments[idx].tasks.splice(ti,1); render(); } }
+  else if(t.dataset.addblock!==undefined){ state.segments.splice(+t.dataset.addblock+1,0,mkBlock()); render(); }
+  else if(t.dataset.addtodo!==undefined){ state.segments.splice(+t.dataset.addtodo+1,0,mkTodo()); render(); }
+});
+
+$("#catSel").addEventListener("change",togglePcatNew);
+
+/* Firebase */
+let fbUser=null, fbDb=null, fbReady=false, _syncT=null, _pulling=false;
+function setAuthStatus(html,on){ $("#authStatus").innerHTML=`<span class="dot${on?' on':''}"></span>`+html; }
+function updateAuthUI(){
+  if(fbUser){ $("#authForm").style.display="none"; $("#authLoggedIn").style.display="block";
+    setAuthStatus(`ログイン中：<b>${esc(fbUser.displayName||fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true);
+  }else{ $("#authForm").style.display="block"; $("#authLoggedIn").style.display="none";
+    setAuthStatus("未ログイン（この端末内のみ保存）", false); }
+}
+function fbInit(){
+  if(typeof firebase==="undefined"){ setAuthStatus("同期ライブラリを読み込めません（オフライン保存のみ）", false); return; }
+  try{
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbDb=firebase.firestore(); fbReady=true;
+    firebase.auth().getRedirectResult().catch(()=>{});
+    firebase.auth().onAuthStateChanged(u=>{ fbUser=u||null; updateAuthUI(); if(fbUser) cloudPull(); });
+  }catch(e){ setAuthStatus("同期の初期化に失敗しました", false); }
+}
+async function googleLogin(){
+  if(!fbReady){ alert("同期の準備ができていません（通信環境を確認）"); return; }
+  const provider=new firebase.auth.GoogleAuthProvider();
+  try{ await firebase.auth().signInWithPopup(provider); }
+  catch(e){
+    const code=e&&e.code;
+    if(code==="auth/popup-blocked"||code==="auth/popup-closed-by-user"||code==="auth/cancelled-popup-request"||code==="auth/operation-not-supported-in-this-environment"){
+      try{ await firebase.auth().signInWithRedirect(provider); return; }catch(e2){ alert("ログインできませんでした：\n"+(e2.message||e2.code)); return; }
+    }
+    alert("ログインできませんでした：\n"+(e.message||code));
+  }
+}
+async function cloudPull(){
+  if(!fbReady||!fbUser) return;
+  try{
+    _pulling=true;
+    const snap=await fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid).get();
+    const d=snap.exists?(snap.data()||{}):{};
+    const R=d[CLOUD_FIELD];
+    if(R && typeof R==="object"){
+      if(R.presets && typeof R.presets==="object") storeSet(PRESET_KEY, R.presets);
+      if(Array.isArray(R.categories)){ categories=R.categories.slice(); storeSet(CAT_KEY, categories); }
+      if(Array.isArray(R.records)){ records=R.records.slice(); storeSet(RECORDS_KEY, records); }
+      if(R.last){ applySnapshot(R.last); state.flowName=R.last.flowName||""; state.flowCat=R.last.flowCat||""; state.currentId=R.last.currentId||null; storeSet(LAST_KEY, R.last); }
+      refreshPresetList(state.currentId||""); $("#presetName").value=state.flowName; setPcatUI(state.flowCat);
+      renderCatChips(); renderRecords(); syncInputs(); updateCurFlow(); render();
+      toast("クラウドから読み込みました");
+    }else{ _pulling=false; await cloudPushNow(); return; }
+  }catch(e){ console.warn(e); setAuthStatus("同期エラー："+esc(e.code||e.message)+"（Firestoreのルール設定が必要かも）", true); }
+  finally{ _pulling=false; }
+}
+async function cloudPushNow(){
+  if(!fbReady||!fbUser||_pulling) return;
+  try{
+    const last=storeGet(LAST_KEY)||snapshot();
+    const payload={}; payload[CLOUD_FIELD]={presets:getPresets(), last:last, categories:categories, records:records};
+    payload.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
+    await fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid).set(payload, {merge:true});
+  }catch(e){ console.warn(e); setAuthStatus("クラウド保存エラー："+esc(e.code||e.message), true); }
+}
+function scheduleSync(){ if(!fbReady||!fbUser||_pulling) return; clearTimeout(_syncT); _syncT=setTimeout(cloudPushNow,900); }
+
+$("#btnGoogle").addEventListener("click",googleLogin);
+$("#btnLogout").addEventListener("click",async()=>{ try{ await firebase.auth().signOut(); toast("ログアウトしました"); }catch(e){} });
+$("#btnSyncNow").addEventListener("click",async()=>{ await cloudPushNow(); toast("同期しました"); });
+
+/* ひな形 */
+function currentName(){ return $("#presetName").value.trim(); }
+$("#btnSaveNew").addEventListener("click",()=>{
+  const name=currentName(); const cat=effectivePcat();
+  if(!name){ alert("名前を入力してください"); return; }
+  const p=getPresets();
+  const dup=Object.values(p).find(x=>(x.cat||"")===cat && x.name===name);
+  if(dup && !confirm(`「${cat?cat+"／":""}${name}」は既にあります。別に新規保存しますか？`)) return;
+  const id=genId(); p[id]={id, cat, name, data:snapshot()}; savePresets(p);
+  state.currentId=id; state.flowName=name; state.flowCat=cat;
+  refreshPresetList(id); setPcatUI(cat); updateCurFlow(); persistLast();
+  toast(`「${cat?cat+"／":""}${name}」を保存しました`);
+});
+$("#btnUpdate").addEventListener("click",()=>{
+  if(!state.currentId){ alert("先に「読込」で選ぶか、新規保存してください"); return; }
+  const p=getPresets(); if(!p[state.currentId]){ alert("元のルーティンが見つかりません"); return; }
+  const name=currentName()||p[state.currentId].name; const cat=effectivePcat();
+  p[state.currentId]={id:state.currentId, cat, name, data:snapshot()}; savePresets(p);
+  state.flowName=name; state.flowCat=cat;
+  refreshPresetList(state.currentId); setPcatUI(cat); updateCurFlow(); persistLast();
+  toast(`「${cat?cat+"／":""}${name}」を上書き更新しました`);
+});
+$("#loadPreset").addEventListener("click",()=>{
+  const id=$("#presetSel").value; if(!id){ alert("読み込むルーティンを選んでください"); return; }
+  const p=getPresets(); if(!p[id]) return;
+  applySnapshot(p[id].data); state.currentId=id; state.flowName=p[id].name; state.flowCat=p[id].cat||"";
+  $("#presetName").value=p[id].name; setPcatUI(p[id].cat||"");
+  renderCatChips(); syncInputs(); updateCurFlow(); render(); scrollToFirstIncomplete(false);
+  toast(`「${p[id].cat?p[id].cat+"／":""}${p[id].name}」を読み込みました`);
+});
+$("#delPreset").addEventListener("click",()=>{
+  const id=$("#presetSel").value; if(!id){ alert("削除するルーティンを選んでください"); return; }
+  const p=getPresets(); if(!p[id]) return;
+  const label=(p[id].cat?p[id].cat+"／":"")+p[id].name;
+  if(!confirm(`「${label}」を削除しますか？`)) return;
+  delete p[id]; savePresets(p);
+  if(state.currentId===id){ state.currentId=null; updateCurFlow(); persistLast(); }
+  refreshPresetList(""); toast(`「${label}」を削除しました`);
+});
+
+/* JSON */
+$("#exportJson").addEventListener("click",()=>{
+  const data={ _app:"routineTracker", version:1, exportedAt:new Date().toISOString(),
+    presets:getPresets(), categories:categories, records:records,
+    last:(function(){const s=snapshot();s.flowName=state.flowName;s.flowCat=state.flowCat;s.currentId=state.currentId;return s;})()
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  a.href=url; a.download="routine_"+stamp()+".json"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500); toast("JSONを書き出しました");
+});
+$("#importJson").addEventListener("change",e=>{
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const d=JSON.parse(rd.result);
+      if(d && d.presets && typeof d.presets==="object"){
+        const p=getPresets(); const byKey={}; Object.values(p).forEach(x=>{ byKey[(x.cat||"")+" "+x.name]=x.id; });
+        Object.keys(d.presets).forEach(k=>{ const v=d.presets[k]||{}; const cat=v.cat||""; const name=v.name||k; const data=v.data||v;
+          const kk=cat+" "+name; const id=byKey[kk] || (v.id && !p[v.id] ? v.id : genId()); p[id]={id,cat,name,data}; byKey[kk]=id; });
+        savePresets(p); refreshPresetList();
+      }
+      if(Array.isArray(d.categories)){ d.categories.forEach(c=>{ if(c && categories.indexOf(c)<0) categories.push(c); }); saveCategories(); renderCatChips(); }
+      if(Array.isArray(d.records)){ const ids=new Set(records.map(r=>r.id)); d.records.forEach(r=>{ if(r&&r.id&&!ids.has(r.id)){ records.push(r); ids.add(r.id); } }); saveRecords(); renderRecords(); }
+      let extra="";
+      if(d && d.last){
+        if(confirm(`データを読み込みました。\n表示中の内容もこのファイルの内容に置き換えますか？`)){
+          applySnapshot(d.last); state.flowName=d.last.flowName||""; state.flowCat=d.last.flowCat||""; state.currentId=null;
+          $("#presetName").value=state.flowName; setPcatUI(state.flowCat); renderCatChips(); syncInputs(); updateCurFlow(); render(); extra="＋表示中も更新";
+        }
+      }
+      toast(`読み込み完了 ${extra}`);
+    }catch(err){ alert("JSONの読み込みに失敗しました。"); }
+    e.target.value="";
+  };
+  rd.readAsText(f);
+});
+
+/* 起動時 */
+(function init(){
+  categories=getCategories();
+  records=getRecords();
+  const last=storeGet(LAST_KEY);
+  if(applySnapshot(last)){ state.flowName=last.flowName||""; state.flowCat=last.flowCat||""; state.currentId=last.currentId||null; }
+  else { if(!state.startDate) state.startDate=todayStr(); defaultSegments(); }
+  if(!state.startDate) state.startDate=todayStr();
+  renderCatChips();
+  refreshPresetList(state.currentId||"");
+  $("#presetName").value=state.flowName; setPcatUI(state.flowCat);
+  syncInputs(); updateCurFlow(); render(); renderRecords();
+  setTimeout(()=>scrollToFirstIncomplete(false),60);
+  fbInit();
+})();
+</script>
+</body>
+</html>
