@@ -6,37 +6,39 @@
 <title>ルーティン時間トラッカー</title>
 <style>
   :root{
-    --bg:#f5f6f8; --card:#fff; --ink:#1f2430; --sub:#6b7280;
-    --line:#e5e7eb; --accent:#7c3aed; --todobg:#f6f2fe; --done:#16a34a;
+    --bg:#f5f5f2; --card:#ffffff; --ink:#26251f; --sub:#75746c;
+    --line:#e2e1da; --line2:#cfcec5; --accent:#185fa5; --accent-bg:#e6f1fb;
+    --todobg:#eef4fb; --done:#3b6d11; --warn:#854f0b; --warn-bg:#faeeda; --danger:#a32d2d;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
-    -webkit-text-size-adjust:100%;}
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    line-height:1.6;-webkit-text-size-adjust:100%;}
   .wrap{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
-  h1{font-size:19px;margin:4px 0 2px;}
+  h1{font-size:20px;font-weight:600;margin:4px 0 2px;}
   .lead{color:var(--sub);font-size:13px;margin:0 0 16px;line-height:1.6;}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
-    padding:14px;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px;}
   .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
   .fld{display:flex;flex-direction:column;gap:5px;}
   label{font-size:12px;color:var(--sub);font-weight:600;}
   input[type=time],input[type=date],input[type=number],input[type=text],select,textarea{font-size:16px;padding:9px 10px;
-    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);width:100%;font-family:inherit;}
+    border:1px solid var(--line2);border-radius:8px;background:#fff;color:var(--ink);width:100%;font-family:inherit;}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg);}
   textarea{min-height:64px;resize:vertical;line-height:1.5;}
   input[type=number]{width:96px;}
   input[type=time]{width:130px;}
   input[type=date]{width:160px;}
-  .btn{border:0;border-radius:10px;padding:9px 14px;font-size:14px;font-weight:600;
+  .btn{border:1px solid var(--accent);border-radius:8px;padding:9px 14px;font-size:14px;font-weight:600;
     cursor:pointer;background:var(--accent);color:#fff;}
-  .btn.sec{background:#eef0f4;color:#374151;}
+  .btn.sec{background:#fff;color:var(--ink);border-color:var(--line2);}
+  .btn.sec:hover{background:#f2f1ec;}
   .btn.mini{padding:7px 11px;font-size:13px;}
   .btn.google{background:#fff;color:#3c4043;border:1px solid #dadce0;display:inline-flex;align-items:center;gap:9px;}
   .btn:disabled{opacity:.42;cursor:not-allowed;}
   .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
-  .divider{border-top:1px dashed var(--line);margin-top:12px;padding-top:12px;}
+  .divider{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;}
 
-  .cardhead{font-size:13px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
+  .cardhead{font-size:14px;font-weight:600;margin:0 0 10px;display:flex;align-items:center;gap:6px;}
   .authstat{font-size:12.5px;color:var(--sub);margin-bottom:10px;}
   .authstat b{color:var(--ink);}
   .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle;background:#9ca3af;}
@@ -44,66 +46,74 @@
   .gicon{width:18px;height:18px;display:inline-block;flex:none;}
 
   .catchip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;
-    padding:6px 11px;margin:0 7px 7px 0;font-size:13px;font-weight:700;background:#fff;}
+    padding:6px 11px;margin:0 7px 7px 0;font-size:13px;font-weight:600;background:#faf9f5;}
   .cdot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none;}
   .cx{border:0;background:transparent;color:#9ca3af;font-size:16px;cursor:pointer;line-height:1;padding:0 0 0 2px;}
   .catempty{font-size:12.5px;color:var(--sub);margin-bottom:6px;}
-  .undobar{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:12.5px;border-radius:10px;
+  .undobar{background:var(--warn-bg);border:1px solid #f0d9b0;color:var(--warn);font-size:12.5px;border-radius:8px;
     padding:8px 11px;margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:space-between;}
-  .undobar button{border:1px solid #fdba74;background:#fff;color:#9a3412;border-radius:8px;
-    padding:5px 11px;font-size:12.5px;font-weight:700;cursor:pointer;flex:none;}
+  .undobar button{border:1px solid #d9b877;background:#fff;color:var(--warn);border-radius:8px;
+    padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;flex:none;}
+  .trash-item{display:flex;align-items:center;gap:8px;justify-content:space-between;
+    border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-top:7px;font-size:13px;}
+  .trash-item .ti-main{min-width:0;}
+  .trash-item .ti-sub{font-size:11px;color:var(--sub);}
+  .trash-item .ti-btns{display:flex;gap:6px;flex:none;}
+  .trash-empty{font-size:12.5px;color:var(--sub);margin-top:7px;}
+  .kindtag{font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:6px;color:#fff;}
+  .kindtag.preset{background:var(--accent);} .kindtag.record{background:#0e7490;}
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;background:#fff;scroll-margin-top:10px;}
-  .seg.todo{background:var(--todobg);border-color:#e2d4ff;}
+  .seg.todo{background:var(--todobg);border-color:#cfe0f5;}
   .seg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .seg-head-left{display:flex;align-items:center;gap:9px;flex:1;min-width:0;}
   .blockdone{width:22px;height:22px;flex:none;accent-color:var(--done);cursor:pointer;}
   .seg.collapsed{opacity:.5;}
   .seg.collapsed .seg-ctrl,.seg.collapsed .tasks-wrap,.seg.collapsed .todo-title{display:none;}
-  .catsel{width:auto;min-width:140px;max-width:100%;font-weight:700;}
-  .tag{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
+  .catsel{width:auto;min-width:140px;max-width:100%;font-weight:600;}
+  .tag{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
   .tag.todo{background:var(--accent);}
-  .clock{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .clock{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
   .dur{font-size:12px;color:var(--sub);margin-top:3px;}
   .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
-    padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
+    padding-top:10px;border-top:1px solid var(--line);}
   .seg-ctrl .fld label{font-size:11px;}
-  .eq{align-self:center;color:var(--sub);font-size:13px;font-weight:800;padding-bottom:9px;}
+  .eq{align-self:center;color:var(--sub);font-size:13px;font-weight:700;padding-bottom:9px;}
   .memo{flex:1 1 100%;}
   .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
   .seg-btns{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto;}
-  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;
-    padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;color:#374151;line-height:1;}
+  .chip{border:1px solid var(--line2);background:#fff;border-radius:999px;
+    padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;color:var(--ink);line-height:1;}
   .del{background:transparent;border:0;color:#9ca3af;font-size:17px;cursor:pointer;line-height:1;padding:0 2px;}
 
-  .todo-title{font-size:15px;font-weight:700;margin-top:8px;}
-  .tasks-wrap{margin-top:10px;padding-top:10px;border-top:1px dashed rgba(0,0,0,.08);}
-  .tasks-head{font-size:11px;color:var(--sub);font-weight:700;margin-bottom:7px;}
+  .todo-title{font-size:15px;font-weight:600;margin-top:8px;}
+  .tasks-wrap{margin-top:10px;padding-top:10px;border-top:1px solid var(--line);}
+  .tasks-head{font-size:11px;color:var(--sub);font-weight:600;margin-bottom:7px;}
   .tasks{display:flex;flex-direction:column;gap:7px;}
   .task{display:flex;align-items:center;gap:9px;}
   .task input[type=checkbox]{width:21px;height:21px;flex:none;accent-color:var(--accent);}
-  .task-text{flex:1;border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
-  .task.done .task-text{text-decoration:line-through;color:#9ca3af;background:#fafafa;}
-  .task-input{width:100%;border:1px dashed #cbb9f0;border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
+  .task-text{flex:1;border:1px solid var(--line2);border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
+  .task.done .task-text{text-decoration:line-through;color:#9ca3af;background:#faf9f5;}
+  .task-input{width:100%;border:1px dashed #b9d3ef;border-radius:8px;padding:8px 9px;font-size:15px;background:#fff;}
 
   .summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;}
-  .pill{flex:1;min-width:120px;background:#f8fafc;border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+  .pill{flex:1;min-width:120px;background:#faf9f5;border:1px solid var(--line);border-radius:10px;padding:10px 12px;}
   .pill .k{font-size:11px;color:var(--sub);font-weight:600;display:flex;align-items:center;gap:6px;}
-  .pill .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px;}
-  .pill.hi{background:#f3ecff;border-color:#e2d4ff;}
+  .pill .v{font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;}
+  .pill.hi{background:var(--accent-bg);border-color:#cfe0f5;} .pill.hi .k,.pill.hi .v{color:var(--accent);}
 
   .rec-scroll{overflow-x:auto;}
   .rec-table{border-collapse:collapse;font-size:12.5px;margin-top:8px;min-width:100%;}
   .rec-table th,.rec-table td{border:1px solid var(--line);padding:6px 9px;text-align:right;white-space:nowrap;}
-  .rec-table th{background:#f8fafc;font-weight:700;}
+  .rec-table th{background:#faf9f5;font-weight:600;}
   .rec-table th:first-child,.rec-table td:first-child{text-align:left;position:sticky;left:0;background:#fff;}
-  .rec-table th:first-child{background:#f8fafc;}
+  .rec-table th:first-child{background:#faf9f5;}
   .rec-table .rcdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;}
-  .rec-del{border:0;background:transparent;color:#c2410c;cursor:pointer;font-size:15px;}
+  .rec-del{border:0;background:transparent;color:var(--danger);cursor:pointer;font-size:15px;}
   .rec-empty{font-size:12.5px;color:var(--sub);margin-top:8px;}
 
-  .saved{background:#e7f7f0;border:1px solid #c7ecdd;color:#0f7a52;font-size:12.5px;
-    border-radius:10px;padding:8px 11px;margin-top:8px;display:none;}
+  .saved{background:#eaf3de;border:1px solid #cfe4b3;color:var(--done);font-size:12.5px;
+    border-radius:8px;padding:8px 11px;margin-top:8px;display:none;}
   details{margin-top:6px;} summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:600;}
   .settings{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;}
   .foot{color:var(--sub);font-size:11.5px;text-align:center;margin-top:20px;line-height:1.6;}
@@ -115,7 +125,7 @@
 <body>
 <div class="wrap">
   <h1>ルーティン時間トラッカー</h1>
-  <p class="lead">開始時刻を入れてブロックを並べるだけ。各ブロックにカテゴリ（睡眠・筋トレ・読書など自分で作成）を選ぶと、カテゴリ別の合計時間が出ます。開始日ごとに記録して、過去と表で比べられます。Googleログインで全端末に同期（タクシーの勤務管理とは別データ）。</p>
+  <p class="lead">開始時刻を入れてブロックを並べるだけ。各ブロックにカテゴリ（睡眠・筋トレ・読書など自作）を選ぶとカテゴリ別の合計時間が出ます。開始日ごとに記録して過去と表で比較。削除したひな形・記録はゴミ箱に入り、1週間で自動消去（それまで復元可）。Googleログインで全端末に同期（タクシー管理とは別データ）。</p>
 
   <!-- アカウント同期 -->
   <div class="card">
@@ -147,7 +157,7 @@
       <button class="btn mini" id="addCat">追加</button>
     </div>
     <div id="catUndo" class="undobar" style="display:none"></div>
-    <p class="hint">ここで作ったカテゴリを各ブロックで選べます。間違えて消したら、すぐ下に出る「元に戻す」で戻せます。</p>
+    <p class="hint">ここで作ったカテゴリを各ブロックで選べます。間違えて消したら、すぐ下の「元に戻す」で戻せます。</p>
   </div>
 
   <!-- メモ -->
@@ -165,6 +175,7 @@
       <button class="btn sec mini" id="delPreset">削除</button>
     </div>
     <div id="curFlow" class="curflow"></div>
+    <div id="presetUndo" class="undobar" style="display:none"></div>
     <div class="divider">
       <div class="row" style="gap:10px">
         <div class="fld" style="flex:1;min-width:150px"><label>名前</label><input type="text" id="presetName" placeholder="例：平日ルーティン"></div>
@@ -221,7 +232,13 @@
     <div class="btnrow"><button class="btn mini" id="saveRecord">📌 この回を記録</button></div>
     <div class="rec-scroll"><div id="records"></div></div>
     <div id="recUndo" class="undobar" style="display:none"></div>
-    <p class="hint">「この回を記録」で、開始日・カテゴリ別合計を保存。下の表で過去と比べられます。行の🗑で削除、消したら「元に戻す」で戻せます。</p>
+    <p class="hint">「この回を記録」で開始日・カテゴリ別合計を保存。行の🗑で削除、消したら「元に戻す」やゴミ箱で戻せます。</p>
+  </div>
+
+  <!-- ゴミ箱 -->
+  <div class="card">
+    <p class="cardhead">🗑 ゴミ箱（削除したひな形・記録／1週間で自動消去）</p>
+    <div id="trashList"></div>
   </div>
 
   <p class="foot">
@@ -239,21 +256,22 @@ const LAST_KEY="routine_last_v1";
 const PRESET_KEY="routine_presets_v1";
 const CAT_KEY="routine_categories_v1";
 const RECORDS_KEY="routine_records_v1";
+const TRASH_KEY="routine_trash_v1";
 const NEWCAT="__new__";
+const TRASH_TTL=7*24*60*60*1000;
 const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
 const CLOUD_COLLECTION="taxiShift";
 const CLOUD_FIELD="routine";
-const PALETTE=['#2563eb','#0f9d6b','#f97316','#7c3aed','#db2777','#0891b2','#ca8a04','#4f46e5','#16a34a','#dc2626','#2dd4bf','#e11d48'];
+const PALETTE=['#185fa5','#3b6d11','#a15c1b','#a32d2d','#5f5aa2','#0e7490','#8a6d00','#4d7c2f','#9b4722','#334155','#7c3f6e','#2b6f6a'];
 
 let categories=[];
 let records=[];
-let lastCat=null;   // 取り消し用（カテゴリ）
-let lastRec=null;   // 取り消し用（記録）
+let trash=[];
+let lastCat=null;
 
 const state={
   out:"06:00", startDate:"", defMin:60,
-  dayMemo:"",
-  flowName:"", flowCat:"", currentId:null,
+  dayMemo:"", flowName:"", flowCat:"", currentId:null,
   segments:[]
 };
 function defaultSegments(){ state.segments=[ mkBlock(), mkBlock(), mkBlock() ]; }
@@ -274,6 +292,9 @@ function getCategories(){ const c=storeGet(CAT_KEY); return Array.isArray(c)?c:[
 function saveCategories(){ storeSet(CAT_KEY, categories); scheduleSync(); }
 function getRecords(){ const r=storeGet(RECORDS_KEY); return Array.isArray(r)?r:[]; }
 function saveRecords(){ storeSet(RECORDS_KEY, records); scheduleSync(); }
+function getTrash(){ const t=storeGet(TRASH_KEY); return Array.isArray(t)?t:[]; }
+function saveTrash(){ storeSet(TRASH_KEY, trash); scheduleSync(); }
+function purgeTrash(){ const now=Date.now(); const b=trash.length; trash=trash.filter(t=>t&&t.deletedAt&&(now-t.deletedAt)<TRASH_TTL); if(trash.length!==b) saveTrash(); }
 
 function snapshot(){
   return {out:state.out, startDate:state.startDate, defMin:state.defMin, dayMemo:state.dayMemo,
@@ -283,34 +304,23 @@ function normTasks(a){ return Array.isArray(a)?a.map(t=>({text:(t&&t.text)||"",d
 function normSeg(x){
   if(!x||typeof x!=="object") return null;
   if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks), done:!!x.done};
-  let cat=x.cat||"";
-  if(!cat && x.type==='work') cat="営業";
-  if(!cat && x.type==='break') cat="休憩";
+  let cat=x.cat||""; if(!cat && x.type==='work') cat="営業"; if(!cat && x.type==='break') cat="休憩";
   return {type:'block', cat:cat, min:x.min||0, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done};
 }
 function applySnapshot(s){
   if(!s) return false;
-  state.out=s.out??"06:00";
-  state.startDate=s.startDate||state.startDate||"";
-  state.defMin=s.defMin??60;
-  state.dayMemo=s.dayMemo||"";
-  let segs=Array.isArray(s.segments)?s.segments:[];
-  segs=segs.map(normSeg).filter(Boolean);
-  state.segments=segs.length?segs:[];
-  if(!state.segments.length) defaultSegments();
-  addCategoriesFromSegments();
-  return true;
+  state.out=s.out??"06:00"; state.startDate=s.startDate||state.startDate||""; state.defMin=s.defMin??60; state.dayMemo=s.dayMemo||"";
+  let segs=Array.isArray(s.segments)?s.segments:[]; segs=segs.map(normSeg).filter(Boolean);
+  state.segments=segs.length?segs:[]; if(!state.segments.length) defaultSegments();
+  addCategoriesFromSegments(); return true;
 }
 function addCategoriesFromSegments(){
-  let changed=false;
-  state.segments.forEach(s=>{ if(s.type==='block' && s.cat && categories.indexOf(s.cat)<0){ categories.push(s.cat); changed=true; } });
+  let changed=false; state.segments.forEach(s=>{ if(s.type==='block' && s.cat && categories.indexOf(s.cat)<0){ categories.push(s.cat); changed=true; } });
   if(changed) saveCategories();
 }
 function persistLast(){
-  const snap=snapshot();
-  snap.flowName=state.flowName; snap.flowCat=state.flowCat; snap.currentId=state.currentId;
-  storeSet(LAST_KEY, snap);
-  scheduleSync();
+  const snap=snapshot(); snap.flowName=state.flowName; snap.flowCat=state.flowCat; snap.currentId=state.currentId;
+  storeSet(LAST_KEY, snap); scheduleSync();
 }
 
 function getPresets(){ const p=storeGet(PRESET_KEY); return (p&&typeof p==="object")?p:{}; }
@@ -325,9 +335,7 @@ function refreshPresetList(sel){
   Object.values(p).forEach(it=>{ const c=it.cat||"（分類なし）"; (groups[c]=groups[c]||[]).push(it); });
   Object.keys(groups).sort().forEach(c=>{
     const og=document.createElement("optgroup"); og.label=c;
-    groups[c].sort((a,b)=>a.name.localeCompare(b.name)).forEach(it=>{
-      const o=document.createElement("option"); o.value=it.id; o.textContent=it.name; og.appendChild(o);
-    });
+    groups[c].sort((a,b)=>a.name.localeCompare(b.name)).forEach(it=>{ const o=document.createElement("option"); o.value=it.id; o.textContent=it.name; og.appendChild(o); });
     el.appendChild(og);
   });
   if(cur && p[cur]) el.value=cur;
@@ -340,40 +348,23 @@ function refreshCatSel(selVal){
   const on=document.createElement("option"); on.value=""; on.textContent="（分類なし）"; sel.appendChild(on);
   cats.forEach(c=>{ const o=document.createElement("option"); o.value=c; o.textContent=c; sel.appendChild(o); });
   const nw=document.createElement("option"); nw.value=NEWCAT; nw.textContent="＋ 新しい分類…"; sel.appendChild(nw);
-  if(want===NEWCAT) sel.value=NEWCAT;
-  else if(cats.indexOf(want)>=0) sel.value=want;
-  else sel.value="";
+  if(want===NEWCAT) sel.value=NEWCAT; else if(cats.indexOf(want)>=0) sel.value=want; else sel.value="";
   togglePcatNew();
 }
-function togglePcatNew(){
-  const isNew=$("#catSel").value===NEWCAT;
-  $("#catNewRow").style.display=isNew?"flex":"none";
-  if(isNew) setTimeout(()=>$("#catNew").focus(),0);
-}
+function togglePcatNew(){ const isNew=$("#catSel").value===NEWCAT; $("#catNewRow").style.display=isNew?"flex":"none"; if(isNew) setTimeout(()=>$("#catNew").focus(),0); }
 function effectivePcat(){ const v=$("#catSel").value; return v===NEWCAT?$("#catNew").value.trim():v; }
-function setPcatUI(cat){
-  refreshCatSel(cat);
-  if(cat && presetCats().indexOf(cat)<0){ $("#catSel").value=NEWCAT; togglePcatNew(); $("#catNew").value=cat; }
-  else $("#catNew").value="";
-}
+function setPcatUI(cat){ refreshCatSel(cat); if(cat && presetCats().indexOf(cat)<0){ $("#catSel").value=NEWCAT; togglePcatNew(); $("#catNew").value=cat; } else $("#catNew").value=""; }
 
-function toast(msg){
-  const t=$("#savedMsg"); t.textContent="✓ "+msg; t.style.display="block";
-  clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2600);
-}
+function toast(msg){ const t=$("#savedMsg"); t.textContent="✓ "+msg; t.style.display="block"; clearTimeout(toast._t); toast._t=setTimeout(()=>{t.style.display="none";},2600); }
 function updateCurFlow(){
   const c=$("#curFlow");
-  if(state.currentId){
-    c.innerHTML=`編集中：<b>${esc(state.flowName||"（名前なし）")}</b>`+(state.flowCat?`（${esc(state.flowCat)}）`:"")+' <span style="color:#0f7a52">● 保存済み</span>';
-  }else{ c.innerHTML='編集中：<b>新規（未保存）</b>'; }
+  if(state.currentId){ c.innerHTML=`編集中：<b>${esc(state.flowName||"（名前なし）")}</b>`+(state.flowCat?`（${esc(state.flowCat)}）`:"")+' <span style="color:#3b6d11">● 保存済み</span>'; }
+  else{ c.innerHTML='編集中：<b>新規（未保存）</b>'; }
   $("#btnUpdate").disabled = !state.currentId;
 }
 function syncInputs(){
-  $("#startTime").value=state.out;
-  $("#startDate").value=state.startDate||todayStr();
-  state.startDate=$("#startDate").value;
-  $("#defMin").value=state.defMin;
-  $("#dayMemo").value=state.dayMemo;
+  $("#startTime").value=state.out; $("#startDate").value=state.startDate||todayStr(); state.startDate=$("#startDate").value;
+  $("#defMin").value=state.defMin; $("#dayMemo").value=state.dayMemo;
 }
 
 function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
@@ -382,24 +373,14 @@ function fmtClock(base,el){ let total=base+el, day=Math.floor(total/1440); let p
 function fmtDur(min){ min=Math.round(min); const h=Math.floor(min/60), m=min%60; if(h&&m) return `${h}時間${m}分`; if(h) return `${h}時間`; return `${m}分`; }
 
 function compute(){
-  const base=toMin(state.out)??0;
-  let elapsed=0; const rows=[]; const totals={};
+  const base=toMin(state.out)??0; let elapsed=0; const rows=[]; const totals={};
   state.segments.forEach((s,idx)=>{
-    if(s.type==='block'){
-      const min=Math.max(0,s.min||0);
-      rows.push({type:'block', idx, start:elapsed, dur:min});
-      const c=s.cat||"（未分類）";
-      totals[c]=(totals[c]||0)+min;
-      elapsed+=min;
-    }else{ rows.push({type:'todo', idx}); }
+    if(s.type==='block'){ const min=Math.max(0,s.min||0); rows.push({type:'block', idx, start:elapsed, dur:min}); const c=s.cat||"（未分類）"; totals[c]=(totals[c]||0)+min; elapsed+=min; }
+    else{ rows.push({type:'todo', idx}); }
   });
   return {base, rows, endElapsed:elapsed, total:elapsed, totals};
 }
-function orderedCats(totals){
-  const order=categories.filter(c=>totals[c]!==undefined);
-  Object.keys(totals).forEach(c=>{ if(order.indexOf(c)<0) order.push(c); });
-  return order;
-}
+function orderedCats(totals){ const order=categories.filter(c=>totals[c]!==undefined); Object.keys(totals).forEach(c=>{ if(order.indexOf(c)<0) order.push(c); }); return order; }
 
 function segButtons(idx){
   return `<div class="seg-btns">
@@ -409,14 +390,10 @@ function segButtons(idx){
   </div>`;
 }
 function doneBox(idx){ return `<input type="checkbox" class="blockdone" data-blockdone data-idx="${idx}" ${state.segments[idx].done?'checked':''} title="完了にする">`; }
-function memoField(idx){ return `<div class="fld memo"><label>メモ</label>
-  <input type="text" value="${esc(state.segments[idx].memo)}" data-k="memo" data-idx="${idx}" placeholder="メモ"></div>`; }
+function memoField(idx){ return `<div class="fld memo"><label>メモ</label><input type="text" value="${esc(state.segments[idx].memo)}" data-k="memo" data-idx="${idx}" placeholder="メモ"></div>`; }
 function catOptions(current){
-  const set=[...categories];
-  if(current && set.indexOf(current)<0) set.push(current);
-  let o=`<option value="">（カテゴリ未選択）</option>`;
-  set.forEach(c=>{ o+=`<option value="${esc(c)}" ${c===current?'selected':''}>${esc(c)}</option>`; });
-  return o;
+  const set=[...categories]; if(current && set.indexOf(current)<0) set.push(current);
+  let o=`<option value="">（カテゴリ未選択）</option>`; set.forEach(c=>{ o+=`<option value="${esc(c)}" ${c===current?'selected':''}>${esc(c)}</option>`; }); return o;
 }
 function taskList(idx){
   const seg=state.segments[idx];
@@ -427,88 +404,58 @@ function taskList(idx){
       <button class="del" data-deltask data-idx="${idx}" data-ti="${ti}" title="項目を削除">🗑</button>
     </div>`).join("");
   return `<div class="tasks-wrap"><div class="tasks-head">✔ チェックリスト</div>
-    <div class="tasks">${items}
-      <div class="task-add"><input type="text" class="task-input" data-addtask data-idx="${idx}" placeholder="＋ 項目を入力してEnter"></div>
-    </div></div>`;
+    <div class="tasks">${items}<div class="task-add"><input type="text" class="task-input" data-addtask data-idx="${idx}" placeholder="＋ 項目を入力してEnter"></div></div></div>`;
 }
 
 function render(){
-  const r=compute();
-  const S=$("#sched");
-  const ae=document.activeElement;
-  let fk=null, fx=null, ss=null, se=null;
-  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['min','blockend'].indexOf(ae.dataset.k)>=0){
-    fk=ae.dataset.k; fx=ae.dataset.idx;
-    try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){}
-  }
+  const r=compute(); const S=$("#sched");
+  const ae=document.activeElement; let fk=null, fx=null, ss=null, se=null;
+  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['min','blockend'].indexOf(ae.dataset.k)>=0){ fk=ae.dataset.k; fx=ae.dataset.idx; try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){} }
   S.innerHTML="";
   r.rows.forEach(row=>{
     if(row.type==='block'){
-      const seg=state.segments[row.idx];
-      const color=catColor(seg.cat);
-      const el=document.createElement("div"); el.className="seg block"+(seg.done?" collapsed":"");
-      el.style.borderLeft="4px solid "+color;
+      const seg=state.segments[row.idx]; const color=catColor(seg.cat);
+      const el=document.createElement("div"); el.className="seg block"+(seg.done?" collapsed":""); el.style.borderLeft="4px solid "+color;
       const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
       el.innerHTML=`
         <div class="seg-top">
-          <div class="seg-head-left">${doneBox(row.idx)}
-            <select class="catsel" data-k="cat" data-idx="${row.idx}" style="border-color:${color}">${catOptions(seg.cat)}</select>
-          </div>
-          <div style="text-align:right">
-            <div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div>
-            <div class="dur">${fmtDur(row.dur)}</div>
-          </div>
+          <div class="seg-head-left">${doneBox(row.idx)}<select class="catsel" data-k="cat" data-idx="${row.idx}" style="border-color:${color}">${catOptions(seg.cat)}</select></div>
+          <div style="text-align:right"><div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div><div class="dur">${fmtDur(row.dur)}</div></div>
         </div>
         <div class="seg-ctrl">
-          <div class="fld"><label>時間（分）</label>
-            <input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="min" data-idx="${row.idx}"></div>
+          <div class="fld"><label>時間（分）</label><input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="min" data-idx="${row.idx}"></div>
           <div class="eq">=</div>
-          <div class="fld"><label>終了時刻</label>
-            <input type="time" value="${plannedEnd}" data-k="blockend" data-start="${row.start}" data-idx="${row.idx}">
-            <span class="hint">分↔時刻どちらでもOK</span></div>
+          <div class="fld"><label>終了時刻</label><input type="time" value="${plannedEnd}" data-k="blockend" data-start="${row.start}" data-idx="${row.idx}"><span class="hint">分↔時刻どちらでもOK</span></div>
           ${segButtons(row.idx)}
           ${memoField(row.idx)}
         </div>
         ${taskList(row.idx)}`;
       S.appendChild(el);
     }else{
-      const seg=state.segments[row.idx];
-      const el=document.createElement("div"); el.className="seg todo"+(seg.done?" collapsed":"");
+      const seg=state.segments[row.idx]; const el=document.createElement("div"); el.className="seg todo"+(seg.done?" collapsed":"");
       el.innerHTML=`
-        <div class="seg-top">
-          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag todo">やること</span></div>
-          ${segButtons(row.idx)}
-        </div>
+        <div class="seg-top"><div class="seg-head-left">${doneBox(row.idx)}<span class="tag todo">やること</span></div>${segButtons(row.idx)}</div>
         <input type="text" class="todo-title" value="${esc(seg.title)}" data-k="title" data-idx="${row.idx}" placeholder="タイトル（例：起床ルーティン / 準備）">
         ${taskList(row.idx)}`;
       S.appendChild(el);
     }
   });
-
-  const end=document.createElement("div");
-  end.className="seg kiko"; end.style.background="#111827"; end.style.borderColor="#111827";
-  end.innerHTML=`<div class="seg-top"><div><span class="tag" style="background:#fff;color:#111827">終了</span></div>
-    <div class="clock" style="color:#fff">${fmtClock(r.base,r.endElapsed)}</div></div>`;
+  const end=document.createElement("div"); end.className="seg kiko"; end.style.background="#26251f"; end.style.borderColor="#26251f";
+  end.innerHTML=`<div class="seg-top"><div><span class="tag" style="background:#fff;color:#26251f">終了</span></div><div class="clock" style="color:#fff">${fmtClock(r.base,r.endElapsed)}</div></div>`;
   S.appendChild(end);
-
   if(fk!==null){ const el=S.querySelector(`[data-k="${fk}"][data-idx="${fx}"]`); if(el){ el.focus(); if(ss!==null){ try{ el.setSelectionRange(ss,se); }catch(e){} } } }
-
   const cats=orderedCats(r.totals);
-  let pills=`<div class="pill hi"><div class="k">終了時刻</div><div class="v">${fmtClock(r.base,r.endElapsed)}</div></div>
-    <div class="pill"><div class="k">合計時間</div><div class="v">${fmtDur(r.total)}</div></div>`;
+  let pills=`<div class="pill hi"><div class="k">終了時刻</div><div class="v">${fmtClock(r.base,r.endElapsed)}</div></div><div class="pill"><div class="k">合計時間</div><div class="v">${fmtDur(r.total)}</div></div>`;
   cats.forEach(c=>{ pills+=`<div class="pill"><div class="k"><span class="cdot" style="background:${catColor(c)}"></span>${esc(c)}</div><div class="v">${fmtDur(r.totals[c])}</div></div>`; });
   $("#summary").innerHTML=pills;
-
   persistLast();
 }
 
 function scrollToFirstIncomplete(force){
-  const anyDone=state.segments.some(s=>s.done);
-  if(!force && !anyDone) return;
+  const anyDone=state.segments.some(s=>s.done); if(!force && !anyDone) return;
   const S=$("#sched"); const segs=[...S.querySelectorAll(".seg")];
   let target=segs.find(el=>!el.classList.contains("collapsed") && !el.classList.contains("kiko"));
-  if(!target) target=S.querySelector(".seg.kiko");
-  if(target) target.scrollIntoView({block:"start"});
+  if(!target) target=S.querySelector(".seg.kiko"); if(target) target.scrollIntoView({block:"start"});
 }
 
 /* カテゴリ管理 + 取り消し */
@@ -518,7 +465,6 @@ function renderCatChips(){
   box.innerHTML=categories.map((c,i)=>`<span class="catchip"><span class="cdot" style="background:${catColor(c)}"></span>${esc(c)}<button class="cx" data-delcat="${i}" title="削除">×</button></span>`).join("");
 }
 function showCatUndo(name){ const b=$("#catUndo"); b.innerHTML=`<span>カテゴリ「${esc(name)}」を削除しました</span><button data-undocat="1">元に戻す</button>`; b.style.display="flex"; }
-function hideCatUndo(){ $("#catUndo").style.display="none"; }
 $("#addCat").addEventListener("click",()=>{
   const v=$("#newCat").value.trim(); if(!v) return;
   if(categories.indexOf(v)>=0){ alert("同じカテゴリが既にあります"); return; }
@@ -529,59 +475,80 @@ $("#catChips").addEventListener("click",e=>{
   const i=e.target.dataset.delcat; if(i===undefined) return;
   const idx=+i; const name=categories[idx];
   if(!confirm(`カテゴリ「${name}」を削除しますか？（元に戻せます）`)) return;
-  lastCat={name, index:idx};
-  categories.splice(idx,1); saveCategories(); renderCatChips(); render();
-  showCatUndo(name);
+  lastCat={name, index:idx}; categories.splice(idx,1); saveCategories(); renderCatChips(); render(); showCatUndo(name);
 });
 $("#catUndo").addEventListener("click",e=>{
   if(e.target.dataset.undocat===undefined) return;
-  if(lastCat){
-    const {name,index}=lastCat;
-    if(categories.indexOf(name)<0){ categories.splice(Math.min(index,categories.length),0,name); saveCategories(); }
-    lastCat=null; hideCatUndo(); renderCatChips(); render(); toast(`「${name}」を戻しました`);
-  }
+  if(lastCat){ const {name,index}=lastCat; if(categories.indexOf(name)<0){ categories.splice(Math.min(index,categories.length),0,name); saveCategories(); } lastCat=null; $("#catUndo").style.display="none"; renderCatChips(); render(); toast(`「${name}」を戻しました`); }
 });
 
-/* 記録 + 取り消し */
+/* 記録 */
 function renderRecords(){
   const box=$("#records");
   if(!records.length){ box.innerHTML='<div class="rec-empty">まだ記録がありません。上の「📌 この回を記録」で保存できます。</div>'; return; }
-  const colSet=[...categories];
-  records.forEach(rec=>{ Object.keys(rec.totals||{}).forEach(c=>{ if(colSet.indexOf(c)<0) colSet.push(c); }); });
+  const colSet=[...categories]; records.forEach(rec=>{ Object.keys(rec.totals||{}).forEach(c=>{ if(colSet.indexOf(c)<0) colSet.push(c); }); });
   const rows=[...records].sort((a,b)=> (b.date||"").localeCompare(a.date||"") || (b.savedAt||0)-(a.savedAt||0));
   let h='<table class="rec-table"><thead><tr><th>開始日</th>';
   colSet.forEach(c=>{ h+=`<th><span class="rcdot" style="background:${catColor(c)}"></span>${esc(c)}</th>`; });
   h+='<th>合計</th><th></th></tr></thead><tbody>';
   rows.forEach(rec=>{
-    h+=`<tr><td>${esc(rec.date||"")}${rec.name?'<br><span style="color:#6b7280">'+esc(rec.name)+'</span>':''}</td>`;
+    h+=`<tr><td>${esc(rec.date||"")}${rec.name?'<br><span style="color:#75746c">'+esc(rec.name)+'</span>':''}</td>`;
     colSet.forEach(c=>{ const v=(rec.totals&&rec.totals[c])||0; h+=`<td>${v?fmtDur(v):'-'}</td>`; });
     h+=`<td>${fmtDur(rec.total||0)}</td><td><button class="rec-del" data-delrec="${rec.id}" title="この記録を削除">🗑</button></td></tr>`;
   });
-  h+='</tbody></table>';
-  box.innerHTML=h;
+  h+='</tbody></table>'; box.innerHTML=h;
 }
-function showRecUndo(rec){ const b=$("#recUndo"); b.innerHTML=`<span>記録（${esc(rec.date||"")}）を削除しました</span><button data-undorec="1">元に戻す</button>`; b.style.display="flex"; }
-function hideRecUndo(){ $("#recUndo").style.display="none"; }
 $("#saveRecord").addEventListener("click",()=>{
-  const r=compute();
-  if(r.total<=0){ alert("記録する時間がありません（ブロックの時間を入れてください）"); return; }
+  const r=compute(); if(r.total<=0){ alert("記録する時間がありません（ブロックの時間を入れてください）"); return; }
   const date=state.startDate||$("#startDate").value||todayStr();
   const rec={id:genId(), date, start:state.out, name:state.flowName||"", totals:{...r.totals}, total:r.total, savedAt:Date.now()};
-  records.unshift(rec); saveRecords(); renderRecords(); hideRecUndo(); toast(`記録しました（${date}）`);
+  records.unshift(rec); saveRecords(); renderRecords(); $("#recUndo").style.display="none"; toast(`記録しました（${date}）`);
 });
 $("#records").addEventListener("click",e=>{
   const id=e.target.dataset.delrec; if(id===undefined) return;
   const rec=records.find(x=>x.id===id); if(!rec) return;
-  if(!confirm("この記録を削除しますか？（元に戻せます）")) return;
-  lastRec=JSON.parse(JSON.stringify(rec));
-  records=records.filter(x=>x.id!==id); saveRecords(); renderRecords(); showRecUndo(rec);
+  if(!confirm("この記録を削除しますか？（ゴミ箱に移動・1週間で自動消去、それまで復元可）")) return;
+  const tid=genId(); trash.unshift({tid, kind:'record', deletedAt:Date.now(), item:JSON.parse(JSON.stringify(rec))});
+  records=records.filter(x=>x.id!==id); saveRecords(); saveTrash(); renderRecords(); renderTrash();
+  showUndoBar($("#recUndo"), `記録（${esc(rec.date||"")}）を削除しました`, tid); toast("記録をゴミ箱へ移動しました");
 });
-$("#recUndo").addEventListener("click",e=>{
-  if(e.target.dataset.undorec===undefined) return;
-  if(lastRec){
-    if(!records.some(x=>x.id===lastRec.id)){ records.unshift(lastRec); saveRecords(); }
-    lastRec=null; hideRecUndo(); renderRecords(); toast("記録を戻しました");
-  }
+
+/* ゴミ箱 + 元に戻す */
+function relTime(ts){ const left=TRASH_TTL-(Date.now()-ts); const d=Math.floor(left/86400000), h=Math.floor((left%86400000)/3600000); if(left<=0) return "まもなく削除"; if(d>0) return `あと約${d}日で自動削除`; return `あと約${Math.max(1,h)}時間で自動削除`; }
+function trashLabel(t){
+  if(t.kind==='preset'){ const it=t.item||{}; return (it.cat?it.cat+"／":"")+(it.name||"（名前なし）"); }
+  const it=t.item||{}; return (it.date||"")+(it.name?"／"+it.name:"");
+}
+function renderTrash(){
+  const box=$("#trashList");
+  if(!trash.length){ box.innerHTML='<div class="trash-empty">ゴミ箱は空です。</div>'; return; }
+  const rows=[...trash].sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));
+  box.innerHTML=rows.map(t=>`
+    <div class="trash-item">
+      <div class="ti-main"><div><b>${esc(trashLabel(t))}</b><span class="kindtag ${t.kind}">${t.kind==='preset'?'ひな形':'記録'}</span></div>
+        <div class="ti-sub">${esc(relTime(t.deletedAt||0))}</div></div>
+      <div class="ti-btns"><button class="btn sec mini" data-restore="${t.tid}">復元</button>
+        <button class="btn sec mini" data-purge="${t.tid}">完全削除</button></div>
+    </div>`).join("");
+}
+function showUndoBar(el, text, tid){ el.innerHTML=`<span>${text}（ゴミ箱へ）</span><button data-restoretid="${tid}">元に戻す</button>`; el.style.display="flex"; }
+function restoreTrash(tid){
+  const idx=trash.findIndex(t=>t.tid===tid); if(idx<0) return;
+  const t=trash[idx];
+  if(t.kind==='preset'){ const it=t.item||{}; const p=getPresets(); p[it.id]={id:it.id, cat:it.cat||"", name:it.name||"", data:it.data}; savePresets(p); refreshPresetList(it.id); }
+  else{ const it=t.item||{}; if(!records.some(r=>r.id===it.id)){ records.unshift(it); saveRecords(); renderRecords(); } }
+  trash.splice(idx,1); saveTrash(); renderTrash();
+  $("#presetUndo").style.display="none"; $("#recUndo").style.display="none";
+  toast("復元しました");
+}
+$("#presetUndo").addEventListener("click",e=>{ const tid=e.target.dataset.restoretid; if(tid!==undefined) restoreTrash(tid); });
+$("#recUndo").addEventListener("click",e=>{ const tid=e.target.dataset.restoretid; if(tid!==undefined) restoreTrash(tid); });
+$("#trashList").addEventListener("click",e=>{
+  const t=e.target;
+  if(t.dataset.restore!==undefined){ restoreTrash(t.dataset.restore); }
+  else if(t.dataset.purge!==undefined){ const tid=t.dataset.purge; const it=trash.find(x=>x.tid===tid); if(!it) return;
+    if(!confirm(`「${trashLabel(it)}」をゴミ箱から完全に削除しますか？（戻せません）`)) return;
+    trash=trash.filter(x=>x.tid!==tid); saveTrash(); renderTrash(); toast("完全に削除しました"); }
 });
 
 /* ブロック/入力 */
@@ -600,38 +567,25 @@ $("#reset").addEventListener("click",()=>{
 });
 
 $("#sched").addEventListener("input",e=>{
-  const t=e.target; const x=t.dataset.idx, k=t.dataset.k;
-  if(x===undefined||k===undefined) return;
+  const t=e.target; const x=t.dataset.idx, k=t.dataset.k; if(x===undefined||k===undefined) return;
   const s=state.segments[+x];
   if(k==="memo"){ s.memo=t.value; persistLast(); return; }
   if(k==="title"){ s.title=t.value; persistLast(); return; }
   if(k==="tasktext"){ const ti=+t.dataset.ti; if(s.tasks&&s.tasks[ti]){ s.tasks[ti].text=t.value; persistLast(); } return; }
   if(k==="cat"){ s.cat=t.value; render(); return; }
   if(k==="min"){ s.min=Math.max(0,+t.value||0); }
-  else if(k==="blockend"){
-    const endClock=toMin(t.value); if(endClock===null){ render(); return; }
-    const base=toMin(state.out)||0; const startElapsed=+t.dataset.start||0;
-    const startClock=((base+startElapsed)%1440+1440)%1440;
-    s.min=((endClock-startClock)%1440+1440)%1440;
-  }
+  else if(k==="blockend"){ const endClock=toMin(t.value); if(endClock===null){ render(); return; } const base=toMin(state.out)||0; const startElapsed=+t.dataset.start||0; const startClock=((base+startElapsed)%1440+1440)%1440; s.min=((endClock-startClock)%1440+1440)%1440; }
   render();
 });
 $("#sched").addEventListener("change",e=>{
   const t=e.target;
   if(t.dataset.blockdone!==undefined){ const idx=+t.dataset.idx; if(state.segments[idx]){ state.segments[idx].done=t.checked; } render(); return; }
-  if(t.dataset.done!==undefined){
-    const idx=+t.dataset.idx, ti=+t.dataset.ti; const s=state.segments[idx];
-    if(s&&s.tasks&&s.tasks[ti]){ s.tasks[ti].done=t.checked; }
-    const row=t.closest(".task"); if(row) row.classList.toggle("done",t.checked); persistLast();
-  }
+  if(t.dataset.done!==undefined){ const idx=+t.dataset.idx, ti=+t.dataset.ti; const s=state.segments[idx]; if(s&&s.tasks&&s.tasks[ti]){ s.tasks[ti].done=t.checked; } const row=t.closest(".task"); if(row) row.classList.toggle("done",t.checked); persistLast(); }
 });
 $("#sched").addEventListener("keydown",e=>{
-  if(e.key==="Enter" && e.target.dataset.addtask!==undefined){
-    e.preventDefault();
-    const idx=+e.target.dataset.idx; const val=e.target.value.trim(); if(!val) return;
+  if(e.key==="Enter" && e.target.dataset.addtask!==undefined){ e.preventDefault(); const idx=+e.target.dataset.idx; const val=e.target.value.trim(); if(!val) return;
     const s=state.segments[idx]; s.tasks=s.tasks||[]; s.tasks.push({text:val,done:false}); render();
-    const inp=$("#sched").querySelector(`[data-addtask][data-idx="${idx}"]`); if(inp) inp.focus();
-  }
+    const inp=$("#sched").querySelector(`[data-addtask][data-idx="${idx}"]`); if(inp) inp.focus(); }
 });
 $("#sched").addEventListener("click",e=>{
   const t=e.target;
@@ -647,16 +601,12 @@ $("#catSel").addEventListener("change",togglePcatNew);
 let fbUser=null, fbDb=null, fbReady=false, _syncT=null, _pulling=false;
 function setAuthStatus(html,on){ $("#authStatus").innerHTML=`<span class="dot${on?' on':''}"></span>`+html; }
 function updateAuthUI(){
-  if(fbUser){ $("#authForm").style.display="none"; $("#authLoggedIn").style.display="block";
-    setAuthStatus(`ログイン中：<b>${esc(fbUser.displayName||fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true);
-  }else{ $("#authForm").style.display="block"; $("#authLoggedIn").style.display="none";
-    setAuthStatus("未ログイン（この端末内のみ保存）", false); }
+  if(fbUser){ $("#authForm").style.display="none"; $("#authLoggedIn").style.display="block"; setAuthStatus(`ログイン中：<b>${esc(fbUser.displayName||fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true); }
+  else{ $("#authForm").style.display="block"; $("#authLoggedIn").style.display="none"; setAuthStatus("未ログイン（この端末内のみ保存）", false); }
 }
 function fbInit(){
   if(typeof firebase==="undefined"){ setAuthStatus("同期ライブラリを読み込めません（オフライン保存のみ）", false); return; }
-  try{
-    firebase.initializeApp(FIREBASE_CONFIG);
-    fbDb=firebase.firestore(); fbReady=true;
+  try{ firebase.initializeApp(FIREBASE_CONFIG); fbDb=firebase.firestore(); fbReady=true;
     firebase.auth().getRedirectResult().catch(()=>{});
     firebase.auth().onAuthStateChanged(u=>{ fbUser=u||null; updateAuthUI(); if(fbUser) cloudPull(); });
   }catch(e){ setAuthStatus("同期の初期化に失敗しました", false); }
@@ -665,13 +615,10 @@ async function googleLogin(){
   if(!fbReady){ alert("同期の準備ができていません（通信環境を確認）"); return; }
   const provider=new firebase.auth.GoogleAuthProvider();
   try{ await firebase.auth().signInWithPopup(provider); }
-  catch(e){
-    const code=e&&e.code;
+  catch(e){ const code=e&&e.code;
     if(code==="auth/popup-blocked"||code==="auth/popup-closed-by-user"||code==="auth/cancelled-popup-request"||code==="auth/operation-not-supported-in-this-environment"){
-      try{ await firebase.auth().signInWithRedirect(provider); return; }catch(e2){ alert("ログインできませんでした：\n"+(e2.message||e2.code)); return; }
-    }
-    alert("ログインできませんでした：\n"+(e.message||code));
-  }
+      try{ await firebase.auth().signInWithRedirect(provider); return; }catch(e2){ alert("ログインできませんでした：\n"+(e2.message||e2.code)); return; } }
+    alert("ログインできませんでした：\n"+(e.message||code)); }
 }
 async function cloudPull(){
   if(!fbReady||!fbUser) return;
@@ -684,9 +631,11 @@ async function cloudPull(){
       if(R.presets && typeof R.presets==="object") storeSet(PRESET_KEY, R.presets);
       if(Array.isArray(R.categories)){ categories=R.categories.slice(); storeSet(CAT_KEY, categories); }
       if(Array.isArray(R.records)){ records=R.records.slice(); storeSet(RECORDS_KEY, records); }
+      if(Array.isArray(R.trash)){ trash=R.trash.slice(); storeSet(TRASH_KEY, trash); }
       if(R.last){ applySnapshot(R.last); state.flowName=R.last.flowName||""; state.flowCat=R.last.flowCat||""; state.currentId=R.last.currentId||null; storeSet(LAST_KEY, R.last); }
+      purgeTrash();
       refreshPresetList(state.currentId||""); $("#presetName").value=state.flowName; setPcatUI(state.flowCat);
-      renderCatChips(); renderRecords(); syncInputs(); updateCurFlow(); render();
+      renderCatChips(); renderRecords(); renderTrash(); syncInputs(); updateCurFlow(); render();
       toast("クラウドから読み込みました");
     }else{ _pulling=false; await cloudPushNow(); return; }
   }catch(e){ console.warn(e); setAuthStatus("同期エラー："+esc(e.code||e.message)+"（Firestoreのルール設定が必要かも）", true); }
@@ -696,13 +645,14 @@ async function cloudPushNow(){
   if(!fbReady||!fbUser||_pulling) return;
   try{
     const last=storeGet(LAST_KEY)||snapshot();
-    const payload={}; payload[CLOUD_FIELD]={presets:getPresets(), last:last, categories:categories, records:records};
+    const payload={}; payload[CLOUD_FIELD]={presets:getPresets(), last:last, categories:categories, records:records, trash:trash};
     payload.updatedAt=firebase.firestore.FieldValue.serverTimestamp();
-    await fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid).set(payload, {merge:true});
+    const ref=fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid);
+    try{ await ref.update(payload); }
+    catch(e){ if(e && (e.code==="not-found"||/No document to update/i.test(e.message||""))){ await ref.set(payload); } else { throw e; } }
   }catch(e){ console.warn(e); setAuthStatus("クラウド保存エラー："+esc(e.code||e.message), true); }
 }
 function scheduleSync(){ if(!fbReady||!fbUser||_pulling) return; clearTimeout(_syncT); _syncT=setTimeout(cloudPushNow,900); }
-
 $("#btnGoogle").addEventListener("click",googleLogin);
 $("#btnLogout").addEventListener("click",async()=>{ try{ await firebase.auth().signOut(); toast("ログアウトしました"); }catch(e){} });
 $("#btnSyncNow").addEventListener("click",async()=>{ await cloudPushNow(); toast("同期しました"); });
@@ -712,8 +662,7 @@ function currentName(){ return $("#presetName").value.trim(); }
 $("#btnSaveNew").addEventListener("click",()=>{
   const name=currentName(); const cat=effectivePcat();
   if(!name){ alert("名前を入力してください"); return; }
-  const p=getPresets();
-  const dup=Object.values(p).find(x=>(x.cat||"")===cat && x.name===name);
+  const p=getPresets(); const dup=Object.values(p).find(x=>(x.cat||"")===cat && x.name===name);
   if(dup && !confirm(`「${cat?cat+"／":""}${name}」は既にあります。別に新規保存しますか？`)) return;
   const id=genId(); p[id]={id, cat, name, data:snapshot()}; savePresets(p);
   state.currentId=id; state.flowName=name; state.flowCat=cat;
@@ -725,8 +674,7 @@ $("#btnUpdate").addEventListener("click",()=>{
   const p=getPresets(); if(!p[state.currentId]){ alert("元のルーティンが見つかりません"); return; }
   const name=currentName()||p[state.currentId].name; const cat=effectivePcat();
   p[state.currentId]={id:state.currentId, cat, name, data:snapshot()}; savePresets(p);
-  state.flowName=name; state.flowCat=cat;
-  refreshPresetList(state.currentId); setPcatUI(cat); updateCurFlow(); persistLast();
+  state.flowName=name; state.flowCat=cat; refreshPresetList(state.currentId); setPcatUI(cat); updateCurFlow(); persistLast();
   toast(`「${cat?cat+"／":""}${name}」を上書き更新しました`);
 });
 $("#loadPreset").addEventListener("click",()=>{
@@ -739,20 +687,21 @@ $("#loadPreset").addEventListener("click",()=>{
 });
 $("#delPreset").addEventListener("click",()=>{
   const id=$("#presetSel").value; if(!id){ alert("削除するルーティンを選んでください"); return; }
-  const p=getPresets(); if(!p[id]) return;
-  const label=(p[id].cat?p[id].cat+"／":"")+p[id].name;
-  if(!confirm(`「${label}」を削除しますか？`)) return;
-  delete p[id]; savePresets(p);
+  const p=getPresets(); const it=p[id]; if(!it) return;
+  const label=(it.cat?it.cat+"／":"")+it.name;
+  if(!confirm(`「${label}」を削除しますか？（ゴミ箱に移動・1週間で自動消去、それまで復元可）`)) return;
+  const tid=genId(); trash.unshift({tid, kind:'preset', deletedAt:Date.now(), item:{id:it.id, cat:it.cat||"", name:it.name||"", data:it.data}});
+  delete p[id]; savePresets(p); saveTrash();
   if(state.currentId===id){ state.currentId=null; updateCurFlow(); persistLast(); }
-  refreshPresetList(""); toast(`「${label}」を削除しました`);
+  refreshPresetList(""); renderTrash(); showUndoBar($("#presetUndo"), `「${esc(label)}」を削除しました`, tid);
+  toast(`「${label}」をゴミ箱へ移動しました`);
 });
 
 /* JSON */
 $("#exportJson").addEventListener("click",()=>{
-  const data={ _app:"routineTracker", version:1, exportedAt:new Date().toISOString(),
-    presets:getPresets(), categories:categories, records:records,
-    last:(function(){const s=snapshot();s.flowName=state.flowName;s.flowCat=state.flowCat;s.currentId=state.currentId;return s;})()
-  };
+  const data={ _app:"routineTracker", version:2, exportedAt:new Date().toISOString(),
+    presets:getPresets(), categories:categories, records:records, trash:trash,
+    last:(function(){const s=snapshot();s.flowName=state.flowName;s.flowCat=state.flowCat;s.currentId=state.currentId;return s;})() };
   const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
   a.href=url; a.download="routine_"+stamp()+".json"; document.body.appendChild(a); a.click(); a.remove();
@@ -772,6 +721,7 @@ $("#importJson").addEventListener("change",e=>{
       }
       if(Array.isArray(d.categories)){ d.categories.forEach(c=>{ if(c && categories.indexOf(c)<0) categories.push(c); }); saveCategories(); renderCatChips(); }
       if(Array.isArray(d.records)){ const ids=new Set(records.map(r=>r.id)); d.records.forEach(r=>{ if(r&&r.id&&!ids.has(r.id)){ records.push(r); ids.add(r.id); } }); saveRecords(); renderRecords(); }
+      if(Array.isArray(d.trash)){ const ids=new Set(trash.map(t=>t.tid)); d.trash.forEach(t=>{ if(t&&t.tid&&!ids.has(t.tid)){ trash.push(t); ids.add(t.tid); } }); purgeTrash(); saveTrash(); renderTrash(); }
       let extra="";
       if(d && d.last){
         if(confirm(`データを読み込みました。\n表示中の内容もこのファイルの内容に置き換えますか？`)){
@@ -788,16 +738,14 @@ $("#importJson").addEventListener("change",e=>{
 
 /* 起動時 */
 (function init(){
-  categories=getCategories();
-  records=getRecords();
+  categories=getCategories(); records=getRecords(); trash=getTrash(); purgeTrash();
   const last=storeGet(LAST_KEY);
   if(applySnapshot(last)){ state.flowName=last.flowName||""; state.flowCat=last.flowCat||""; state.currentId=last.currentId||null; }
   else { if(!state.startDate) state.startDate=todayStr(); defaultSegments(); }
   if(!state.startDate) state.startDate=todayStr();
-  renderCatChips();
-  refreshPresetList(state.currentId||"");
+  renderCatChips(); refreshPresetList(state.currentId||"");
   $("#presetName").value=state.flowName; setPcatUI(state.flowCat);
-  syncInputs(); updateCurFlow(); render(); renderRecords();
+  syncInputs(); updateCurFlow(); render(); renderRecords(); renderTrash();
   setTimeout(()=>scrollToFirstIncomplete(false),60);
   fbInit();
 })();
