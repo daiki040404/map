@@ -65,19 +65,25 @@
 
   .seg{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:9px;background:#fff;scroll-margin-top:10px;}
   .seg.todo{background:var(--todobg);border-color:#cfe0f5;}
+  .seg.pinned{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
   .seg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .seg-head-left{display:flex;align-items:center;gap:9px;flex:1;min-width:0;}
   .blockdone{width:22px;height:22px;flex:none;accent-color:var(--done);cursor:pointer;}
+  .lockbadge{font-size:13px;flex:none;}
   .seg.collapsed{opacity:.5;}
   .seg.collapsed .seg-ctrl,.seg.collapsed .tasks-wrap,.seg.collapsed .todo-title{display:none;}
-  .catsel{width:auto;min-width:140px;max-width:100%;font-weight:600;}
+  .catsel{width:auto;min-width:130px;max-width:100%;font-weight:600;}
   .tag{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
   .tag.todo{background:var(--accent);}
   .clock{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;}
   .dur{font-size:12px;color:var(--sub);margin-top:3px;}
+  .adj{color:var(--warn);font-weight:700;}
   .seg-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;margin-top:10px;
     padding-top:10px;border-top:1px solid var(--line);}
   .seg-ctrl .fld label{font-size:11px;}
+  .timewrap{display:flex;gap:6px;align-items:center;}
+  .clearbtn{border:1px solid var(--line2);background:#fff;border-radius:8px;padding:8px 10px;
+    font-size:14px;font-weight:700;color:#6b7280;cursor:pointer;line-height:1;flex:none;}
   .eq{align-self:center;color:var(--sub);font-size:13px;font-weight:700;padding-bottom:9px;}
   .memo{flex:1 1 100%;}
   .hint{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.4;}
@@ -125,7 +131,7 @@
 <body>
 <div class="wrap">
   <h1>ルーティン時間トラッカー</h1>
-  <p class="lead">開始時刻を入れてブロックを並べるだけ。各ブロックにカテゴリ（睡眠・筋トレ・読書など自作）を選ぶとカテゴリ別の合計時間が出ます。開始日ごとに記録して過去と表で比較。削除したひな形・記録はゴミ箱に入り、1週間で自動消去（それまで復元可）。Googleログインで全端末に同期（タクシー管理とは別データ）。</p>
+  <p class="lead">開始時刻を入れてブロックを並べるだけ。各ブロックにカテゴリを選ぶとカテゴリ別の合計時間が出ます。ブロックの「開始を固定」を入れると、そのブロックがその時刻ぴったりに始まり、前のブロックが自動で伸縮します。開始日ごとに記録して過去と表で比較。Googleログインで全端末に同期（タクシー管理とは別データ）。</p>
 
   <!-- アカウント同期 -->
   <div class="card">
@@ -242,8 +248,8 @@
   </div>
 
   <p class="foot">
-    ブロックの左上チェックで「完了」（畳まれます）。次に開くと未完了の位置まで自動スクロール。<br>
-    時間は「分」でも「終了時刻」でも入力OK。カテゴリはブロックのプルダウンで選びます。
+    「開始を固定」を入れると、そのブロックがその時刻に始まり、直前のブロックが自動で伸縮します（🔒表示）。<br>
+    ブロックの左上チェックで「完了」（畳まれます）。時間は「分」でも「終了時刻」でも入力OK。
   </p>
 </div>
 
@@ -275,7 +281,7 @@ const state={
   segments:[]
 };
 function defaultSegments(){ state.segments=[ mkBlock(), mkBlock(), mkBlock() ]; }
-function mkBlock(){ return {type:'block', cat:(categories[0]||""), min:state.defMin, memo:"", tasks:[], done:false}; }
+function mkBlock(){ return {type:'block', cat:(categories[0]||""), min:state.defMin, memo:"", tasks:[], done:false, fixStart:null}; }
 function mkTodo(){ return {type:'todo', title:"", tasks:[], done:false}; }
 
 function genId(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -305,7 +311,7 @@ function normSeg(x){
   if(!x||typeof x!=="object") return null;
   if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks), done:!!x.done};
   let cat=x.cat||""; if(!cat && x.type==='work') cat="営業"; if(!cat && x.type==='break') cat="休憩";
-  return {type:'block', cat:cat, min:x.min||0, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done};
+  return {type:'block', cat:cat, min:x.min||0, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done, fixStart:x.fixStart||null};
 }
 function applySnapshot(s){
   if(!s) return false;
@@ -369,16 +375,32 @@ function syncInputs(){
 
 function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function hm(t){ let m=((t%1440)+1440)%1440; return pad2(Math.floor(m/60))+":"+pad2(m%60); }
+function clockToElapsed(base, hhmm, lb){ const tc=toMin(hhmm); if(tc==null) return null; let E=((tc-base)%1440+1440)%1440; while(E<lb) E+=1440; return E; }
 function fmtClock(base,el){ let total=base+el, day=Math.floor(total/1440); let pre=day<=0?"":(day===1?"翌 ":`+${day}日 `); return pre+hm(total); }
 function fmtDur(min){ min=Math.round(min); const h=Math.floor(min/60), m=min%60; if(h&&m) return `${h}時間${m}分`; if(h) return `${h}時間`; return `${m}分`; }
 
+/* 計算：固定ブロックは前のブロックを伸縮させて時刻ぴったりに始める */
 function compute(){
-  const base=toMin(state.out)??0; let elapsed=0; const rows=[]; const totals={};
+  const base=toMin(state.out)??0; let elapsed=0; const rows=[]; const totals={}; let prev=null;
+  function addTot(c,v){ totals[c]=(totals[c]||0)+v; }
   state.segments.forEach((s,idx)=>{
-    if(s.type==='block'){ const min=Math.max(0,s.min||0); rows.push({type:'block', idx, start:elapsed, dur:min}); const c=s.cat||"（未分類）"; totals[c]=(totals[c]||0)+min; elapsed+=min; }
-    else{ rows.push({type:'todo', idx}); }
+    if(s.type==='block'){
+      let wStart=elapsed; let pinned=false;
+      if(s.fixStart){
+        const pin=clockToElapsed(base, s.fixStart, prev?prev.start:0);
+        if(pin!=null){
+          pinned=true;
+          if(prev){ let nd=pin-prev.start; if(nd<0) nd=0; addTot(prev.cat,-prev.dur); prev.dur=nd; addTot(prev.cat,nd); prev.adjusted=true; wStart=prev.start+nd; }
+          else { wStart=pin; }
+        }
+      }
+      const dur=Math.max(0,s.min||0); const cat=s.cat||"（未分類）";
+      const row={type:'block', idx, start:wStart, dur, cat, pinned, adjusted:false};
+      rows.push(row); addTot(cat,dur); elapsed=wStart+dur; prev=row;
+    } else { rows.push({type:'todo', idx}); }
   });
-  return {base, rows, endElapsed:elapsed, total:elapsed, totals};
+  const total=Object.values(totals).reduce((a,b)=>a+b,0);
+  return {base, rows, endElapsed:elapsed, total, totals};
 }
 function orderedCats(totals){ const order=categories.filter(c=>totals[c]!==undefined); Object.keys(totals).forEach(c=>{ if(order.indexOf(c)<0) order.push(c); }); return order; }
 
@@ -410,22 +432,24 @@ function taskList(idx){
 function render(){
   const r=compute(); const S=$("#sched");
   const ae=document.activeElement; let fk=null, fx=null, ss=null, se=null;
-  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['min','blockend'].indexOf(ae.dataset.k)>=0){ fk=ae.dataset.k; fx=ae.dataset.idx; try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){} }
+  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['min','blockend','fixstart'].indexOf(ae.dataset.k)>=0){ fk=ae.dataset.k; fx=ae.dataset.idx; try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){} }
   S.innerHTML="";
   r.rows.forEach(row=>{
     if(row.type==='block'){
       const seg=state.segments[row.idx]; const color=catColor(seg.cat);
-      const el=document.createElement("div"); el.className="seg block"+(seg.done?" collapsed":""); el.style.borderLeft="4px solid "+color;
+      const el=document.createElement("div"); el.className="seg block"+(seg.done?" collapsed":"")+(row.pinned?" pinned":""); el.style.borderLeft="4px solid "+color;
       const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
+      const adjTxt = row.adjusted ? ` <span class="adj">（固定に合わせて調整）</span>`:"";
       el.innerHTML=`
         <div class="seg-top">
-          <div class="seg-head-left">${doneBox(row.idx)}<select class="catsel" data-k="cat" data-idx="${row.idx}" style="border-color:${color}">${catOptions(seg.cat)}</select></div>
-          <div style="text-align:right"><div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div><div class="dur">${fmtDur(row.dur)}</div></div>
+          <div class="seg-head-left">${doneBox(row.idx)}<select class="catsel" data-k="cat" data-idx="${row.idx}" style="border-color:${color}">${catOptions(seg.cat)}</select>${row.pinned?'<span class="lockbadge" title="開始時刻を固定中">🔒</span>':''}</div>
+          <div style="text-align:right"><div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div><div class="dur">${fmtDur(row.dur)}${adjTxt}</div></div>
         </div>
         <div class="seg-ctrl">
           <div class="fld"><label>時間（分）</label><input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="min" data-idx="${row.idx}"></div>
           <div class="eq">=</div>
           <div class="fld"><label>終了時刻</label><input type="time" value="${plannedEnd}" data-k="blockend" data-start="${row.start}" data-idx="${row.idx}"><span class="hint">分↔時刻どちらでもOK</span></div>
+          <div class="fld"><label>🔒 開始を固定</label><div class="timewrap"><input type="time" value="${seg.fixStart||''}" data-k="fixstart" data-idx="${row.idx}"><button class="clearbtn" data-clearfix="${row.idx}" title="固定解除">×</button></div><span class="hint">${seg.fixStart?'この時刻に固定（前が伸縮）':'固定すると前のブロックが自動調整'}</span></div>
           ${segButtons(row.idx)}
           ${memoField(row.idx)}
         </div>
@@ -573,6 +597,7 @@ $("#sched").addEventListener("input",e=>{
   if(k==="title"){ s.title=t.value; persistLast(); return; }
   if(k==="tasktext"){ const ti=+t.dataset.ti; if(s.tasks&&s.tasks[ti]){ s.tasks[ti].text=t.value; persistLast(); } return; }
   if(k==="cat"){ s.cat=t.value; render(); return; }
+  if(k==="fixstart"){ s.fixStart=t.value||null; render(); return; }
   if(k==="min"){ s.min=Math.max(0,+t.value||0); }
   else if(k==="blockend"){ const endClock=toMin(t.value); if(endClock===null){ render(); return; } const base=toMin(state.out)||0; const startElapsed=+t.dataset.start||0; const startClock=((base+startElapsed)%1440+1440)%1440; s.min=((endClock-startClock)%1440+1440)%1440; }
   render();
@@ -590,6 +615,7 @@ $("#sched").addEventListener("keydown",e=>{
 $("#sched").addEventListener("click",e=>{
   const t=e.target;
   if(t.dataset.del!==undefined){ if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); } }
+  else if(t.dataset.clearfix!==undefined){ const idx=+t.dataset.clearfix; if(state.segments[idx]){ state.segments[idx].fixStart=null; render(); } }
   else if(t.dataset.deltask!==undefined){ const idx=+t.dataset.idx, ti=+t.dataset.ti; if(state.segments[idx]&&state.segments[idx].tasks){ state.segments[idx].tasks.splice(ti,1); render(); } }
   else if(t.dataset.addblock!==undefined){ state.segments.splice(+t.dataset.addblock+1,0,mkBlock()); render(); }
   else if(t.dataset.addtodo!==undefined){ state.segments.splice(+t.dataset.addtodo+1,0,mkTodo()); render(); }
