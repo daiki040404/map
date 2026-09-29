@@ -168,7 +168,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v31</span></h1>
+      <h1>東京 通りで覚える <span style="font-size:11px;color:#6b7280;font-weight:400">v32</span></h1>
       <button id="menuToggle">閉じる</button>
       <p>編集モードで地図をなぞって通りを作成・修正。ピンをタップ→曜日(月〜日/祝)・需要の時間帯(24h)・メモを保存。「需要」欄で指定した曜日+時刻や「今」に需要のある場所だけ表示できる。全てブラウザに保存。</p>
     </header>
@@ -314,6 +314,8 @@ const TYPE={street:{shape:'tag',label:'通り名'},route:{shape:'tag',label:'ル
 
 // ===== map =====
 const map=L.map('map',{zoomControl:true}).setView([35.6852,139.7528],13);
+// パン/ズーム後、画面内のマーカーを描き直す（軽量化のため画面外は描いていないので）
+let _mvT=null;map.on('moveend zoomend',()=>{if(!(mode==='learn'||mode==='edit'))return;if(anyAddMode())return;clearTimeout(_mvT);_mvT=setTimeout(()=>{try{render();}catch(e){}},140);});
 const baseOSM=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'});
 const baseNoLabel=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png',{maxZoom:20,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'});
 const BASES=[{name:'通常',layer:baseOSM},{name:'白地図',layer:baseNoLabel},{name:'真っ白',layer:null}];
@@ -362,6 +364,7 @@ function shapeHtml(it,num){const t=TYPE[it.type],col=colOf(it);const done=store.
 function itemVisible(it){
   if(_scope&&!_scope.has(it.streetId))return false;
   if(mode==='edit'){
+    if(anyAddMode())return false; // 追加中は既存マーカーを隠してすっきり作業
     if(selectedId)return it.streetId===selectedId||(it.roads&&it.roads.indexOf(selectedId)>=0)||(it.type==='ramp'&&it.expwy===selectedId)||(it.type==='station'&&it.line===selectedId);
     return catPass(it);
   }
@@ -418,6 +421,7 @@ function popupHtml(it,num,detail){const t=TYPE[it.type],done=store.learned[it.id
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+function anyAddMode(){return addVertexMode||addBuildingMode||addCautionMode||addAvoidMode||addCrossingMode||addFacilityMode||addRampMode||addStationMode;}
 // ===== render =====
 function render(){
   _scope=scopeSet();
@@ -426,13 +430,13 @@ function render(){
   if(mode==='test'&&testType==='draw'){renderDrawTest();return;}
   if(mode==='test'&&testType==='name'){renderNameTest();return;}
   clearDrawLayers();
-  const anySel=selectedId!=null, editing=mode==='edit';
+  const anySel=selectedId!=null, editing=mode==='edit', adding=anyAddMode();
   _selEntry=anySel?DATA.find(o=>o.id===selectedId):null;
   const activeRoads=_selEntry?((_selEntry.kind==='crossing'||_selEntry.kind==='facility'||_selEntry.kind==='ramp')?new Set(_selEntry.roads||[]):new Set([selectedId])):null;
   DATA.forEach(o=>{const L2=lineLayers[o.id];if(!L2)return;L2.off('click');
     if(_scope&&!_scope.has(o.id)){map.removeLayer(L2);return;}
     let show=false,opacity=.85,weight=4;
-    if(editing){ show=true; if(!anySel){opacity=.85;weight=4;} else if(o.id===selectedId){opacity=1;weight=6;} else {opacity=.4;weight=3;} }
+    if(editing){ show=true; if(adding){ if(o.id===selectedId){opacity=1;weight=6;} else {opacity=.12;weight=2;} } else if(!anySel){opacity=.85;weight=4;} else if(o.id===selectedId){opacity=1;weight=6;} else {opacity=.4;weight=3;} }
     else if(mode==='test'&&activeTestId){ show=ITEMS.some(it=>it.streetId===o.id&&itemVisible(it)); opacity=.85; }
     else if(activeRoads){ if(activeRoads.has(o.id)){show=true;opacity=1;weight=6;} else {show=!catOff.has(o.kind);opacity=.12;weight=4;} }
     else if(view==='all'){ show=!catOff.has(o.kind); }
@@ -448,7 +452,10 @@ function render(){
   const allVis=vis.concat(extra);
   // connectors avoid -> caution
   allVis.filter(x=>x.type==='avoid'&&x.avoidFor).forEach(a=>{const c=ITEMS.find(x=>x.type==='caution'&&x.pid===a.avoidFor&&x.streetId===a.streetId);if(c)L.polyline([[a.lat,a.lon],[c.lat,c.lon]],{color:'#0ea5e9',weight:3,dashArray:'3,7',opacity:.9}).addTo(connGroup);});
+  // スマホ軽量化：画面外のマーカーは描かない（学習・編集モード）
+  const _vb=(mode==='learn'||mode==='edit')?(function(){try{return map.getBounds().pad(0.25);}catch(e){return null;}})():null;
   allVis.forEach((it,i)=>{const num=i+1;it._num=num;
+    if(_vb&&!_vb.contains([it.lat,it.lon]))return;
     if(mode==='learn'){
       const rev=showAllNames||learnRevealed.has(it.id);
       const m=L.marker([it.lat,it.lon],{icon:L.divIcon({className:(!rev&&focusId===it.id)?'curq':'',html:shapeHtml(it,num),iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:(focusId===it.id)?1000:0});
