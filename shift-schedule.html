@@ -61,9 +61,11 @@
   .seg.work{background:var(--workbg);border-color:#cfe0ff;}
   .seg.brk{background:var(--brkbg);border-color:#c7ecdd;}
   .seg.todo{background:var(--todobg);border-color:#e2d4ff;}
+  .seg.pinned{box-shadow:0 0 0 2px var(--accent) inset;}
   .seg-top{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .seg-head-left{display:flex;align-items:center;gap:9px;}
   .blockdone{width:22px;height:22px;flex:none;accent-color:var(--done);cursor:pointer;}
+  .lockbadge{font-size:13px;flex:none;}
   .seg.collapsed{opacity:.5;}
   .seg.collapsed .seg-ctrl,.seg.collapsed .tasks-wrap{display:none;}
   .tag{font-size:11px;font-weight:800;letter-spacing:.04em;padding:2px 8px;border-radius:999px;color:#fff;}
@@ -118,7 +120,7 @@
 <body>
 <div class="wrap">
   <h1>営業・休憩スケジュール自動計算</h1>
-  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。実際の終了時刻でずれ込み調整、各ブロックにチェックリスト＋完了チェック。Googleログインで全端末に同期。削除した流れはゴミ箱に入り、1週間で自動消去されます。</p>
+  <p class="lead">出庫時刻を入れるだけで営業と休憩が自動で並びます。各ブロックの「開始を固定」を入れると、その時刻ぴったりに始まり直前のブロックが自動で伸縮します。実際の終了時刻でずれ込み調整、チェックリスト、Googleログイン同期、削除した流れのゴミ箱（1週間で自動消去）も。</p>
 
   <!-- アカウント同期 -->
   <div class="card">
@@ -214,8 +216,8 @@
   <div class="card"><div class="summary" id="summary"></div></div>
 
   <p class="foot">
-    予定の営業は「分」でも「終了時刻」でも入力OK。「実際の営業終了時刻」を入れると次の営業が縮み帰庫時刻は不変（右の×で空白に戻せます）。<br>
-    左上チェックでブロック完了（畳まれます）。次に開くと未完了へ自動スクロール。
+    「開始を固定」を入れると、そのブロックがその時刻に始まり直前のブロックが自動で伸縮します（🔒表示）。<br>
+    「実際の営業終了時刻」はずれ込み調整（右の×で空白に戻せます）。左上チェックでブロック完了。
   </p>
 </div>
 
@@ -230,11 +232,11 @@ const V2_KEY="taxiShift_presets_v2";
 const V1_KEY="taxiShift_presets_v1";
 const TRASH_KEY="taxiShift_trash_v1";
 const NEWCAT="__new__";
-const TRASH_TTL=7*24*60*60*1000;   // 1週間
+const TRASH_TTL=7*24*60*60*1000;
 const FIREBASE_CONFIG={apiKey:"AIzaSyCjVXOMhuDPB0U-p2_FG3sraPjFvP_AQVU",authDomain:"tokyo-75556.firebaseapp.com",projectId:"tokyo-75556",storageBucket:"tokyo-75556.firebasestorage.app",messagingSenderId:"143590278758",appId:"1:143590278758:web:3086b0b046376283b3cfa7"};
 const CLOUD_COLLECTION="taxiShift";
 
-let trash=[];   // 削除した流れ {id,cat,name,data,deletedAt}
+let trash=[];
 
 const state={
   out:"13:50", defWork:180, defBreak:30, cap:210,
@@ -242,13 +244,10 @@ const state={
   segments:[]
 };
 function normTasks(a){ return Array.isArray(a)?a.map(t=>({text:(t&&t.text)||"",done:!!(t&&t.done)})):[]; }
-function defaultSegments(){
-  state.segments=[];
-  for(let i=0;i<5;i++){
-    state.segments.push({type:'work', min:state.defWork, actual:null, memo:"", tasks:[], done:false});
-    if(i<4) state.segments.push({type:'break', min:state.defBreak, memo:"", tasks:[], done:false});
-  }
-}
+function mkWork(){ return {type:'work', min:state.defWork, actual:null, memo:"", tasks:[], done:false, fixStart:null}; }
+function mkBreak(){ return {type:'break', min:state.defBreak, memo:"", tasks:[], done:false, fixStart:null}; }
+function mkTodo(){ return {type:'todo', title:"", tasks:[], done:false}; }
+function defaultSegments(){ state.segments=[]; for(let i=0;i<5;i++){ state.segments.push(mkWork()); if(i<4) state.segments.push(mkBreak()); } }
 function genId(){ return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 function pad2(n){ return String(n).padStart(2,"0"); }
@@ -262,21 +261,18 @@ function snapshot(){
 }
 function applySnapshot(s){
   if(!s) return false;
-  state.out=s.out??"13:50";
-  state.defWork=s.defWork??180; state.defBreak=s.defBreak??30; state.cap=s.cap??210;
+  state.out=s.out??"13:50"; state.defWork=s.defWork??180; state.defBreak=s.defBreak??30; state.cap=s.cap??210;
   state.dayMemo=s.dayMemo||"";
   let segs=Array.isArray(s.segments)?s.segments:[];
   segs=segs.map(x=>{
     if(x.type==='todo') return {type:'todo', title:x.title||"", tasks:normTasks(x.tasks), done:!!x.done};
-    return {type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done};
+    return {type:x.type, min:x.min||0, actual:x.actual||null, memo:x.memo||"", tasks:normTasks(x.tasks), done:!!x.done, fixStart:x.fixStart||null};
   });
-  state.segments=segs.length?segs:[];
-  if(!state.segments.length) defaultSegments();
+  state.segments=segs.length?segs:[]; if(!state.segments.length) defaultSegments();
   return true;
 }
 function persistLast(){
-  const snap=snapshot();
-  snap.flowName=state.flowName; snap.flowCat=state.flowCat; snap.currentId=state.currentId;
+  const snap=snapshot(); snap.flowName=state.flowName; snap.flowCat=state.flowCat; snap.currentId=state.currentId;
   storeSet(LAST_KEY, snap); scheduleSync();
 }
 
@@ -294,11 +290,7 @@ function getPresets(){
 function savePresets(p){ storeSet(PRESET_KEY,p); scheduleSync(); }
 function getTrash(){ const t=storeGet(TRASH_KEY); return Array.isArray(t)?t:[]; }
 function saveTrash(){ storeSet(TRASH_KEY, trash); scheduleSync(); }
-function purgeTrash(){
-  const now=Date.now(); const before=trash.length;
-  trash=trash.filter(t=>t&&t.deletedAt&&(now-t.deletedAt)<TRASH_TTL);
-  if(trash.length!==before) saveTrash();
-}
+function purgeTrash(){ const now=Date.now(); const b=trash.length; trash=trash.filter(t=>t&&t.deletedAt&&(now-t.deletedAt)<TRASH_TTL); if(trash.length!==b) saveTrash(); }
 function categories(){ return [...new Set(Object.values(getPresets()).map(x=>x.cat||"").filter(c=>c!==""))].sort(); }
 
 function refreshPresetList(sel){
@@ -340,26 +332,42 @@ function syncInputs(){ $("#outTime").value=state.out; $("#defWork").value=state.
 
 function toMin(hhmm){ if(!hhmm) return null; const [h,m]=hhmm.split(":").map(Number); return h*60+m; }
 function hm(t){ let m=((t%1440)+1440)%1440; return pad2(Math.floor(m/60))+":"+pad2(m%60); }
+function clockToElapsed(base, hhmm, lb){ const tc=toMin(hhmm); if(tc==null) return null; let E=((tc-base)%1440+1440)%1440; while(E<lb) E+=1440; return E; }
 function fmtClock(base,el){ let total=base+el, day=Math.floor(total/1440); let pre=day<=0?"":(day===1?"翌 ":`+${day}日 `); return pre+hm(total); }
 function fmtDur(min){ min=Math.round(min); const s=min<0?"-":""; min=Math.abs(min); const h=Math.floor(min/60), m=min%60; if(h&&m) return `${s}${h}時間${m}分`; if(h) return `${s}${h}時間`; return `${s}${m}分`; }
 
 function compute(){
   const base=toMin(state.out)??0;
   let elapsed=0, carry=0, breakUsed=0; const rows=[]; const notes=[]; const cap=Math.max(0,state.cap);
+  let prev=null;
+  function pinStart(fx){
+    const pin=clockToElapsed(base, fx, prev?prev.start:0);
+    if(pin==null) return {start:elapsed, applied:false};
+    if(prev){ let nd=pin-prev.start; if(nd<0) nd=0;
+      if(prev.type==='break'){ breakUsed += (nd - prev.dur); }
+      prev.dur=nd; prev.adjusted=true; return {start:prev.start+nd, applied:true};
+    }
+    return {start:pin, applied:true};
+  }
   state.segments.forEach((s,idx)=>{
     if(s.type==='work'){
-      const wStart=elapsed; const planned=Math.max(0,s.min);
+      let wStart=elapsed; let pinned=false;
+      if(s.fixStart){ const p=pinStart(s.fixStart); wStart=p.start; pinned=p.applied; }
+      const planned=Math.max(0,s.min);
       let effPlanned=planned-carry; let leftover=0; if(effPlanned<0){ leftover=-effPlanned; effPlanned=0; } carry=leftover;
       let workDur; const actual=toMin(s.actual);
       if(actual!==null){ let aElapsed=actual-base; while(aElapsed<wStart) aElapsed+=1440; workDur=aElapsed-wStart; carry+=(workDur-effPlanned); }
       else{ workDur=effPlanned; }
-      rows.push({type:'work', idx, start:wStart, dur:workDur, planned, hasActual:actual!==null, adj:workDur-planned});
-      elapsed=wStart+workDur;
+      const row={type:'work', idx, start:wStart, dur:workDur, planned, hasActual:actual!==null, adj:workDur-planned, pinned, adjusted:false};
+      rows.push(row); elapsed=wStart+workDur; prev=row;
     }else if(s.type==='break'){
+      let bStart=elapsed; let pinned=false;
+      if(s.fixStart){ const p=pinStart(s.fixStart); bStart=p.start; pinned=p.applied; }
       let br=Math.max(0, s.min||0); const remain=cap-breakUsed;
       if(remain<=0){ br=0; notes.push(`合計休憩が上限(${fmtDur(cap)})に達したため、以降の休憩は0分になります。`);}
       else if(br>remain){ br=remain; notes.push(`合計休憩の上限に合わせて休憩を${fmtDur(br)}に短縮しました。`);}
-      rows.push({type:'break', idx, start:elapsed, dur:br, set:s.min||0}); breakUsed+=br; elapsed+=br;
+      const row={type:'break', idx, start:bStart, dur:br, set:s.min||0, pinned, adjusted:false};
+      rows.push(row); breakUsed+=br; elapsed=bStart+br; prev=row;
     }else{ rows.push({type:'todo', idx}); }
   });
   return {base, rows, kikoElapsed:elapsed, breakUsed, workTotal:elapsed-breakUsed, notes};
@@ -375,6 +383,10 @@ function segButtons(idx){
 }
 function doneBox(idx){ return `<input type="checkbox" class="blockdone" data-blockdone data-idx="${idx}" ${state.segments[idx].done?'checked':''} title="完了にする">`; }
 function memoField(idx, ph){ return `<div class="fld memo"><label>メモ</label><input type="text" value="${esc(state.segments[idx].memo)}" data-k="memo" data-idx="${idx}" placeholder="${ph}"></div>`; }
+function fixField(idx){
+  const seg=state.segments[idx];
+  return `<div class="fld"><label>🔒 開始を固定</label><div class="timewrap"><input type="time" value="${seg.fixStart||''}" data-k="fixstart" data-idx="${idx}"><button class="clearbtn" data-clearfix="${idx}" title="固定解除">×</button></div><span class="hint">${seg.fixStart?'この時刻に固定（前が伸縮）':'固定すると前のブロックが自動調整'}</span></div>`;
+}
 function taskList(idx){
   const seg=state.segments[idx];
   const items=(seg.tasks||[]).map((t,ti)=>`
@@ -391,18 +403,18 @@ function render(){
   const r=compute(); const S=$("#sched");
   const ae=document.activeElement;
   let fk=null, fx=null, ss=null, se=null;
-  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['work','brk','actual','workend'].indexOf(ae.dataset.k)>=0){ fk=ae.dataset.k; fx=ae.dataset.idx; try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){} }
+  if(ae && ae.dataset && ae.dataset.idx!==undefined && ['work','brk','actual','workend','fixstart'].indexOf(ae.dataset.k)>=0){ fk=ae.dataset.k; fx=ae.dataset.idx; try{ ss=ae.selectionStart; se=ae.selectionEnd; }catch(e){} }
   S.innerHTML=""; let workNo=0, breakNo=0;
   r.rows.forEach(row=>{
     if(row.type==='work'){
       workNo++; const seg=state.segments[row.idx];
-      const el=document.createElement("div"); el.className="seg work"+(seg.done?" collapsed":"");
-      const adjTxt = Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"";
+      const el=document.createElement("div"); el.className="seg work"+(seg.done?" collapsed":"")+(row.pinned?" pinned":"");
+      const adjTxt = row.adjusted ? ` <span class="adj">（固定に合わせて調整）</span>` : (Math.abs(row.adj)>=1 ? ` <span class="adj">(予定より${row.adj>0?"+":""}${fmtDur(row.adj)})</span>`:"");
       const plannedEnd = hm(r.base + row.start + Math.max(0,seg.min));
       const actualHint = row.hasActual ? `実績 ${fmtDur(row.dur)}` : "ずれ込んだ時だけ入力";
       el.innerHTML=`
         <div class="seg-top">
-          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag work">営業 ${workNo}</span></div>
+          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag work">営業 ${workNo}</span>${row.pinned?'<span class="lockbadge" title="開始時刻を固定中">🔒</span>':''}</div>
           <div style="text-align:right"><div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div><div class="dur">営業 ${fmtDur(row.dur)}${adjTxt}</div></div>
         </div>
         <div class="seg-ctrl">
@@ -410,6 +422,7 @@ function render(){
           <div class="eq">=</div>
           <div class="fld"><label>予定の終了時刻</label><input type="time" value="${plannedEnd}" data-k="workend" data-start="${row.start}" data-idx="${row.idx}"><span class="hint">分↔時刻どちらでもOK</span></div>
           <div class="fld"><label>実際の営業終了時刻</label><div class="timewrap"><input type="time" value="${seg.actual||""}" data-k="actual" data-idx="${row.idx}"><button class="clearbtn" data-clearactual="${row.idx}" title="空白に戻す">×</button></div><span class="hint">${actualHint}</span></div>
+          ${fixField(row.idx)}
           ${segButtons(row.idx)}
           ${memoField(row.idx,"例：〇〇エリアで流す / 迎車")}
         </div>
@@ -417,15 +430,16 @@ function render(){
       S.appendChild(el);
     }else if(row.type==='break'){
       breakNo++; const seg=state.segments[row.idx];
-      const el=document.createElement("div"); el.className="seg brk"+(seg.done?" collapsed":"");
-      const shortTxt = row.dur<row.set ? ` <span class="adj">(上限で${fmtDur(row.set)}→${fmtDur(row.dur)})</span>`:"";
+      const el=document.createElement("div"); el.className="seg brk"+(seg.done?" collapsed":"")+(row.pinned?" pinned":"");
+      const shortTxt = row.adjusted ? ` <span class="adj">（固定に合わせて調整）</span>` : (row.dur<row.set ? ` <span class="adj">(上限で${fmtDur(row.set)}→${fmtDur(row.dur)})</span>`:"");
       el.innerHTML=`
         <div class="seg-top">
-          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag brk">休憩 ${breakNo}</span></div>
+          <div class="seg-head-left">${doneBox(row.idx)}<span class="tag brk">休憩 ${breakNo}</span>${row.pinned?'<span class="lockbadge" title="開始時刻を固定中">🔒</span>':''}</div>
           <div style="text-align:right"><div class="clock">${fmtClock(r.base,row.start)} → ${fmtClock(r.base,row.start+row.dur)}</div><div class="dur">休憩 ${fmtDur(row.dur)}${shortTxt}</div></div>
         </div>
         <div class="seg-ctrl">
-          <div class="fld"><label>この休憩（分）</label><input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="brk" data-idx="${row.idx}"><span class="hint">長引いた回はここを変更（30分より短くも可）</span></div>
+          <div class="fld"><label>この休憩（分）</label><input type="number" inputmode="numeric" min="0" step="5" value="${seg.min}" data-k="brk" data-idx="${row.idx}"><span class="hint">長引いた回はここを変更</span></div>
+          ${fixField(row.idx)}
           ${segButtons(row.idx)}
           ${memoField(row.idx,"例：帰庫前 / ガス満タン / 仮眠")}
         </div>
@@ -463,14 +477,8 @@ function scrollToFirstIncomplete(force){
   if(target) target.scrollIntoView({block:"start"});
 }
 
-/* ---- ゴミ箱 + 元に戻す ---- */
-function relTime(ts){
-  const diff=Date.now()-ts; const left=TRASH_TTL-diff;
-  const d=Math.floor(left/86400000), h=Math.floor((left%86400000)/3600000);
-  if(left<=0) return "まもなく削除";
-  if(d>0) return `あと約${d}日で自動削除`;
-  return `あと約${Math.max(1,h)}時間で自動削除`;
-}
+/* ゴミ箱 + 元に戻す */
+function relTime(ts){ const left=TRASH_TTL-(Date.now()-ts); const d=Math.floor(left/86400000), h=Math.floor((left%86400000)/3600000); if(left<=0) return "まもなく削除"; if(d>0) return `あと約${d}日で自動削除`; return `あと約${Math.max(1,h)}時間で自動削除`; }
 function renderTrash(){
   const box=$("#trashList");
   if(!trash.length){ box.innerHTML='<div class="trash-empty">ゴミ箱は空です。</div>'; return; }
@@ -483,40 +491,33 @@ function renderTrash(){
         <button class="btn sec mini" data-purge="${it.id}">完全削除</button></div>
     </div>`).join("");
 }
-function showPresetUndo(item){
-  const b=$("#presetUndo");
-  b.innerHTML=`<span>「${esc((item.cat?item.cat+"／":"")+item.name)}」を削除しました（ゴミ箱へ）</span><button data-undopreset="${item.id}">元に戻す</button>`;
-  b.style.display="flex";
-}
-function hidePresetUndo(){ $("#presetUndo").style.display="none"; }
+function showPresetUndo(item){ const b=$("#presetUndo"); b.innerHTML=`<span>「${esc((item.cat?item.cat+"／":"")+item.name)}」を削除しました（ゴミ箱へ）</span><button data-undopreset="${item.id}">元に戻す</button>`; b.style.display="flex"; }
 function restorePreset(id){
   const idx=trash.findIndex(t=>t.id===id); if(idx<0) return;
   const it=trash[idx]; trash.splice(idx,1); saveTrash();
   const p=getPresets(); p[it.id]={id:it.id, cat:it.cat||"", name:it.name||"", data:it.data}; savePresets(p);
-  refreshPresetList(it.id); renderTrash(); hidePresetUndo();
+  refreshPresetList(it.id); renderTrash(); $("#presetUndo").style.display="none";
   toast(`「${(it.cat?it.cat+"／":"")+it.name}」を復元しました`);
 }
 $("#presetUndo").addEventListener("click",e=>{ const id=e.target.dataset.undopreset; if(id!==undefined) restorePreset(id); });
 $("#trashList").addEventListener("click",e=>{
   const t=e.target;
   if(t.dataset.restore!==undefined){ restorePreset(t.dataset.restore); }
-  else if(t.dataset.purge!==undefined){
-    const id=t.dataset.purge; const it=trash.find(x=>x.id===id); if(!it) return;
+  else if(t.dataset.purge!==undefined){ const id=t.dataset.purge; const it=trash.find(x=>x.id===id); if(!it) return;
     if(!confirm(`「${(it.cat?it.cat+"／":"")+it.name}」をゴミ箱から完全に削除しますか？（戻せません）`)) return;
-    trash=trash.filter(x=>x.id!==id); saveTrash(); renderTrash(); toast("完全に削除しました");
-  }
+    trash=trash.filter(x=>x.id!==id); saveTrash(); renderTrash(); toast("完全に削除しました"); }
 });
 
-/* ---- 入力イベント ---- */
+/* 入力イベント */
 $("#dayMemo").addEventListener("input",e=>{state.dayMemo=e.target.value;persistLast();});
 $("#outTime").addEventListener("input",e=>{state.out=e.target.value;render();});
 $("#defWork").addEventListener("input",e=>{state.defWork=+e.target.value||0;persistLast();});
 $("#defBreak").addEventListener("input",e=>{state.defBreak=Math.max(0,+e.target.value||0);persistLast();});
 $("#cap").addEventListener("input",e=>{state.cap=+e.target.value||0;render();});
-$("#addWork").addEventListener("click",()=>{state.segments.push({type:'work',min:state.defWork,actual:null,memo:"",tasks:[],done:false});render();});
-$("#addBreak").addEventListener("click",()=>{state.segments.push({type:'break',min:state.defBreak,memo:"",tasks:[],done:false});render();});
-$("#addTodo").addEventListener("click",()=>{state.segments.push({type:'todo',title:"",tasks:[],done:false});render();});
-$("#addTodoTop").addEventListener("click",()=>{state.segments.unshift({type:'todo',title:"",tasks:[],done:false});render();});
+$("#addWork").addEventListener("click",()=>{state.segments.push(mkWork());render();});
+$("#addBreak").addEventListener("click",()=>{state.segments.push(mkBreak());render();});
+$("#addTodo").addEventListener("click",()=>{state.segments.push(mkTodo());render();});
+$("#addTodoTop").addEventListener("click",()=>{state.segments.unshift(mkTodo());render();});
 $("#jumpTodo").addEventListener("click",()=>scrollToFirstIncomplete(true));
 $("#reset").addEventListener("click",()=>{
   if(!confirm("いまの入力を初期状態に戻します。よろしいですか？（保存した流れは消えません）")) return;
@@ -531,6 +532,7 @@ $("#sched").addEventListener("input",e=>{
   if(k==="memo"){ s.memo=t.value; persistLast(); return; }
   if(k==="title"){ s.title=t.value; persistLast(); return; }
   if(k==="tasktext"){ const ti=+t.dataset.ti; if(s.tasks&&s.tasks[ti]){ s.tasks[ti].text=t.value; persistLast(); } return; }
+  if(k==="fixstart"){ s.fixStart=t.value||null; render(); return; }
   if(k==="work"){ s.min=+t.value||0; }
   else if(k==="brk"){ s.min=Math.max(0,+t.value||0); }
   else if(k==="actual"){ s.actual=t.value||null; }
@@ -557,26 +559,25 @@ $("#sched").addEventListener("click",e=>{
   const t=e.target;
   if(t.dataset.del!==undefined){ if(state.segments.length>1){ state.segments.splice(+t.dataset.del,1); render(); } }
   else if(t.dataset.clearactual!==undefined){ const idx=+t.dataset.clearactual; if(state.segments[idx]){ state.segments[idx].actual=null; render(); } }
+  else if(t.dataset.clearfix!==undefined){ const idx=+t.dataset.clearfix; if(state.segments[idx]){ state.segments[idx].fixStart=null; render(); } }
   else if(t.dataset.deltask!==undefined){ const idx=+t.dataset.idx, ti=+t.dataset.ti; if(state.segments[idx]&&state.segments[idx].tasks){ state.segments[idx].tasks.splice(ti,1); render(); } }
-  else if(t.dataset.addwork!==undefined){ state.segments.splice(+t.dataset.addwork+1,0,{type:'work',min:state.defWork,actual:null,memo:"",tasks:[],done:false}); render(); }
-  else if(t.dataset.addbreak!==undefined){ state.segments.splice(+t.dataset.addbreak+1,0,{type:'break',min:state.defBreak,memo:"",tasks:[],done:false}); render(); }
-  else if(t.dataset.addtodo!==undefined){ state.segments.splice(+t.dataset.addtodo+1,0,{type:'todo',title:"",tasks:[],done:false}); render(); }
+  else if(t.dataset.addwork!==undefined){ state.segments.splice(+t.dataset.addwork+1,0,mkWork()); render(); }
+  else if(t.dataset.addbreak!==undefined){ state.segments.splice(+t.dataset.addbreak+1,0,mkBreak()); render(); }
+  else if(t.dataset.addtodo!==undefined){ state.segments.splice(+t.dataset.addtodo+1,0,mkTodo()); render(); }
 });
 
 $("#catSel").addEventListener("change",toggleCatNew);
 
-/* ---- Firebase ---- */
+/* Firebase */
 let fbUser=null, fbDb=null, fbReady=false, _syncT=null, _pulling=false;
 function setAuthStatus(html,on){ $("#authStatus").innerHTML=`<span class="dot${on?' on':''}"></span>`+html; }
 function updateAuthUI(){
-  if(fbUser){ $("#authForm").style.display="none"; $("#authLoggedIn").style.display="block";
-    setAuthStatus(`ログイン中：<b>${esc(fbUser.displayName||fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true); }
+  if(fbUser){ $("#authForm").style.display="none"; $("#authLoggedIn").style.display="block"; setAuthStatus(`ログイン中：<b>${esc(fbUser.displayName||fbUser.email||fbUser.uid)}</b>（自動同期ON）`, true); }
   else{ $("#authForm").style.display="block"; $("#authLoggedIn").style.display="none"; setAuthStatus("未ログイン（この端末内のみ保存）", false); }
 }
 function fbInit(){
   if(typeof firebase==="undefined"){ setAuthStatus("同期ライブラリを読み込めません（オフライン保存のみ）", false); return; }
-  try{
-    firebase.initializeApp(FIREBASE_CONFIG); fbDb=firebase.firestore(); fbReady=true;
+  try{ firebase.initializeApp(FIREBASE_CONFIG); fbDb=firebase.firestore(); fbReady=true;
     firebase.auth().getRedirectResult().catch(()=>{});
     firebase.auth().onAuthStateChanged(u=>{ fbUser=u||null; updateAuthUI(); if(fbUser) cloudPull(); });
   }catch(e){ setAuthStatus("同期の初期化に失敗しました", false); }
@@ -613,7 +614,6 @@ async function cloudPushNow(){
   if(!fbReady||!fbUser||_pulling) return;
   try{
     const last=storeGet(LAST_KEY)||snapshot();
-    // update で各フィールドを丸ごと置き換え（削除も反映される）／routine 等の他アプリ領域は保持
     const data={ presets:getPresets(), last:last, trash:trash, updatedAt:firebase.firestore.FieldValue.serverTimestamp() };
     const ref=fbDb.collection(CLOUD_COLLECTION).doc(fbUser.uid);
     try{ await ref.update(data); }
@@ -625,7 +625,7 @@ $("#btnGoogle").addEventListener("click",googleLogin);
 $("#btnLogout").addEventListener("click",async()=>{ try{ await firebase.auth().signOut(); toast("ログアウトしました"); }catch(e){} });
 $("#btnSyncNow").addEventListener("click",async()=>{ await cloudPushNow(); toast("同期しました"); });
 
-/* ---- 保存・更新・読込・削除（削除はゴミ箱へ） ---- */
+/* 保存・更新・読込・削除（削除はゴミ箱へ） */
 function currentName(){ return $("#presetName").value.trim(); }
 $("#btnSaveNew").addEventListener("click",()=>{
   const name=currentName(); const cat=effectiveCat();
@@ -642,8 +642,7 @@ $("#btnUpdate").addEventListener("click",()=>{
   const p=getPresets(); if(!p[state.currentId]){ alert("元の流れが見つかりません"); return; }
   const name=currentName()||p[state.currentId].name; const cat=effectiveCat();
   p[state.currentId]={id:state.currentId, cat, name, data:snapshot()}; savePresets(p);
-  state.flowName=name; state.flowCat=cat;
-  refreshPresetList(state.currentId); setCatUI(cat); updateCurFlow(); persistLast();
+  state.flowName=name; state.flowCat=cat; refreshPresetList(state.currentId); setCatUI(cat); updateCurFlow(); persistLast();
   toast(`「${cat?cat+"／":""}${name}」を上書き更新しました`);
 });
 $("#loadPreset").addEventListener("click",()=>{
@@ -658,7 +657,7 @@ $("#delPreset").addEventListener("click",()=>{
   const id=$("#presetSel").value; if(!id){ alert("削除する流れを選んでください"); return; }
   const p=getPresets(); const it=p[id]; if(!it) return;
   const label=(it.cat?it.cat+"／":"")+it.name;
-  if(!confirm(`「${label}」を削除しますか？（ゴミ箱に移動し、1週間で自動消去。それまで復元できます）`)) return;
+  if(!confirm(`「${label}」を削除しますか？（ゴミ箱に移動・1週間で自動消去、それまで復元可）`)) return;
   trash.unshift({id:it.id, cat:it.cat||"", name:it.name||"", data:it.data, deletedAt:Date.now()});
   delete p[id]; savePresets(p); saveTrash();
   if(state.currentId===id){ state.currentId=null; updateCurFlow(); persistLast(); }
@@ -666,7 +665,7 @@ $("#delPreset").addEventListener("click",()=>{
   toast(`「${label}」をゴミ箱へ移動しました`);
 });
 
-/* ---- JSON ---- */
+/* JSON */
 $("#exportJson").addEventListener("click",()=>{
   const data={ _app:"taxiShift", version:4, exportedAt:new Date().toISOString(),
     presets:getPresets(), trash:trash,
@@ -703,7 +702,7 @@ $("#importJson").addEventListener("change",e=>{
   rd.readAsText(f);
 });
 
-/* ---- 起動時 ---- */
+/* 起動時 */
 (function init(){
   trash=getTrash(); purgeTrash();
   const last=storeGet(LAST_KEY);
