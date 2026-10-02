@@ -98,6 +98,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .ed input[type=text]{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:8px;padding:5px 8px;min-width:0;width:9em}
 .ed .catin{font-weight:700;width:7em}
 .mini{border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:4px 8px;font-size:12px}
+.mini:disabled{opacity:.3}
+.items.editlist{flex-direction:column;align-items:flex-start;padding-left:20px}
 .mini.del{color:var(--bad)}
 .mini.del.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
 .itemed{display:inline-flex;align-items:center;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px 4px 3px 3px}
@@ -112,6 +114,16 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .pill{font-size:12px;font-weight:700;border-radius:999px;padding:3px 10px}
 .pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.bad{background:var(--bad-bg);color:var(--bad)} .pill.warn{background:var(--warn-bg);color:var(--warn)}
 .rules{display:flex;flex-direction:column;gap:8px}
+.sortbtns{display:flex;gap:4px;align-self:center}
+.sortbtns button{width:36px;height:32px;border:1px solid var(--line);background:var(--panel);border-radius:8px;font-size:15px}
+.sortbtns button:disabled{opacity:.3}
+.rule.sorting{border-style:dashed}
+.day .more{font-size:11px;font-weight:700;color:var(--accent);border:1px dashed currentColor;border-radius:4px;padding:0 6px;margin:1px auto 0;cursor:pointer}
+.day.selected .more{color:var(--sel-ink)}
+.sortlist{display:flex;flex-direction:column;gap:6px;width:100%}
+.sortrow{display:flex;align-items:center;gap:8px;border-radius:10px;padding:6px 6px 6px 12px;color:#fff;font-weight:700;font-size:14px}
+.sortrow .nm{flex:1;min-width:0}
+.sortrow .sortbtns button{color:var(--fg)}
 .rule{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:start;padding:10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
 .rule .st{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
 .rule .st.ok{background:var(--ok-bg);color:var(--ok)} .rule .st.bad{background:var(--bad-bg);color:var(--bad)} .rule .st.warn{background:var(--warn-bg);color:var(--warn)}
@@ -234,7 +246,7 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
   </section>
 
   <section class="panel">
-    <div class="label">チェックリスト（この期間のルール）</div>
+    <div class="palhead"><div class="label">チェックリスト（この期間のルール）</div><button class="edittoggle" id="ruleSortBtn">並び替え</button></div>
     <div class="banner" id="noRules" hidden></div>
     <div class="rulesum" id="rulesum"></div>
     <div class="rules" id="rules"></div>
@@ -314,7 +326,7 @@ let tags=defaultTags(),dayTags={},tagEditing=false;
 const liveTags=()=>tags.filter(t=>!t.deleted);
 const tagById=id=>tags.find(t=>t.id===id);
 const dayTagList=k=>(dayTags[k]||[]).map(tagById).filter(Boolean);
-let editing=false,openArch=null,perMode=null;
+let openDays=new Set(),daySort=false,ruleSort=false,editing=false,openArch=null,perMode=null;
 let curId=null,sel=todayK;
 
 const sorted=()=>periods.slice().sort((a,b)=>a.start<b.start?-1:1);
@@ -399,8 +411,11 @@ function render(){
     for(let i=0;i<plen(p);i++){const dk=addK(p.start,i),d=parse(dk),ids=dayItems(dk),w=d.getDay();
       const tags=el("div",{class:"tags"});
       if(!ids.length)tags.append(el("div",{class:"rest"},"—"));
-      ids.slice(0,3).forEach(id=>{const r=itemById(id);tags.append(el("div",{class:"tag",style:"background:"+r.cat.color},r.item.name))});
-      if(ids.length>3)tags.append(el("div",{class:"rest"},"+"+(ids.length-3)));
+      const opened=openDays.has(dk);
+      (opened?ids:ids.slice(0,3)).forEach(id=>{const r=itemById(id);tags.append(el("div",{class:"tag",style:"background:"+r.cat.color},r.item.name))});
+      if(ids.length>3){const m=el("span",{class:"more",role:"button",tabindex:"0","aria-label":opened?"閉じる":"残り"+(ids.length-3)+"種目を表示"},opened?"▲閉じる":"+"+(ids.length-3));
+        const tg=e=>{e.stopPropagation();if(opened)openDays.delete(dk);else openDays.add(dk);render()};
+        m.addEventListener("click",tg);m.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tg(e)}});tags.append(m)}
       const b=el("button",{class:"day"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{sel=dk;render()},"aria-label":md(d)+"("+DOW[w]+")"},el("span",{class:"dow"},DOW[w]),el("span",{class:"dn"},(i===0||d.getDate()===1?(d.getMonth()+1)+"/":"")+d.getDate()),el("div",{class:"dts"},...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name))),tags);
       if(badByDay[dk])b.append(el("span",{class:"flag"},"!"));
       if(notes[dk])b.append(el("span",{class:"memo","aria-label":"メモあり"},"✎"));
@@ -414,7 +429,15 @@ function render(){
   const ch=$("chosen");ch.replaceChildren();
   if(!p)ch.append(el("div",{class:"empty"},"期間を作ると、日付ごとに種目を入れられます。"));
   else if(!ids.length)ch.append(el("div",{class:"empty"},"まだ種目がありません。下のリストからタップして入れてください。"));
+  if(daySort&&ids.length>1){const list=el("div",{class:"sortlist"});
+    const mv=(i,d)=>{const a=dayItems(sel),j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];plan[sel]=a;savePlan();render()};
+    ids.forEach((id,i)=>{const r=itemById(id);list.append(el("div",{class:"sortrow",style:"background:"+r.cat.color},el("span",{class:"nm"},r.item.name),
+      el("div",{class:"sortbtns"},el("button",{"aria-label":"上へ",onclick:()=>mv(i,-1),...(i===0?{disabled:""}:{})},"↑"),el("button",{"aria-label":"下へ",onclick:()=>mv(i,1),...(i===ids.length-1?{disabled:""}:{})},"↓"))))});
+    ch.append(list,el("button",{class:"edittoggle on",onclick:()=>{daySort=false;render()}},"完了"));
+  } else {
   ids.forEach(id=>{const r=itemById(id);ch.append(el("button",{class:"c",style:"background:"+r.cat.color,onclick:()=>toggle(id),"aria-label":r.item.name+"を外す"},r.item.name,el("span",{class:"x"},"✕")))});
+  if(ids.length>1)ch.append(el("button",{class:"mini",onclick:()=>{daySort=true;render()}},"並び替え"));
+  }
   const al=$("dayAlerts");al.replaceChildren();
   (badByDay[sel]||[]).forEach(m=>al.append(el("div",{class:"alert bad"},el("b",null,"⚠"),el("span",null,m))));
   const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";
@@ -477,9 +500,12 @@ function renderRules(results){
   $("rulesum").replaceChildren(el("span",{class:"pill ok"},"OK "+no),el("span",{class:"pill bad"},"違反 "+nb),el("span",{class:"pill warn"},"未達 "+nw));
   const rl=$("rules");rl.replaceChildren();
   if(rules&&!rules.length)rl.append(el("div",{class:"empty"},"ルールがありません。下のフォームから追加できます。"));
-  results.forEach(({r,res})=>{const why=el("div",{class:"why "+res.status});res.msgs.forEach((m,i)=>{if(i)why.append(el("br"));why.append(m)});
+  $("ruleSortBtn").classList.toggle("on",ruleSort);$("ruleSortBtn").textContent=ruleSort?"完了":"並び替え";$("ruleSortBtn").hidden=!rules||rules.length<2;
+  const move=(i,d)=>{const a=pRules(p).slice(),j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];p.rules=a;savePeriods();render()};
+  results.forEach(({r,res},idx)=>{const why=el("div",{class:"why "+res.status});res.msgs.forEach((m,i)=>{if(i)why.append(el("br"));why.append(m)});
     rl.append(el("div",{class:"rule"},el("span",{class:"st "+res.status},res.status==="ok"?"✓":res.status==="bad"?"!":"…"),el("div",{class:"txt"},ruleText(r),why),
-      armed("削除","本当に？",()=>{p.rules=pRules(p).filter(x=>x.id!==r.id);savePeriods();render()})))});
+      ruleSort?el("div",{class:"sortbtns"},el("button",{"aria-label":"上へ",onclick:()=>move(idx,-1),...(idx===0?{disabled:""}:{})},"↑"),el("button",{"aria-label":"下へ",onclick:()=>move(idx,1),...(idx===results.length-1?{disabled:""}:{})},"↓"))
+      :armed("削除","本当に？",()=>{p.rules=pRules(p).filter(x=>x.id!==r.id);savePeriods();render()})));if(ruleSort)rl.lastChild.classList.add("sorting")});
 }
 
 function renderDayTags(p){
@@ -502,6 +528,8 @@ function renderDayTags(p){
 }
 function toggleTag(id){if(!cur())return;const a=(dayTags[sel]||[]).slice(),i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);if(a.length)dayTags[sel]=a;else delete dayTags[sel];touch();render()}
 
+// 削除済みを飛ばして、表示中の隣と入れ替える
+function moveIn(arr,x,d,ok){const i=arr.indexOf(x);let j=i+d;while(j>=0&&j<arr.length&&!ok(arr[j]))j+=d;if(j<0||j>=arr.length)return;[arr[i],arr[j]]=[arr[j],arr[i]]}
 function renderCats(){
   const box=$("cats");box.replaceChildren();
   $("editBtn").classList.toggle("on",editing);$("editBtn").textContent=editing?"完了":"編集";
@@ -519,12 +547,17 @@ function renderCats(){
       const nameIn=el("input",{type:"text",class:"catin",id:"cat-"+c.id,value:c.name,"aria-label":"カテゴリ名"});
       nameIn.addEventListener("change",()=>{const v=nameIn.value.trim();if(v){c.name=v;saveCfg();render()}});
       const sw=el("button",{class:"swatch",style:"background:"+c.color,"aria-label":"色を変える",onclick:()=>{c.color=COLORS[(COLORS.indexOf(c.color)+1)%COLORS.length];saveCfg();render()}});
-      const up=el("button",{class:"mini","aria-label":"上へ",onclick:()=>{const ci=cats.indexOf(c);let j=ci-1;while(j>=0&&!live(cats[j]))j--;if(j>=0){[cats[j],cats[ci]]=[cats[ci],cats[j]];saveCfg();render()}}},"↑");
-      wrap.append(el("div",{class:"ed"},sw,nameIn,up,armed("カテゴリ削除","本当に？",()=>{c.deleted=true;saveCfg();render();toast("「"+c.name+"」を削除しました（過去の記録は残ります）")})));
-      const it=el("div",{class:"items"});
+      const vi=vis.indexOf(c);
+      const up=el("button",{class:"mini","aria-label":"カテゴリを上へ",onclick:()=>{moveIn(cats,c,-1,live);saveCfg();render()},...(vi===0?{disabled:""}:{})},"↑");
+      const dn=el("button",{class:"mini","aria-label":"カテゴリを下へ",onclick:()=>{moveIn(cats,c,1,live);saveCfg();render()},...(vi===vis.length-1?{disabled:""}:{})},"↓");
+      wrap.append(el("div",{class:"ed"},sw,nameIn,up,dn,armed("カテゴリ削除","本当に？",()=>{c.deleted=true;saveCfg();render();toast("「"+c.name+"」を削除しました（過去の記録は残ります）")})));
+      const it=el("div",{class:"items editlist"});
       items.forEach(i=>{const inp=el("input",{type:"text",id:"it-"+i.id,value:i.name,"aria-label":"種目名"});
         inp.addEventListener("change",()=>{const v=inp.value.trim();if(v){i.name=v;saveCfg();render()}});
-        it.append(el("span",{class:"itemed"},inp,armed("✕","消す",()=>{i.deleted=true;saveCfg();render()})))});
+        const ii=items.indexOf(i),notDel=x=>!x.deleted;
+        const lf=el("button",{class:"mini","aria-label":i.name+"を上へ",onclick:()=>{moveIn(c.items,i,-1,notDel);saveCfg();render()},...(ii===0?{disabled:""}:{})},"↑");
+        const rt=el("button",{class:"mini","aria-label":i.name+"を下へ",onclick:()=>{moveIn(c.items,i,1,notDel);saveCfg();render()},...(ii===items.length-1?{disabled:""}:{})},"↓");
+        it.append(el("span",{class:"itemed"},inp,lf,rt,armed("✕","消す",()=>{i.deleted=true;saveCfg();render()})))});
       const ni=el("input",{type:"text",id:"new-"+c.id,placeholder:"種目を追加","aria-label":c.name+"に種目を追加"});
       const addI=()=>{const v=ni.value.trim();if(!v)return;c.items.push({id:uid(),name:v});saveCfg();render();const n=$("new-"+c.id);n&&n.focus()};
       ni.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addI()}});
@@ -607,6 +640,7 @@ $("nextP").onclick=()=>{const s=sorted(),i=s.indexOf(cur());if(i>=0&&i<s.length-
 $("todayP").onclick=()=>{const t=periodFor(todayK);if(t){curId=t.id;sel=todayK;perMode=null;render()}else{toast("今日を含む期間がありません。新しく作れます");openEditor("new");$("pStart").value=todayK;$("pEnd").value=addK(todayK,6);pNote()}};
 $("editPBtn").onclick=()=>openEditor(perMode==="edit"?null:"edit");
 $("newPBtn").onclick=()=>openEditor("new");
+$("ruleSortBtn").onclick=()=>{ruleSort=!ruleSort;render()};
 $("editBtn").onclick=()=>{editing=!editing;render()};
 const addCat=()=>{const v=$("newCat").value.trim();if(!v)return;cats.push({id:uid(),name:v,color:COLORS[cats.filter(live).length%COLORS.length],items:[]});$("newCat").value="";saveCfg();render()};
 $("addCatBtn").onclick=addCat;$("newCat").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addCat()}});
