@@ -132,6 +132,10 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .grip{cursor:grab;color:var(--muted);font-size:16px;padding:2px 4px;line-height:1;touch-action:none}
 .cathead{cursor:grab}
 .hint{font-size:11px;color:var(--muted);font-weight:500;letter-spacing:0}
+.rpill{display:inline-block;color:#fff;font-weight:700;border-radius:6px;padding:1px 8px;margin:1px 0;background:var(--muted);line-height:1.5}
+.rline{line-height:1.9}
+.rlist li{line-height:1.9}
+.rule[style*="--rc"]{background:color-mix(in srgb,var(--rc) 9%,var(--panel2));border-color:color-mix(in srgb,var(--rc) 35%,var(--line))}
 .rule{display:grid;grid-template-columns:28px 1fr auto auto;gap:10px;align-items:start;padding:10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
 .rule .st{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
 .rule .st.ok{background:var(--ok-bg);color:var(--ok)} .rule .st.bad{background:var(--bad-bg);color:var(--bad)} .rule .st.warn{background:var(--warn-bg);color:var(--warn)}
@@ -366,6 +370,16 @@ function ruleText(r){
   if(r.type==="same")return selName(r.a)+" と "+selName(r.b)+" を同じ日にしない";
   return "";
 }
+// 種目・カテゴリの色
+function selColor(s){if(!s)return null;const[t,id]=s.split(":");if(t==="c"){const c=catById(id);return c?c.color:null}const r=itemById(id);return r?r.cat.color:null}
+function pill(s){const c=selColor(s);return el("span",{class:"rpill",style:c?"background:"+c:""},selName(s))}
+// ルール文を色付きの種目名で組み立てる
+function ruleNodes(r){
+  if(r.type==="gap")return [pill(r.a)," の"+(r.n==1?"翌日":"後 "+r.n+"日間")+"は ",pill(r.b)," を入れない"+(r.both?"（逆も）":"")];
+  if(r.type==="freq")return [pill(r.a)," を "+freqRange(r)];
+  if(r.type==="same")return [pill(r.a)," と ",pill(r.b)," を同じ日にしない"];
+  return [];
+}
 function evalRule(r,p){
   const res={status:"ok",msgs:[],badDays:{}},L=plen(p);
   if(!selKnown(r.a)||(r.type!=="freq"&&!selKnown(r.b))){res.status="warn";res.msgs.push("対象の種目が見つかりません");return res}
@@ -502,7 +516,8 @@ function renderRules(results){
   const rl=$("rules");rl.replaceChildren();
   if(rules&&!rules.length)rl.append(el("div",{class:"empty"},"ルールがありません。下のフォームから追加できます。"));
   results.forEach(({r,res})=>{const why=el("div",{class:"why "+res.status});res.msgs.forEach((m,i)=>{if(i)why.append(el("br"));why.append(m)});
-    rl.append(el("div",{class:"rule sortable-item","data-id":r.id},el("span",{class:"st "+res.status},res.status==="ok"?"✓":res.status==="bad"?"!":"…"),el("div",{class:"txt"},ruleText(r),why),
+    const rc=selColor(r.a);
+    rl.append(el("div",{class:"rule sortable-item","data-id":r.id,style:rc?"--rc:"+rc:""},el("span",{class:"st "+res.status},res.status==="ok"?"✓":res.status==="bad"?"!":"…"),el("div",{class:"txt"},el("div",{class:"rline"},...ruleNodes(r)),why),
       armed("削除","本当に？",()=>{p.rules=pRules(p).filter(x=>x.id!==r.id);savePeriods();render()}),el("span",{class:"grip","aria-hidden":"true"},"⠿")))});
 }
 
@@ -615,7 +630,7 @@ function archDetail(p){
     const it=el("div",{class:"it"});tg.forEach(t=>it.append(el("span",{style:"background:transparent;color:"+t.color+";border:1px solid "+t.color},t.name)));ids.forEach(id=>{const r=itemById(id);it.append(el("span",{style:"background:"+r.cat.color},r.item.name))});
     box.append(el("div",{class:"dline"},el("div",{class:"dd"},md(d)+"("+DOW[d.getDay()]+")"),el("div",null,it,notes[dk]?el("div",{class:"nn"},notes[dk]):null)))}
   const rules=pRules(p)||[];
-  if(rules.length){const ul=el("ul",{class:"rlist"});rules.forEach(r=>ul.append(el("li",null,ruleText(r))));box.append(el("div",{class:"label"},"ルール"),ul)}
+  if(rules.length){const ul=el("ul",{class:"rlist"});rules.forEach(r=>ul.append(el("li",null,...ruleNodes(r))));box.append(el("div",{class:"label"},"ルール"),ul)}
   const row=el("div",{class:"btnrow"}),c=cur();
   row.append(el("button",{class:"ghost",onclick:()=>{curId=p.id;sel=p.start;openArch=null;render();window.scrollTo({top:0,behavior:"smooth"})}},"この期間を開く"));
   if(c&&c.id!==p.id){
