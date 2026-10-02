@@ -136,6 +136,9 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .rline{line-height:1.9}
 .rlist li{line-height:1.9}
 .rule[style*="--rc"]{background:color-mix(in srgb,var(--rc) 9%,var(--panel2));border-color:color-mix(in srgb,var(--rc) 35%,var(--line))}
+.ruleform.editing{background:var(--warn-bg);border:1px solid var(--warn);border-radius:12px;padding:12px;border-top-style:solid}
+.rule.editing-now{outline:2px solid var(--accent);outline-offset:2px}
+.rbtns{display:flex;flex-direction:column;gap:6px;align-self:center}
 .rule{display:grid;grid-template-columns:28px 1fr auto auto;gap:10px;align-items:start;padding:10px;border-radius:12px;background:var(--panel2);border:1px solid var(--line)}
 .rule .st{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
 .rule .st.ok{background:var(--ok-bg);color:var(--ok)} .rule .st.bad{background:var(--bad-bg);color:var(--bad)} .rule .st.warn{background:var(--warn-bg);color:var(--warn)}
@@ -262,15 +265,15 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
     <div class="banner" id="noRules" hidden></div>
     <div class="rulesum" id="rulesum"></div>
     <div class="rules" id="rules"></div>
-    <div class="ruleform">
-      <div class="label">ルールを追加</div>
+    <div class="ruleform" id="ruleForm">
+      <div class="label" id="formTitle">ルールを追加</div>
       <div class="types" id="ruleTypes">
         <button data-t="gap" class="on">間隔をあける</button>
         <button data-t="freq">○日で○回</button>
         <button data-t="same">同じ日にしない</button>
       </div>
       <div class="row" id="formBody"></div>
-      <div><button class="primary" id="addRuleBtn">ルールを追加</button></div>
+      <div class="btnrow"><button class="primary" id="addRuleBtn">ルールを追加</button><button class="ghost" id="cancelRuleBtn" hidden>やめる</button></div>
       <div class="note" id="formNote"></div>
     </div>
   </section>
@@ -338,7 +341,7 @@ let tags=defaultTags(),dayTags={},tagEditing=false;
 const liveTags=()=>tags.filter(t=>!t.deleted);
 const tagById=id=>tags.find(t=>t.id===id);
 const dayTagList=k=>(dayTags[k]||[]).map(tagById).filter(Boolean);
-let openDays=new Set(),editing=false,openArch=null,perMode=null;
+let editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
 let curId=null,sel=todayK;
 
 const sorted=()=>periods.slice().sort((a,b)=>a.start<b.start?-1:1);
@@ -518,7 +521,8 @@ function renderRules(results){
   results.forEach(({r,res})=>{const why=el("div",{class:"why "+res.status});res.msgs.forEach((m,i)=>{if(i)why.append(el("br"));why.append(m)});
     const rc=selColor(r.a);
     rl.append(el("div",{class:"rule sortable-item","data-id":r.id,style:rc?"--rc:"+rc:""},el("span",{class:"st "+res.status},res.status==="ok"?"✓":res.status==="bad"?"!":"…"),el("div",{class:"txt"},el("div",{class:"rline"},...ruleNodes(r)),why),
-      armed("削除","本当に？",()=>{p.rules=pRules(p).filter(x=>x.id!==r.id);savePeriods();render()}),el("span",{class:"grip","aria-hidden":"true"},"⠿")))});
+      el("div",{class:"rbtns"},el("button",{class:"mini",onclick:()=>startEditRule(r)},"編集"),armed("削除","本当に？",()=>{p.rules=pRules(p).filter(x=>x.id!==r.id);if(editRuleId===r.id)editRuleId=null;savePeriods();render()})),el("span",{class:"grip","aria-hidden":"true"},"⠿")));
+    if(editRuleId===r.id)rl.lastChild.classList.add("editing-now")});
 }
 
 function renderDayTags(p){
@@ -656,6 +660,9 @@ function selectFor(id,val,onc){const s=el("select",{id});
 function num(id,val,min,onc){const n=el("input",{type:"number",id,min:String(min),max:"90",value:String(val)});n.addEventListener("change",()=>{const v=Math.max(min,parseInt(n.value)||min);n.value=v;onc(v)});return n}
 function renderForm(){
   document.querySelectorAll("#ruleTypes button").forEach(b=>b.classList.toggle("on",b.dataset.t===ftype));
+  const p=cur();if(editRuleId&&!(pRules(p)||[]).some(x=>x.id===editRuleId))editRuleId=null;
+  $("ruleForm").classList.toggle("editing",!!editRuleId);$("formTitle").textContent=editRuleId?"ルールを編集中":"ルールを追加";
+  $("addRuleBtn").textContent=editRuleId?"ルールを更新":"ルールを追加";$("cancelRuleBtn").hidden=!editRuleId;
   const fb=$("formBody");fb.replaceChildren();$("addRuleBtn").disabled=!cur();
   const first=()=>{for(const c of cats)if(live(c)&&liveItems(c).length)return "i:"+liveItems(c)[0].id};
   if(!first()){fb.append(el("span",{class:"empty"},"先に種目を登録してください"));return}
@@ -675,7 +682,12 @@ function note(){$("formNote").textContent="→ "+ruleText(formRule())+(ftype==="
 document.querySelectorAll("#ruleTypes button").forEach(b=>b.addEventListener("click",()=>{ftype=b.dataset.t;renderForm()}));
 $("addRuleBtn").addEventListener("click",()=>{const p=cur();if(!p||!selLive(form.a))return;
   if(ftype==="same"&&form.a===form.b){toast("別の種目を選んでください");return}
-  const r=formRule();r.id=uid();p.rules=(pRules(p)||[]).concat([r]);savePeriods();render();toast("ルールを追加しました")});
+  const r=formRule();
+  if(editRuleId){r.id=editRuleId;p.rules=(pRules(p)||[]).map(x=>x.id===editRuleId?r:x);editRuleId=null;savePeriods();render();toast("ルールを更新しました")}
+  else{r.id=uid();p.rules=(pRules(p)||[]).concat([r]);savePeriods();render();toast("ルールを追加しました")}});
+$("cancelRuleBtn").addEventListener("click",()=>{editRuleId=null;render()});
+function startEditRule(r){editRuleId=r.id;ftype=r.type;form.a=r.a;if(r.b)form.b=r.b;form.n=r.n||1;form.both=!!r.both;form.d=r.d||7;form.min=r.min!=null?r.min:1;form.nomax=r.max>=99;form.max=r.max>=99?Math.max(1,form.min):(r.max||1);
+  render();$("ruleForm").scrollIntoView({behavior:"smooth",block:"center"})}
 
 // ---------- controls ----------
 $("prevP").onclick=()=>{const s=sorted(),i=s.indexOf(cur());if(i>0){curId=s[i-1].id;sel=s[i-1].start;perMode=null;render()}};
