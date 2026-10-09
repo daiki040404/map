@@ -56,6 +56,25 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .days .wkh{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding-bottom:2px}
 .days .wkh.sun{color:var(--bad)} .days .wkh.sat{color:#3c74c8}
 .days .pad{min-height:0}
+.viewsw{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.viewsw button{border:0;background:var(--panel2);padding:6px 14px;font-size:13px;font-weight:700;color:var(--muted)}
+.viewsw button.on{background:var(--sel);color:var(--sel-ink)}
+.days.list{display:flex;flex-direction:column;gap:6px}
+.lrow{position:relative;display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:10px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:8px 10px}
+.lrow.today{border-color:var(--accent)}
+.lrow.selected{border-color:var(--sel);box-shadow:inset 0 0 0 1.5px var(--sel)}
+.lrow.bad{border-color:var(--bad)}
+.lhead{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.ldate{font-family:var(--f-num);font-size:20px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.lrow.today .ldate{color:var(--accent)}
+.ldow{font-size:12px;font-weight:700;color:var(--muted)}
+.ldow.sun{color:var(--bad)} .ldow.sat{color:#3c74c8}
+.lhead .dt{font-size:10px;border:1px solid currentColor;border-radius:4px;padding:0 4px;font-weight:700}
+.lmemo{font-size:11px;color:var(--accent)}
+.lchips{display:flex;flex-wrap:wrap;gap:4px;min-width:0;align-self:center}
+.lchip{color:#fff;font-size:12.5px;font-weight:700;border-radius:6px;padding:3px 8px;line-height:1.3;overflow-wrap:anywhere}
+.lchips .rest{color:var(--muted);font-size:13px}
+.lrow .flag{top:6px;right:6px}
 .day{min-width:0;overflow:hidden;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:6px 2px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:84px;position:relative}
 .day .dow{font-size:11px;color:var(--muted);font-weight:700}
 .day .dn{font-family:var(--f-num);font-size:24px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
@@ -271,6 +290,7 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
         <span id="pDelWrap"></span>
       </div>
     </div>
+    <div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">リスト</button><button id="vCal">カレンダー</button></div>
     <div class="days" id="days"></div>
   </section>
 
@@ -385,6 +405,7 @@ let tags=defaultTags(),dayTags={},tagEditing=false;
 const liveTags=()=>tags.filter(t=>!t.deleted);
 const tagById=id=>tags.find(t=>t.id===id);
 const dayTagList=k=>(dayTags[k]||[]).map(tagById).filter(Boolean);
+let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v)return v}catch(e){}return window.innerWidth<700?"list":"cal"})();
 let statsZero=false,editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
 let curId=null,sel=todayK;
 
@@ -479,6 +500,18 @@ function render(){
   else{
     $("range").replaceChildren(document.createTextNode(parse(p.start).getFullYear()+"  "+mdk(p.start)+" – "+mdk(p.end)));
     $("plen").replaceChildren(document.createTextNode(plen(p)+"日間 "));if(p.saved)$("plen").append(el("span",{class:"savedtag"},"保存済み"));
+    days.classList.toggle("list",viewMode==="list");$("vList").classList.toggle("on",viewMode==="list");$("vCal").classList.toggle("on",viewMode!=="list");
+    if(viewMode==="list"){
+      for(let i=0;i<plen(p);i++){const dk=addK(p.start,i),d=parse(dk),ids=dayItems(dk),w=d.getDay();
+        const chips=el("div",{class:"lchips"});
+        if(!ids.length)chips.append(el("span",{class:"rest"},"種目なし"));
+        ids.forEach(id=>{const r=itemById(id);chips.append(el("span",{class:"lchip",style:"background:"+r.cat.color},r.item.name))});
+        const head=el("div",{class:"lhead"},el("span",{class:"ldate"},(i===0||d.getDate()===1?(d.getMonth()+1)+"/":"")+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)));
+        if(notes[dk])head.append(el("span",{class:"lmemo","aria-label":"メモあり"},"✎"));
+        const row=el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":"")+(badByDay[dk]?" bad":""),onclick:()=>{sel=dk;render();if(window.innerWidth<700)$("dayhead").scrollIntoView({behavior:"smooth",block:"start"})},"aria-label":md(d)+"("+DOW[w]+")"},head,chips);
+        if(badByDay[dk])row.append(el("span",{class:"flag"},"!"));
+        days.append(row)}
+    } else {
     ["月","火","水","木","金","土","日"].forEach((w,i)=>days.append(el("div",{class:"wkh"+(i===6?" sun":"")+(i===5?" sat":"")},w)));
     const lead=(parse(p.start).getDay()+6)%7;for(let i=0;i<lead;i++)days.append(el("div",{class:"pad","aria-hidden":"true"}));
     for(let i=0;i<plen(p);i++){const dk=addK(p.start,i),d=parse(dk),ids=dayItems(dk),w=d.getDay();
@@ -492,7 +525,7 @@ function render(){
       const b=el("button",{class:"day"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{sel=dk;render()},"aria-label":md(d)+"("+DOW[w]+")"},el("span",{class:"dn"},(i===0||d.getDate()===1?(d.getMonth()+1)+"/":"")+d.getDate()),el("div",{class:"dts"},...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name))),tags);
       if(badByDay[dk])b.append(el("span",{class:"flag"},"!"));
       if(notes[dk])b.append(el("span",{class:"memo","aria-label":"メモあり"},"✎"));
-      days.append(b)}}
+      days.append(b)}}}
   renderPerEdit();
 
   // selected day
@@ -783,6 +816,8 @@ sortable($("chosen"),".c",ids=>{if(!cur())return;plan[sel]=ids;savePlan();render
 sortable($("rules"),".rule",ids=>{const p=cur();if(!p)return;const by={};pRules(p).forEach(r=>by[r.id]=r);p.rules=ids.map(i=>by[i]).filter(Boolean);savePeriods();render()});
 sortable($("dayTags"),".dtag",ids=>{tags=reorderLive(tags,t=>!t.deleted,ids);touch();render()});
 sortable($("cats"),".cat",ids=>{cats=reorderLive(cats,live,ids);saveCfg();render()},{handle:".cathead,.cgrip"});
+const setView=v=>{viewMode=v;try{localStorage.setItem("kintore-view",v)}catch(e){}render()};
+$("vList").onclick=()=>setView("list");$("vCal").onclick=()=>setView("cal");
 $("statsZeroBtn").onclick=()=>{statsZero=!statsZero;render()};
 $("editBtn").onclick=()=>{editing=!editing;render()};
 const addCat=()=>{const v=$("newCat").value.trim();if(!v)return;cats.push({id:uid(),name:v,color:COLORS[cats.filter(live).length%COLORS.length],items:[]});$("newCat").value="";saveCfg();render()};
