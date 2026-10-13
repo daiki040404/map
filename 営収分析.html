@@ -361,6 +361,11 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <select id="mapHFrom"></select><span class="muted small">〜</span><select id="mapHTo"></select>
         </div>
         <div class="grp">
+          <label class="small" title="過去に乗せた場所を、指定時刻の前後30分だけ表示"><input type="checkbox" id="rtimeOn"> ⏰ 乗車±30分</label>
+          <input type="time" id="rtimeVal" style="padding:4px 6px">
+          <button class="icon-btn" id="rtimeNow" style="padding:3px 8px">今</button>
+        </div>
+        <div class="grp">
           <label class="chip">客カテゴリ</label>
           <select id="mapCat"><option value="">全て</option></select>
           <button class="icon-btn" id="mapCatAdd" style="padding:3px 8px" title="新しいカテゴリを作る">＋</button>
@@ -1014,11 +1019,20 @@ function initMap(){
 }
 function roundKey(lat,lng){ return lat.toFixed(3)+','+lng.toFixed(3); } // ~100m格子
 let mapCatFilter='';   // '' = 全カテゴリ
+/* 2つの分(0-1439)の円環距離(日跨ぎ対応) */
+function circMinDiff(a,b){ let d=Math.abs(a-b)%1440; return Math.min(d,1440-d); }
 function mapRides(){
   const hF=+document.getElementById('mapHFrom').value;
   const hT=+document.getElementById('mapHTo').value;
+  // 乗車±30分フィルタ（イベントとは別。指定時刻の前後30分に乗せた分だけ）
+  const rtOn=document.getElementById('rtimeOn') && document.getElementById('rtimeOn').checked;
+  const rtMin=rtOn? toMin(document.getElementById('rtimeVal').value) : null;
   return scopedRides().filter(r=>{   // 曜日は共通フィルタ(scopedRides)で反映済み
     if(mapCatFilter && (r.cat||'')!==mapCatFilter) return false;   // 客カテゴリ絞り込み
+    if(rtOn){
+      const pm=toMin(r.on); if(pm==null || rtMin==null) return false;
+      return circMinDiff(pm, rtMin)<=30;      // 前後30分
+    }
     const ph=pickupHour(r); if(ph==null) return false;
     // 0〜23で範囲指定。hF<=hTなら通常、hF>hTなら日をまたぐ範囲(例 22〜2時)
     return (hF<=hT)? (ph>=hF && ph<=hT) : (ph>=hF || ph<=hT);
@@ -1670,6 +1684,15 @@ document.getElementById('mapCatAdd').onclick=()=>{
   f.innerHTML=html; t.innerHTML=html;
   f.value=0; t.value=23;                     // 既定は0〜23（全部）
   f.onchange=renderMap; t.onchange=renderMap;
+})();
+// 乗車±30分フィルタ（過去に乗せた場所を指定時刻の前後30分で絞る）
+(function(){
+  const on=document.getElementById('rtimeOn'), val=document.getElementById('rtimeVal'), now=document.getElementById('rtimeNow');
+  const nowHM=()=>{ const d=new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+  if(!val.value) val.value=nowHM();
+  on.onchange=renderMap;
+  val.onchange=()=>{ if(!on.checked){ on.checked=true; } renderMap(); };   // 時刻を変えたら自動でON
+  now.onclick=()=>{ val.value=nowHM(); on.checked=true; renderMap(); };
 })();
 // 現在地
 let locLayer=null, headMarker=null, orientFollow=false, orientHandler=null, watchId=null, lastHeading=0;
