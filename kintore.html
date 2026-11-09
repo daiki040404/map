@@ -598,6 +598,8 @@ body.catpage .catback{display:flex}
 .pmenu .armbox{margin:0;flex-basis:100%}
 .plist .drag-src{opacity:.4}
 #dayStick[hidden]{display:none}
+.tpick.tmemo{justify-content:flex-start;cursor:default}
+.dmemo{width:100%;font:inherit;font-size:16px;border:0;border-bottom:1px dashed var(--line);background:transparent;color:var(--fg);padding:4px 4px}.dmemo:focus{outline:none}
 </style>
 </head>
 <body>
@@ -783,7 +785,7 @@ const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
-let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},planSrc={},openEx=new Set(),skipLog=false;
+let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),skipLog=false;
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recAsc=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -1173,6 +1175,11 @@ function renderDayTags(p){
       box.append(pan);
     }
   });
+  // メモ（この日だけの一言）
+  {const k=sel,mi=el("input",{type:"text",class:"dmemo",id:"dmemo-"+k,value:dayMemo[k]||"","aria-label":"この日のメモ"});
+    mi.addEventListener("input",()=>{const v=mi.value;if(v.trim())dayMemo[k]=v;else delete dayMemo[k];touch();refreshSoon()});
+    mi.addEventListener("click",e=>e.stopPropagation());
+    box.append(el("div",{class:"tagrow"},el("span",{class:"tpick tmemo"},"メモ"),el("div",{class:"tagwrap"},linkWrap(mi))))}
   ed.hidden=!(tagEditing&&tagPick);if(ed.hidden)return;ed.replaceChildren();
   const g=tagPick,ph=g==="mark"?"例：自己ベスト、減量中":"例：夜勤、出張";
   ed.addEventListener("click",e=>e.stopPropagation());
@@ -1925,8 +1932,8 @@ const FB_COLLECTION="kintoreMenu";
 const LS="kintore-menu-v3";
 const SEED={"cats": [{"color": "#d4561c", "id": "7synawt", "items": [{"id": "c8b941y", "name": "ベンチ9割"}, {"id": "6pb4x0y", "name": "ベンチ7割"}, {"id": "daiyvo3", "name": "ダンベルプレス"}], "name": "胸"}, {"color": "#2f6fd0", "id": "i1us2f2", "items": [{"id": "45uah5d", "name": "デッドリフト"}, {"id": "l5rbud5", "name": "懸垂"}, {"id": "81mflf5", "name": "ローイング"}], "name": "背中"}, {"color": "#2f8a57", "id": "e9b6h5u", "items": [{"id": "117e0pf", "name": "スクワット"}, {"id": "wu4kol4", "name": "レッグプレス"}], "name": "脚"}, {"color": "#8a4fc4", "id": "xotib05", "items": [{"id": "h5hk2c7", "name": "ショルダープレス"}, {"id": "4fq1afl", "name": "サイドレイズ"}], "name": "肩"}, {"color": "#c23a6b", "id": "bk3mpcs", "items": [{"id": "7uez3o6", "name": "カール"}, {"id": "ih9sd1l", "name": "トライセプス"}], "name": "腕"}], "plan": {"2026-10-02": ["6pb4x0y"]}, "notes": {}, "periods": [{"end": "2026-10-04", "id": "p0928", "rules": [], "start": "2026-09-28"}], "updatedAt": 0};
 let updatedAt=0,fbUser=null,fbDb=null,unsub=null,pushT=null;
-const storeObj=()=>({cats,plan,planSrc,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,updatedAt});
-function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rebuildIdx();updatedAt=s.updatedAt||0}
+const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,updatedAt});
+function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rebuildIdx();updatedAt=s.updatedAt||0}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(storeObj()))}catch(e){}}
 function lsLoad(){try{const s=JSON.parse(localStorage.getItem(LS)||"null");if(s&&s.cats){applyStore(s);return}}catch(e){}applyStore(SEED)}
 function setSync(msg,state){$("sync").replaceChildren(el("span",{class:"sync-dot"+(state?" "+state:"")}),document.createTextNode(msg))}
@@ -1934,14 +1941,14 @@ const stamp=t=>{if(!t)return"";const d=new Date(t);return (d.getMonth()+1)+"/"+d
 function touch(){updatedAt=Date.now();lsSave();push();if(!histApplying)histNote()}
 // ===== 戻す／進む（操作の履歴） =====
 let hist=[],hpos=-1,histT=null,histApplying=false;
-const histKeys=["cats","plan","planSrc","notes","periods","tags","dayTags","logs","templates","exNotes","trash"];
-function snapState(){return JSON.stringify({cats,plan,planSrc,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits})}
+const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","tags","dayTags","logs","templates","exNotes","trash"];
+function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits})}
 function histCommit(){clearTimeout(histT);histT=null;const st=snapState();if(hist[hpos]===st)return;hist=hist.slice(0,hpos+1);hist.push(st);if(hist.length>60)hist.shift();hpos=hist.length-1;paintHist()}
 // 文字入力中はまとめて1回分、ボタン操作などはその都度1回分として記録
 function histNote(){const a=document.activeElement;if(a&&a.matches&&a.matches("input[type=text],input:not([type]),textarea")&&!a.closest("#appbar")){clearTimeout(histT);histT=setTimeout(histCommit,900);paintHist(true)}else histCommit()}
 function histReset(){hist=[snapState()];hpos=0;paintHist()}
 function histGo(d){if(histT)histCommit();const to=hpos+d;if(to<0||to>=hist.length)return;hpos=to;const o=JSON.parse(hist[hpos]);
-  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];
+  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];
   rebuildIdx();if(curId&&!P(curId))pickInitial();histApplying=true;try{touch()}finally{histApplying=false}render();toast(d<0?"ひとつ前に戻しました":"やり直しました")}
 function paintHist(pending){const u=$("hUndo"),r=$("hRedo");if(!u)return;const pend=!!(pending||histT);u.disabled=!(hpos>0||pend);r.disabled=pend||!(hpos<hist.length-1);const n=$("hTrashN");if(n){n.hidden=!trash.length;n.textContent=String(trash.length)}}
 $("hBrand").onclick=()=>{tab="menu";catPage=false;perMode=null;render();window.scrollTo({top:0,behavior:"smooth"})};
