@@ -617,6 +617,20 @@ body.catpage .catback{display:flex}
 #dayTags>.tagrow .tagwrap{flex:none}
 #dayTags>.tpanel,#dayTags>.memoline{flex-basis:100%;width:100%}
 #dayTags .tpick{min-width:0;gap:8px}
+#recMk{display:flex;flex-direction:column;gap:8px;align-items:stretch;width:100%}
+#recMk .mkpick{width:100%}#recMk .mkrow{flex-wrap:nowrap}#recMk .mkl{min-width:0;flex:none}
+#recMk .tpick{flex:1;min-width:0;max-width:24em}
+#recEx .mkl{flex:none}
+#dayTags>.dmlist{flex-basis:100%;display:flex;flex-direction:column;gap:4px}
+.dmitem{display:flex;align-items:center;gap:8px;border-bottom:1px dashed var(--line);padding:3px 2px}
+.dmitem .dmt{flex:1;min-width:0;font-size:15px;white-space:pre-wrap;word-break:break-all}
+.memoline.dmadd{display:flex;gap:6px;align-items:center}.memoline.dmadd .dmemo{flex:1;min-width:0}.memoline.dmadd button{flex:none;white-space:nowrap}
+.popov{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}
+.popcard{width:min(420px,100%);max-height:75vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 16px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:10px}
+.poph{display:flex;align-items:center;gap:8px}
+.poph .popd{font-family:var(--f-num);font-size:20px;font-weight:700}
+.poph .popx{margin-left:auto}
+.dview .dvn small .dvpd{font-style:normal;font-weight:500;font-size:10px;margin-left:5px;opacity:.85}
 </style>
 </head>
 <body>
@@ -806,7 +820,7 @@ const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",n
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
 let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),skipLog=false;
-let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recAsc=false,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
+let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recAsc=false,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
 const liveTags=g=>tags.filter(t=>!t.deleted&&(!g||(t.group||"plan")===g));
@@ -1051,7 +1065,7 @@ const isCompact=()=>window.innerWidth<600;
 function calCellC(dk,out){const d=parse(dk),ids=visIds(dk),w=d.getDay(),tl=allMode||!out?dayTagList(dk):[];
   const dots=el("div",{class:"cdots"});ids.slice(0,6).forEach(id=>{const r=itemById(id);dots.append(el("span",{class:"cdot",style:"background:"+r.cat.color}))});
   if(ids.length>6)dots.append(el("span",{class:"cmore"},"+"+(ids.length-6)));
-  const b=el("button",{class:"day cday"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":"")+(out?" out":""),onclick:()=>pickDay(dk),"aria-label":md(d)+"("+DOW[w]+")"+(tl.length?"・"+tl.map(t=>t.name).join("・"):"")+"・"+(ids.length?ids.length+"種目":"種目なし")},
+  const b=el("button",{class:"day cday"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":"")+(out?" out":""),onclick:()=>{pickDay(dk);if(sel===dk)openDayPop(dk)},"aria-label":md(d)+"("+DOW[w]+")"+(tl.length?"・"+tl.map(t=>t.name).join("・"):"")+"・"+(ids.length?ids.length+"種目":"種目なし")},
     el("span",{class:"dn"},String(d.getDate())),el("div",{class:"ctag"},tl.length?el("span",{class:"dt",style:"color:"+tl[0].color},tl[0].name+(tl.length>1?"+":"")):null),dots);
   if(ids.length)b.append(el("span",{class:"ccnt"},ids.length+"種目"));
   if(notes[dk])b.append(el("span",{class:"memo","aria-label":"メモあり"},"✎"));
@@ -1071,7 +1085,7 @@ function calCell(dk,out){if(isCompact())return calCellC(dk,out);const d=parse(dk
   if(ids.length>3){const m=el("span",{class:"more",role:"button",tabindex:"0","aria-label":opened?"閉じる":"残り"+(ids.length-3)+"種目を表示"},opened?"▲閉じる":"+"+(ids.length-3));
     const tg=e=>{e.stopPropagation();if(opened)openDays.delete(dk);else openDays.add(dk);render()};
     m.addEventListener("click",tg);m.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();tg(e)}});tags.append(m)}
-  const b=el("button",{class:"day"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":"")+(out?" out":""),onclick:()=>pickDay(dk),"aria-label":md(d)+"("+DOW[w]+")"+(out?"・期間外":"")},
+  const b=el("button",{class:"day"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":"")+(out?" out":""),onclick:()=>{pickDay(dk);if(sel===dk)openDayPop(dk)},"aria-label":md(d)+"("+DOW[w]+")"+(out?"・期間外":"")},
     el("span",{class:"dn"},String(d.getDate())),el("div",{class:"dts"},...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name))),tags);
   if(notes[dk])b.append(el("span",{class:"memo","aria-label":"メモあり"},"✎"));
   return b}
@@ -1195,13 +1209,14 @@ function renderDayTags(p){
       box.append(pan);
     }
   });
-  // メモ（この日だけの一言）
-  {const k=sel,mi=el("input",{type:"text",class:"dmemo",id:"dmemo-"+k,value:dayMemo[k]||"","aria-label":"この日のメモ"});
-    mi.addEventListener("input",()=>{const v=mi.value;if(v.trim())dayMemo[k]=v;else delete dayMemo[k];touch();refreshSoon()});
-    mi.addEventListener("click",e=>e.stopPropagation());
-    const on=memoOpen||!!dayMemo[k];
+  // メモ（この日だけの一言・いくつでも追加できる）
+  {const k=sel,list=memosOf(k),on=memoOpen;
     box.append(el("div",{class:"tagrow"},el("button",{class:"tpick"+(on?" on":""),onclick:e=>{e.stopPropagation();memoOpen=!memoOpen;render();if(memoOpen){const x=$("dmemo-"+k);x&&x.focus()}}},"メモ",el("span",{class:"tv"},on?"▲":"▼"))));
-    if(on)box.append(el("div",{class:"memoline"},linkWrap(mi)))}
+    if(list.length){const ul=el("div",{class:"dmlist"});list.forEach((m,i)=>ul.append(el("div",{class:"dmitem"},el("span",{class:"dmt"},...linkNodes(m)),el("button",{class:"mini tclose","aria-label":"このメモを消す",onclick:e=>{e.stopPropagation();const a=memosOf(k);a.splice(i,1);setMemos(k,a);touch();render()}},"✕"))));box.append(ul)}
+    if(on){const mi=el("input",{type:"text",class:"dmemo",id:"dmemo-"+k,"aria-label":"メモを追加"});
+      const add=()=>{const v=mi.value.trim();if(!v)return;setMemos(k,memosOf(k).concat([v]));touch();render();const x=$("dmemo-"+k);x&&x.focus()};
+      mi.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();add()}});mi.addEventListener("click",e=>e.stopPropagation());
+      box.append(el("div",{class:"memoline dmadd"},mi,el("button",{class:"primary mini",onclick:e=>{e.stopPropagation();add()}},"追加")))}}
   ed.hidden=!(tagEditing&&tagPick);if(ed.hidden)return;ed.replaceChildren();
   const g=tagPick,ph=g==="mark"?"例：自己ベスト、減量中":"例：夜勤、出張";
   ed.addEventListener("click",e=>e.stopPropagation());
@@ -1561,15 +1576,27 @@ async function shareDay(k){const d=parse(k),name="kintore-"+d.getFullYear()+"-"+
   if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e&&e.name==="AbortError")return}}
   const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast("画像を保存しました")}
 // メニュー画面：その日の内容を見るだけ（編集は「記録」で）
-function renderDayView(){const box=$("dayView");if(!box)return;box.replaceChildren();const k=sel,ids=dayItems(k);
+function renderDayView(){const box=$("dayView");if(!box)return;dayViewInto(box,sel)}
+// カレンダーの日付を押したとき：小さい画面でその日の内容を見せる（✕か外側で閉じる）
+function openDayPop(k){closeDayPop();const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
+  const ids=dayItems(k);
+  const card=el("div",{class:"popcard",role:"dialog","aria-label":"この日の内容"},
+    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕")),
+    body.childNodes.length?body:el("div",{class:"note"},"—"));
+  card.addEventListener("click",e=>e.stopPropagation());
+  const ov=el("div",{class:"popov",id:"dayPop",onclick:closeDayPop},card);document.body.append(ov)}
+function closeDayPop(){const o=$("dayPop");if(o)o.remove()}
+function dayViewInto(box,k){box.replaceChildren();const ids=dayItems(k);
   const tl=dayTagList(k);if(tl.length)box.append(el("div",{class:"dvtags"},...tl.map(t=>el("span",{class:"dvtag",style:"color:"+t.color},t.name))));
-  if(dayMemo[k])box.append(el("div",{class:"dvmemo"},...linkNodes(dayMemo[k])));
+  memosOf(k).forEach(m=>box.append(el("div",{class:"dvmemo"},"・",...linkNodes(m))));
   ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),ds=doneSets(k,id),x=el("div",{class:"dvex",style:"--c:"+r.cat.color});
-    x.append(el("div",{class:"dvn"},r.item.name+(String(id).includes("#")?" "+String(id).split("#")[1]+"回目":""),covering(k).length>1?el("small",null,(srcOf(k,id)||{}).name||pLabel(srcOf(k,id)||{start:k,end:k})):null));
+    x.append(el("div",{class:"dvn"},r.item.name+(String(id).includes("#")?" "+String(id).split("#")[1]+"回目":""),covering(k).length>1?(()=>{const q=srcOf(k,id)||{start:k,end:k};return el("small",null,q.name||pLabel(q),q.name?el("i",{class:"dvpd"},pLabel(q)):null)})():null));
     ds.forEach((s2,i)=>{const e=hasRM(fs)?e1rm(s2.w,s2.r):null;x.append(el("div",{class:"dvs"},(i+1)+"　"+setTxt(s2,id),e?el("small",null,"　1RM "+f1(e)+"kg"):null,String(s2.m||"").trim()?el("small",null,"　",...linkNodes(s2.m)):null))});
     if(exNote(k,id))x.append(el("div",{class:"dvx"},"メモ：",...linkNodes(exNote(k,id))));
     box.append(x)});
   if(notes[k])box.append(el("div",{class:"dvnote"},...linkNodes(notes[k])))}
+const memosOf=k=>{const v=dayMemo[k];return Array.isArray(v)?v.slice():(v&&String(v).trim()?[String(v)]:[])};
+function setMemos(k,a){a=a.filter(x=>String(x).trim());if(a.length)dayMemo[k]=a;else delete dayMemo[k]}
 function keepY(fn){const y=window.scrollY;fn();window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y))}
 function recordDays(){const ks=new Set([...Object.keys(plan),...Object.keys(logs),...Object.keys(notes),...Object.keys(exNotes),...Object.keys(dayTags)]);
   return [...ks].filter(k=>(dayItems(k).length||Object.keys(logs[k]||{}).some(id=>itemById(id)&&doneSets(k,id).length)||notes[k]||exNotes[k]||(dayTags[k]||[]).length)).sort()}
@@ -1590,11 +1617,20 @@ function renderRecords(){
   // タグ／予定で絞り込み（選んだどれかが付いている日）
   const mk=$("recMk");mk.replaceChildren();
   const usable=tags.filter(t=>!t.deleted||all.some(k=>(dayTags[k]||[]).includes(t.id)));
-  const mrow={mark:el("div",{class:"mkrow"},el("span",{class:"note mkl"},"タグ：")),plan:el("div",{class:"mkrow"},el("span",{class:"note mkl"},"予定："))};
-  if(usable.some(t=>t.group==="mark"))mk.append(mrow.mark);if(usable.some(t=>(t.group||"plan")!=="mark"))mk.append(mrow.plan);
-  usable.forEach(t=>{const n=all.filter(k=>(dayTags[k]||[]).includes(t.id)).length;
-    mrow[t.group==="mark"?"mark":"plan"].append(el("button",{class:"dmark"+(recMarks.has(t.id)?" on":""),style:recMarks.has(t.id)?"color:"+t.color:"","aria-pressed":String(recMarks.has(t.id)),onclick:()=>{if(recMarks.has(t.id))recMarks.delete(t.id);else recMarks.add(t.id);render()}},t.name+" "+n))});
-  if(recMarks.size)(mk.lastChild||mk).append(el("button",{class:"mini",onclick:()=>{recMarks.clear();render()}},"解除"));
+  // タグ・予定は種目と同じ選択形式（押すと一覧が開き、✓で複数選べる）
+  [["mark","タグ"],["plan","予定"]].forEach(([g,lb])=>{const its=usable.filter(t=>(t.group||"plan")===g);if(!its.length)return;
+    const chosen=its.filter(t=>recMarks.has(t.id)),open=recMkOpen===g;
+    const pick=el("button",{class:"tpick"+(open?" on":""),onclick:e=>{e.stopPropagation();recMkOpen=open?null:g;keepY(render)}},el("span",{class:"tpv"},chosen.length?chosen.map(t=>t.name).join("、"):"すべて"),el("span",{class:"tv"},open?"▲":"▼"));
+    const wrap=el("div",{class:"recex mkpick"},el("div",{class:"mkrow"},el("span",{class:"note mkl"},lb+"："),pick));
+    if(open){const pan=el("div",{class:"tpanel expanel"}),tl=el("div",{class:"extree"});pan.addEventListener("click",e=>e.stopPropagation());
+      its.forEach(t=>{const on=recMarks.has(t.id),n=all.filter(k=>(dayTags[k]||[]).includes(t.id)).length;
+        const r=el("div",{class:"exrow"+(on?" on":"")});
+        r.append(el("button",{class:"exn",onclick:()=>{recMarks.add(t.id);keepY(render)}},el("span",{style:"color:"+t.color},t.name),el("small",{class:"note"},"　"+n+"日")));
+        if(on)r.append(el("span",{class:"exshow","aria-label":"選択中"},"✓"),el("button",{class:"exx","aria-label":t.name+"を外す",onclick:()=>{recMarks.delete(t.id);keepY(render)}},"✕"));
+        tl.append(r)});
+      pan.append(tl,el("div",{class:"tpfoot"},chosen.length?el("button",{class:"mini",onclick:()=>{its.forEach(t=>recMarks.delete(t.id));keepY(render)}},"すべて解除"):el("span"),el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{recMkOpen=null;keepY(render)}},"完了")));
+      wrap.append(pan)}
+    mk.append(wrap)});
   // 種目で絞り込み
   const hasEx=(k,id)=>(plan[k]||[]).some(x=>baseId(x)===id)||Object.keys(logs[k]||{}).some(x=>baseId(x)===id);
   [...recExs].forEach(x=>{if(!(IDX.items[x]&&!IDX.items[x].deleted)&&!(IDX.folders[x]&&!IDX.folders[x].deleted))recExs.delete(x)});
@@ -1641,6 +1677,7 @@ function renderRecords(){
     if(notes[k]&&!eff.size)card.append(el("div",{class:"rdm"},...linkNodes(notes[k])));
     box.append(card)});
 }
+document.addEventListener("click",e=>{if(!recMkOpen)return;if(!e.composedPath().some(x=>x.classList&&x.classList.contains("mkpick"))){recMkOpen=null;keepY(render)}});
 document.addEventListener("click",e=>{if(!recExOpen)return;const box=$("recEx");if(box&&!e.composedPath().includes(box)){recExOpen=false;keepY(render)}});
 document.querySelectorAll("#tabRec .recf .viewsw button").forEach(b=>b.addEventListener("click",()=>{recMode=b.dataset.m;if(recMode==="range"&&!recFrom){recFrom=addK(todayK,-30);recTo=addK(todayK,-1)}render()}));
 $("recSort").onclick=()=>{recAsc=!recAsc;render()};
