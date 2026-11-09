@@ -592,6 +592,12 @@ body.catpage .catback{display:flex}
 .pli .pck{width:16px;color:var(--accent);font-weight:800}
 .pli input{flex:1;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:6px 8px;margin:4px}
 .pli .pln{flex:1;min-width:0;display:flex;flex-direction:column}.pli .pld{align-self:flex-end;font-size:11px;color:var(--muted);margin-top:2px}
+.pgrip{flex:none;width:28px;text-align:center;color:var(--muted);font-size:18px;cursor:grab;touch-action:none;-webkit-user-select:none;user-select:none}
+.pliw+.pli,.pli+.pliw,.pliw+.pliw{border-top:1px solid var(--line)}
+.pmenu{display:flex;gap:8px;flex-wrap:wrap;padding:2px 8px 10px 32px}
+.pmenu .armbox{margin:0;flex-basis:100%}
+.plist .drag-src{opacity:.4}
+#dayStick[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -778,7 +784,7 @@ const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",n
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
 let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},planSrc={},openEx=new Set(),skipLog=false;
-let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recAsc=false,renOpen=false,pOpen=false,renId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
+let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recAsc=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
 const liveTags=g=>tags.filter(t=>!t.deleted&&(!g||(t.group||"plan")===g));
@@ -790,7 +796,7 @@ let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list
 let statsZero=false,editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
 let curId=null,sel=todayK;
 
-const sorted=()=>periods.slice().sort((a,b)=>a.start<b.start?-1:1);
+const sorted=()=>periods.slice().sort((a,b)=>((a.ord??1e9)-(b.ord??1e9))||(a.start<b.start?-1:1));
 const P=id=>periods.find(p=>p.id===id);
 const cur=()=>P(curId);
 const plen=p=>diff(p.start,p.end)+1;
@@ -924,15 +930,21 @@ function renderInner(){
   // 計画の選択（自前のリスト。各計画の右の ⋮ で名前を変える）
   $("pPick").textContent=allMode||!p?"一覧":(p.name||parse(p.start).getFullYear()+"  "+mdk(p.start)+" – "+mdk(p.end));
   const pl=$("pList");pl.hidden=!pOpen;pl.replaceChildren();
-  if(pOpen){const row=(id,label,on)=>{const r=el("div",{class:"pli"+(on?" on":"")});
+  if(pOpen){const row=(id,label,on)=>{const r=el("div",{class:"pli"+(on?" on":""),"data-id":id||""});
       if(id&&renId===id){const q=P(id),ni=el("input",{type:"text",value:q.name||"","aria-label":"計画の名前"});
         const ok=()=>{const v=ni.value.trim();if(v)q.name=v;else delete q.name;renId=null;touch();render()};
         ni.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();ok()}});
-        r.append(ni,el("button",{class:"primary mini",onclick:ok},"決定"),el("button",{class:"mini tclose","aria-label":"消す／閉じる",onclick:()=>{if(ni.value){ni.value="";ni.focus()}else{renId=null;render()}}},"✕"));setTimeout(()=>ni.focus(),0);return r}
+        r.append(ni,el("button",{class:"primary mini",onclick:ok},"決定"),el("button",{class:"mini tclose","aria-label":"消す／閉じる",onclick:()=>{if(ni.value){ni.value="";ni.focus()}else{delete q.name;renId=null;touch();render()}}},"✕"));setTimeout(()=>ni.focus(),0);return r}
       const q=id?P(id):null;
       r.append(el("button",{class:"plb",onclick:()=>{pOpen=false;renId=null;goPeriod(id||"__all__")}},el("span",{class:"pck"},on?"✓":""),el("span",{class:"pln"},label,q&&q.name?el("small",{class:"pld"},pLabel(q,true)):null)));
-      if(id)r.append(el("button",{class:"kebab","aria-label":"名前を変える",onclick:()=>{renId=id;render()}},"⋮"));return r};
+      if(id){r.append(el("button",{class:"kebab","aria-label":"メニュー",onclick:()=>{pMenuId=pMenuId===id?null:id;pDelId=null;render()}},"⋮"),el("span",{class:"pgrip","aria-label":"長押しで並び替え"},"⠿"));
+        if(pMenuId===id){const m=el("div",{class:"pmenu"});
+          if(pDelId===id)m.append(el("div",{class:"delconfirm armbox"},el("div",{class:"dct"},"この期間を削除しますか？"),el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{pMenuId=pDelId=null;pOpen=false;deletePeriod(q,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{pDelId=null;render()}},"いいえ"))));
+          else m.append(el("button",{class:"mini",onclick:()=>{pMenuId=null;renId=id;render()}},"名前を変更"),el("button",{class:"mini del",onclick:()=>{pDelId=id;render()}},"削除"));
+          r.dataset.id="";const w=el("div",{class:"pliw","data-id":id});w.append(r,m);return w}}
+      return r};
     pl.append(row(null,"一覧",allMode||!p));
+    sortable(pl,".pli[data-id]:not([data-id='']),.pliw",ids=>{ids.forEach((x,i)=>{const q=P(x);if(q)q.ord=i});touch();render()},{handle:".pgrip"});
     s.forEach(x=>pl.append(row(x.id,x.name||(parse(x.start).getFullYear()+"  "+mdk(x.start)+" – "+mdk(x.end)),!allMode&&p&&p.id===x.id)))}
   const rn=$("pRename");rn.hidden=!(renOpen&&p&&!allMode);
   if(!rn.hidden&&!rn.querySelector("input")){const ni=el("input",{type:"text",value:p.name||"","aria-label":"計画の名前"});
@@ -962,11 +974,11 @@ function renderInner(){
 
   // selected day
   const sd=parse(sel),ids=p?dayItems(sel):[];
-  $("dayhead").replaceChildren(el("span",{class:"yr"},sd.getFullYear()+"年"),el("span",{class:"big"},md(sd)),el("span",{class:"dw"+(sd.getDay()===0?" sun":"")+(sd.getDay()===6?" sat":"")},"("+DOW[sd.getDay()]+")"),...dayTagList(sel).map(t=>el("span",{class:"dht",style:"color:"+t.color},t.name)),...(ids.length?[]:[el("span",{class:"note"},"休み")]),
+  $("dayhead").replaceChildren(el("span",{class:"yr"},sd.getFullYear()+"年"),el("span",{class:"big"},md(sd)),el("span",{class:"dw"+(sd.getDay()===0?" sun":"")+(sd.getDay()===6?" sat":"")},"("+DOW[sd.getDay()]+")"),...dayTagList(sel).map(t=>el("span",{class:"dht",style:"color:"+t.color},t.name)),
     el("button",{class:"sharebtn","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(sel)},SHARE_SVG()));
   renderDayTags(p);
   renderTplBar(p);
-  renderDsum(p,ids);
+  renderDsum(p,ids);$("dayStick").hidden=!ids.length;
   if(!skipLog)renderLog(p,ids);
   const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
 
@@ -1596,7 +1608,7 @@ $("recSort").onclick=()=>{recAsc=!recAsc;render()};
 document.querySelectorAll(".tabbar button").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;catPage=false;render();window.scrollTo({top:0})}));
 // 右下の＋：種目リストの画面へ（選んでいる日に追加する）
 $("pMore").onclick=()=>{renOpen=!renOpen;render()};
-$("pPick").onclick=()=>{pOpen=!pOpen;renId=null;render()};
+$("pPick").onclick=()=>{pOpen=!pOpen;renId=null;pMenuId=pDelId=null;render()};
 document.addEventListener("click",e=>{if(!pOpen)return;const a=$("pList"),b=$("pPick"),path=e.composedPath();if(!path.includes(a)&&!path.includes(b)){pOpen=false;renId=null;render()}});
 $("fabAdd").onclick=()=>{catY=window.scrollY;catPage=true;render();window.scrollTo({top:0})};
 $("catBack").onclick=()=>{catPage=false;render();window.scrollTo({top:catY})};
