@@ -32,7 +32,7 @@
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
 .wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:14px calc(110px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 .tabpage{display:flex;flex-direction:column;gap:14px}
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(2,1fr);background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
 .tabbar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--muted);padding:4px 0;border-radius:10px}
 .tabbar button .ti{font-size:18px;line-height:1}
 .tabbar button.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
@@ -744,7 +744,8 @@ body.catpage .catback{display:flex}
 <button class="fab" id="fabAdd" aria-label="種目を追加">＋</button>
 <nav class="tabbar" aria-label="画面の切り替え">
   <button data-tab="menu" class="on"><span class="ti">☰</span>メニュー</button>
-  <button data-tab="rec"><span class="ti">◷</span>記録</button>
+  <button data-tab="log"><span class="ti">✎</span>記録</button>
+  <button data-tab="rec"><span class="ti">◷</span>履歴</button>
 </nav>
 <div class="toast" id="toast"></div>
 
@@ -999,8 +1000,8 @@ function renderInner(){
   $("reflPanel").hidden=allMode||!p;$("reflSub").textContent=p&&!allMode?pLabel(p):"";
   renderRecords();
   document.querySelectorAll(".tabbar button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
-  if(tab!=="menu")catPage=false;document.body.classList.toggle("catpage",catPage);{const d=parse(sel);$("catDate").textContent=d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"（"+DOW[d.getDay()]+"）に追加"}$("fabAdd").hidden=tab!=="menu"||catPage;
-  $("tabMenu").hidden=tab!=="menu";$("tabTpl").hidden=tab!=="tpl";$("tabRec").hidden=tab!=="rec";$("tabTrash").hidden=tab!=="trash";
+  catPage=tab==="log";document.body.classList.toggle("catpage",catPage);{const d=parse(sel);$("catDate").textContent=d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"（"+DOW[d.getDay()]+"）に追加"}$("fabAdd").hidden=tab!=="menu"||catPage;
+  $("tabMenu").hidden=tab!=="menu"&&tab!=="log";$("tabTpl").hidden=tab!=="tpl";$("tabRec").hidden=tab!=="rec";$("tabTrash").hidden=tab!=="trash";
   renderTrash();paintHist();
 }
 
@@ -1616,14 +1617,14 @@ function renderRecords(){
 document.addEventListener("click",e=>{if(!recExOpen)return;const box=$("recEx");if(box&&!e.composedPath().includes(box)){recExOpen=false;keepY(render)}});
 document.querySelectorAll("#tabRec .recf .viewsw button").forEach(b=>b.addEventListener("click",()=>{recMode=b.dataset.m;if(recMode==="range"&&!recFrom){recFrom=addK(todayK,-30);recTo=addK(todayK,-1)}render()}));
 $("recSort").onclick=()=>{recAsc=!recAsc;render()};
-document.querySelectorAll(".tabbar button").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;catPage=false;render();window.scrollTo({top:0})}));
+document.querySelectorAll(".tabbar button").forEach(b=>b.addEventListener("click",()=>{tab=b.dataset.tab;render();window.scrollTo({top:0})}));
 // 右下の＋：種目リストの画面へ（選んでいる日に追加する）
 $("pMore").onclick=()=>{renOpen=!renOpen;render()};
 $("pPick").onclick=()=>{pOpen=!pOpen;renId=null;pMenuId=pDelId=null;render()};
 document.addEventListener("click",e=>{if(!pOpen)return;const a=$("pList"),b=$("pPick"),path=e.composedPath();if(!path.includes(a)&&!path.includes(b)){pOpen=false;renId=null;render()}});
-$("fabAdd").onclick=()=>{catY=window.scrollY;catPage=true;render();window.scrollTo({top:0})};
+$("fabAdd").onclick=()=>{catY=window.scrollY;tab="log";render();window.scrollTo({top:0})};
 $("catBack2").onclick=()=>$("catBack").click();
-$("catBack").onclick=()=>{catPage=false;render();window.scrollTo({top:catY})};
+$("catBack").onclick=()=>{tab="menu";render();window.scrollTo({top:catY})};
 
 // ===== テンプレート =====
 const tplColor=t=>{for(const x of t.items){const r=itemById(x.id);if(r&&!r.item.deleted)return r.cat.color}return "var(--muted)"};
@@ -1956,7 +1957,7 @@ function histGo(d){if(histT)histCommit();const to=hpos+d;if(to<0||to>=hist.lengt
   cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];
   rebuildIdx();if(curId&&!P(curId))pickInitial();histApplying=true;try{touch()}finally{histApplying=false}render();toast(d<0?"ひとつ前に戻しました":"やり直しました")}
 function paintHist(pending){const u=$("hUndo"),r=$("hRedo");if(!u)return;const pend=!!(pending||histT);u.disabled=!(hpos>0||pend);r.disabled=pend||!(hpos<hist.length-1);const n=$("hTrashN");if(n){n.hidden=!trash.length;n.textContent=String(trash.length)}}
-$("hBrand").onclick=()=>{tab="menu";catPage=false;perMode=null;render();window.scrollTo({top:0,behavior:"smooth"})};
+$("hBrand").onclick=()=>{tab="menu";perMode=null;render();window.scrollTo({top:0,behavior:"smooth"})};
 $("hUndo").onclick=()=>histGo(-1);$("hRedo").onclick=()=>histGo(1);
 document.addEventListener("keydown",e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"&&!e.target.closest("input,textarea")){e.preventDefault();histGo(e.shiftKey?1:-1)}});
 // ===== ごみ箱（30日間保管） =====
