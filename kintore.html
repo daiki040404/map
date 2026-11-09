@@ -568,7 +568,10 @@ a.mlink{color:#4ea1ff;text-decoration:underline;text-underline-offset:2px;word-b
 .lgroups .lchips,.cprev .lgroups .lchips{justify-content:flex-start!important;width:auto}
 .dcard .dh .nth{font-size:12px;font-weight:600;opacity:.85}
 html,body{overflow-anchor:none}
-body.catpage #tabMenu>section,body.catpage #tabMenu>div:not(#dayGroup),body.catpage #dayGroup>.daypanel{display:none!important}
+body.catpage #tabMenu>section,body.catpage #tabMenu>div:not(#dayGroup),body.catpage .daypanel #dayTags,body.catpage .daypanel #tagEdit,body.catpage .daypanel #tplBar,body.catpage .daypanel #tplConfirm,body.catpage .daypanel .memoblock,body.catpage #catSec .catback{display:none!important}
+body.catpage .daypanel:has(#wlog:empty){display:none}
+body.catpage .daypanel{border-radius:0 0 14px 14px}
+body.catpage #catSec{margin-top:14px!important;border-top:1px solid var(--line)!important;border-radius:14px!important}
 body:not(.catpage) #catSec{display:none}
 body.catpage #catSec{margin-top:0!important;border-top:0;border-radius:0 0 14px 14px}
 .catback{display:none;align-items:center;gap:10px;margin-bottom:10px}
@@ -661,6 +664,7 @@ body.catpage .catback{display:flex}
   </section>
 
   <div class="daygroup" id="dayGroup">
+  <div class="catback catback2"><button class="ghost" id="catBack2">‹ 戻る</button><span class="cbt" id="catDate"></span></div>
   <div class="daystick" id="dayStick"><div class="dayhead" id="dayhead"></div><div class="dsum" id="dsum"></div></div>
   <section class="panel daypanel">
     <div class="daytags" id="dayTags"></div>
@@ -995,7 +999,7 @@ function renderInner(){
   $("reflPanel").hidden=allMode||!p;$("reflSub").textContent=p&&!allMode?pLabel(p):"";
   renderRecords();
   document.querySelectorAll(".tabbar button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
-  if(tab!=="menu")catPage=false;document.body.classList.toggle("catpage",catPage);$("fabAdd").hidden=tab!=="menu"||catPage;
+  if(tab!=="menu")catPage=false;document.body.classList.toggle("catpage",catPage);{const d=parse(sel);$("catDate").textContent=d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"（"+DOW[d.getDay()]+"）に追加"}$("fabAdd").hidden=tab!=="menu"||catPage;
   $("tabMenu").hidden=tab!=="menu";$("tabTpl").hidden=tab!=="tpl";$("tabRec").hidden=tab!=="rec";$("tabTrash").hidden=tab!=="trash";
   renderTrash();paintHist();
 }
@@ -1157,7 +1161,7 @@ function renderDayTags(p){
     row.append(el("button",{class:"tpick"+(open?" on":""),"aria-expanded":String(open),onclick:e=>{e.stopPropagation();tagPick=open?null:g;tagEditing=false;render()}},label,el("span",{class:"tv"},open?"▲":"▼")));
     const wrap=el("div",{class:"tagwrap"});
     if(chosen.length)chosen.forEach(t=>wrap.append(el("span",{class:"tchip",style:"color:"+t.color},t.name)));
-    else wrap.append(el("span",{class:"tnone"},"なし"));
+
     wrap.addEventListener("click",e=>{e.stopPropagation();tagPick=open?null:g;tagEditing=false;render()});
     row.append(wrap);box.append(row);
     if(open){
@@ -1618,6 +1622,7 @@ $("pMore").onclick=()=>{renOpen=!renOpen;render()};
 $("pPick").onclick=()=>{pOpen=!pOpen;renId=null;pMenuId=pDelId=null;render()};
 document.addEventListener("click",e=>{if(!pOpen)return;const a=$("pList"),b=$("pPick"),path=e.composedPath();if(!path.includes(a)&&!path.includes(b)){pOpen=false;renId=null;render()}});
 $("fabAdd").onclick=()=>{catY=window.scrollY;catPage=true;render();window.scrollTo({top:0})};
+$("catBack2").onclick=()=>$("catBack").click();
 $("catBack").onclick=()=>{catPage=false;render();window.scrollTo({top:catY})};
 
 // ===== テンプレート =====
