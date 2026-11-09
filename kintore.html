@@ -190,6 +190,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .daystick .dsum small{font-size:10px;letter-spacing:0}
 .daystick .dsum b{font-size:16px}
 .daystick .dsum i{font-style:normal;font-size:10px;color:var(--muted);margin-left:2px;font-weight:600}
+.dayhead .sharebtn{margin-left:auto;align-self:center;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--fg);padding:0}
 .dayhead .yr{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
 .dayhead .dw.sun{color:var(--bad)}.dayhead .dw.sat{color:#3c74c8}
 .dayhead .dht{font-size:11px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:0 5px;align-self:center}
@@ -883,7 +884,8 @@ function renderInner(){
 
   // selected day
   const sd=parse(sel),ids=p?dayItems(sel):[];
-  $("dayhead").replaceChildren(el("span",{class:"yr"},sd.getFullYear()+"年"),el("span",{class:"big"},md(sd)),el("span",{class:"dw"+(sd.getDay()===0?" sun":"")+(sd.getDay()===6?" sat":"")},"("+DOW[sd.getDay()]+")"),...dayTagList(sel).map(t=>el("span",{class:"dht",style:"color:"+t.color},t.name)),...(ids.length?[]:[el("span",{class:"note"},"休み")]));
+  $("dayhead").replaceChildren(el("span",{class:"yr"},sd.getFullYear()+"年"),el("span",{class:"big"},md(sd)),el("span",{class:"dw"+(sd.getDay()===0?" sun":"")+(sd.getDay()===6?" sat":"")},"("+DOW[sd.getDay()]+")"),...dayTagList(sel).map(t=>el("span",{class:"dht",style:"color:"+t.color},t.name)),...(ids.length?[]:[el("span",{class:"note"},"休み")]),
+    el("button",{class:"sharebtn","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(sel)},SHARE_SVG()));
   renderDayTags(p);
   renderTplBar(p);
   renderDsum(p,ids);
@@ -1379,6 +1381,62 @@ function nameLink(inp,v,url){const f=el("span",{class:"lnform"}),ni=el("input",{
   f.append(ni,el("button",{class:"mini primary",type:"button",onclick:e=>{e.stopPropagation();ok()}},"決定"),el("button",{class:"mini tclose",type:"button","aria-label":"やめる",onclick:e=>{e.stopPropagation();linkSync(inp,v)}},"✕"));
   v.replaceChildren(f);ni.focus()}
 function linkSync(inp,v){if(!v)v=inp.nextElementSibling;if(!v||!v.classList.contains("lnkview"))return;const on=document.activeElement!==inp&&hasURL(inp.value);v.hidden=!on;inp.style.display=on?"none":"";if(on)v.replaceChildren(...linkNodes(inp.value,url=>nameLink(inp,v,url)))}
+// その日のトレーニングを共有（スマホは共有シート、無理ならコピー）
+const SHARE_SVG=()=>{const d=document.createElement("span");d.innerHTML='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3"/><path d="M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>';return d.firstChild};
+const plainLinks=t=>String(t||"").replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,"$1 $2");
+function dayShareText(k){const d=parse(k),ids=dayItems(k),L=[];
+  L.push("🏋️ "+d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()+"("+DOW[d.getDay()]+") のトレーニング");
+  const tl=dayTagList(k);if(tl.length)L.push(tl.map(t=>"#"+t.name).join(" "));
+  let ns=0,nr=0,vol=0;
+  ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg"),ds=doneSets(k,id);
+    L.push("");L.push("■ "+r.item.name);
+    if(!ds.length)L.push("  （記録なし）");
+    ds.forEach((s2,i)=>{ns++;const rr=parseInt(s2.r)||0,w=toNum(s2.w);nr+=rr;if(kg&&w>0)vol+=w*rr;
+      const e=hasRM(fs)?e1rm(s2.w,s2.r):null;L.push("  "+(i+1)+". "+setTxt(s2,id)+(e?"（1RM "+f1(e)+"kg）":"")+(String(s2.m||"").trim()?" "+plainLinks(s2.m):""))});
+    const xn=exNote(k,id);if(xn.trim())L.push("  メモ："+plainLinks(xn))});
+  if(ids.length){L.push("");L.push(ids.length+"種目 / "+ns+"セット / "+nr+"レップ / 総負荷量 "+Math.round(vol).toLocaleString()+"kg")}
+  if(notes[k])L.push("","📝 "+plainLinks(notes[k]));
+  return L.join("\n")}
+// 画像にして共有
+function dayShareCanvas(k){const d=parse(k),ids=dayItems(k),W=1080,P=64,F='"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif';
+  const cv=document.createElement("canvas"),c=cv.getContext("2d");
+  const wrap=(t,font,maxW)=>{c.font=font;const out=[];String(t).split("\n").forEach(par=>{let line="";for(const ch of par){if(c.measureText(line+ch).width>maxW&&line){out.push(line);line=ch}else line+=ch}out.push(line)});return out};
+  // 内容を組み立て
+  const blocks=[];let ns=0,nr=0,vol=0;
+  ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg"),ds=doneSets(k,id),rows=[];
+    ds.forEach((s2,i)=>{ns++;const rr=parseInt(s2.r)||0,w=toNum(s2.w);nr+=rr;if(kg&&w>0)vol+=w*rr;const e=hasRM(fs)?e1rm(s2.w,s2.r):null;
+      rows.push({t:(i+1)+".  "+setTxt(s2,id),rm:e?"1RM "+f1(e)+"kg":"",m:String(s2.m||"").trim()?plainLinks(s2.m):""})});
+    blocks.push({name:r.item.name,color:r.cat.color,rows,memo:exNote(k,id).trim()?plainLinks(exNote(k,id)):""})});
+  // 高さを計算
+  const fT="700 54px "+F,fS="600 30px "+F,fN="700 40px "+F,fR="500 34px "+F,fM="400 28px "+F;
+  let h=P+70+50;const tl=dayTagList(k);if(tl.length)h+=56;h+=150;
+  blocks.forEach(b=>{h+=78;h+=Math.max(1,b.rows.length)*52;b.rows.forEach(r=>{if(r.m)r.ml=wrap(r.m,fM,W-P*2-80),h+=r.ml.length*40});if(b.memo){b.ml=wrap("メモ："+b.memo,fM,W-P*2-40);h+=b.ml.length*40+8}h+=26});
+  let nl=[];if(notes[k]){nl=wrap(plainLinks(notes[k]),fM,W-P*2-40);h+=nl.length*40+50}
+  h+=P+40;cv.width=W;cv.height=h;
+  // 背景
+  c.fillStyle="#151a21";c.fillRect(0,0,W,h);c.fillStyle="#f07a3a";c.fillRect(0,0,W,12);
+  let y=P+50;c.fillStyle="#9aa4b2";c.font=fS;c.fillText(d.getFullYear()+"年",P,y-10);
+  y+=60;c.fillStyle="#f3f5f8";c.font=fT;c.fillText((d.getMonth()+1)+"/"+d.getDate()+" ("+DOW[d.getDay()]+")",P,y);
+  c.font=fS;c.fillStyle="#f07a3a";c.textAlign="right";c.fillText("筋トレログ",W-P,y);c.textAlign="left";
+  if(tl.length){y+=56;let x=P;c.font="700 28px "+F;tl.forEach(t=>{const tw=c.measureText(t.name).width+28;c.strokeStyle=t.color;c.lineWidth=3;c.beginPath();c.roundRect(x,y-32,tw,44,10);c.stroke();c.fillStyle=t.color;c.fillText(t.name,x+14,y);x+=tw+12})}
+  // 合計
+  y+=36;const st=[["種目数",ids.length,""],["セット数",ns,""],["レップ",nr,""],["総負荷量",Math.round(vol).toLocaleString(),"kg"]],bw=(W-P*2-36)/4;
+  st.forEach(([a,b,u],i)=>{const x=P+i*(bw+12);c.fillStyle="#1f2630";c.beginPath();c.roundRect(x,y,bw,112,16);c.fill();c.textAlign="center";c.fillStyle="#9aa4b2";c.font="600 24px "+F;c.fillText(a,x+bw/2,y+38);
+    c.fillStyle="#f3f5f8";c.font="700 44px "+F;const bt=String(b);c.fillText(bt,x+bw/2-(u?14:0),y+92);if(u){c.font="600 22px "+F;c.fillStyle="#9aa4b2";c.fillText(u,x+bw/2+c.measureText(bt).width/2+30,y+92)}c.textAlign="left"});
+  y+=150;
+  blocks.forEach(b=>{c.fillStyle=b.color;c.beginPath();c.roundRect(P,y,W-P*2,62,14);c.fill();c.fillStyle="#fff";c.font=fN;c.fillText(b.name,P+24,y+45);y+=78;
+    if(!b.rows.length){c.fillStyle="#9aa4b2";c.font=fR;c.fillText("記録なし",P+28,y+36);y+=52}
+    b.rows.forEach(r=>{c.fillStyle="#f3f5f8";c.font=fR;c.fillText(r.t,P+28,y+36);if(r.rm){c.textAlign="right";c.fillStyle="#9aa4b2";c.font="600 28px "+F;c.fillText(r.rm,W-P-12,y+36);c.textAlign="left"}y+=52;
+      if(r.ml){c.fillStyle="#b9c2cf";c.font=fM;r.ml.forEach(l=>{c.fillText(l,P+80,y+28);y+=40})}});
+    if(b.ml){c.fillStyle="#b9c2cf";c.font=fM;b.ml.forEach(l=>{c.fillText(l,P+28,y+30);y+=40});y+=8}
+    y+=26});
+  if(nl.length){y+=10;c.fillStyle="#9aa4b2";c.font="700 26px "+F;c.fillText("この日のメモ",P,y+20);y+=40;c.fillStyle="#d5dbe3";c.font=fM;nl.forEach(l=>{c.fillText(l,P,y+30);y+=40})}
+  return cv}
+async function shareDay(k){const d=parse(k),name="kintore-"+d.getFullYear()+"-"+(d.getMonth()+1)+"-"+d.getDate()+".png";
+  const cv=dayShareCanvas(k);const blob=await new Promise(r=>cv.toBlob(r,"image/png"));if(!blob){toast("画像を作れませんでした");return}
+  const file=new File([blob],name,{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e&&e.name==="AbortError")return}}
+  const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast("画像を保存しました")}
 function keepY(fn){const y=window.scrollY;fn();window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y))}
 function recordDays(){const ks=new Set([...Object.keys(plan),...Object.keys(logs),...Object.keys(notes),...Object.keys(exNotes),...Object.keys(dayTags)]);
   return [...ks].filter(k=>(dayItems(k).length||Object.keys(logs[k]||{}).some(id=>itemById(id)&&doneSets(k,id).length)||notes[k]||exNotes[k]||(dayTags[k]||[]).length)).sort()}
