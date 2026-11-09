@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<script>/* スマホでは全体を約8割の大きさで表示 */(function(){try{var sw=Math.min(screen.width,screen.height);if(sw&&sw<600){var k=0.8,w=Math.round(sw/k),m=document.querySelector('meta[name=viewport]');m.setAttribute("content","width="+w+",initial-scale="+k+",maximum-scale="+k+",viewport-fit=cover")}}catch(e){}})();</script>
 <title>筋トレログ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
@@ -31,7 +32,7 @@
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55}
 .wrap{max-width:720px;margin:0 auto;padding-inline:16px;padding-block:14px calc(110px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
 .tabpage{display:flex;flex-direction:column;gap:14px}
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(3,1fr);background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(2,1fr);background:var(--panel);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
 .tabbar button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--muted);padding:4px 0;border-radius:10px}
 .tabbar button .ti{font-size:18px;line-height:1}
 .tabbar button.on{color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
@@ -58,7 +59,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);fon
 .dedit{padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px}
 .dedit .prevline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
 .dedit .prevline b{color:var(--fg);font-weight:600}
-.dedit .xmemo{font:inherit;font-size:16px;width:100%;min-height:52px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:10px;padding:6px 8px;resize:vertical}
+.dedit textarea.xmemo{resize:none;overflow:hidden;line-height:1.4;display:block;min-height:0;border:0;border-bottom:1px dashed var(--line);border-radius:0;background:transparent;padding:2px 4px;font-size:16px}
+.wmline.xmline{padding-left:0;align-items:flex-start;margin-top:2px}.wmline.xmline .ml{padding-top:5px}
 .recf{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .recf .viewsw{margin-bottom:0;align-self:flex-start}
 .recf .viewsw button{padding:6px 12px}
@@ -115,7 +117,7 @@ h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.02em}
 .acct{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .sync-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--line);margin-right:6px;vertical-align:middle}
 .sync-dot.on{background:var(--ok)} .sync-dot.err{background:var(--bad)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;scroll-margin-top:calc(var(--abh,64px) + 8px)}
 .label{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -178,8 +180,35 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .day .flag{position:absolute;top:-6px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;font-family:var(--f-num)}
 
 /* 選択日 */
-.dayhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.dayhead .big{font-family:var(--f-num);font-size:30px;font-weight:700;line-height:1}
+.daygroup{scroll-margin-top:calc(var(--abh,64px) + 8px)}
+.daygroup>.panel+.panel{margin-top:14px}
+.daypanel{border-top:0;border-radius:0 0 14px 14px}
+.daystick{position:sticky;top:var(--abh,64px);z-index:40;background:var(--panel);padding:10px 14px 8px;border:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 6px 10px -8px rgba(0,0,0,.45)}
+.dayhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.daystick .dsum{margin-top:6px;gap:4px}
+.daystick .dsum div{padding:3px 2px;border-radius:8px}
+.daystick .dsum small{font-size:10px;letter-spacing:0}
+.daystick .dsum b{font-size:16px}
+.daystick .dsum i{font-style:normal;font-size:10px;color:var(--muted);margin-left:2px;font-weight:600}
+.dayhead .yr{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
+.dayhead .dw.sun{color:var(--bad)}.dayhead .dw.sat{color:#3c74c8}
+.dayhead .dht{font-size:11px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:0 5px;align-self:center}
+.day.cday{min-height:62px;padding:5px 1px 4px;gap:3px;justify-content:flex-start}
+.day.cday .dn{font-size:17px}
+.day.cday .ctag{height:14px;display:flex;justify-content:center;max-width:100%;overflow:hidden}
+.day.cday .ctag .dt{font-size:9px;padding:0 2px;line-height:12px}
+.cdots{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;padding:0 3px;max-width:100%}
+.cdot{width:7px;height:7px;border-radius:50%}
+.cmore{font-size:9px;font-weight:700;line-height:7px;color:var(--muted)}
+.day.cday .ccnt{display:none}
+.day.selected .cmore{color:var(--sel-ink)}
+.cprev{grid-column:1/-1;margin-top:8px;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.cph{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cph .cpd{font-family:var(--f-num);font-size:20px;font-weight:700}
+.cph .dt{font-size:10.5px;border:1px solid currentColor;border-radius:5px;padding:0 5px;font-weight:700}
+.cph .cpgo{margin-left:auto}
+.cpn{font-size:12.5px;color:var(--muted);white-space:pre-wrap}
+.dayhead .big{font-family:var(--f-num);font-size:26px;font-weight:700;line-height:1}
 .dayhead .dw{font-size:15px;font-weight:700}
 .chosen{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .chosen .c{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 8px 5px 12px;color:#fff;font-weight:700;font-size:14px;border:0}
@@ -236,6 +265,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .sortrow .sortbtns button{color:var(--fg)}
 /* トレーニング記録 */
 .tplbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
+.tplbar>.tagrow{width:100%}.panel.inpanel{border:0;padding:0;background:none;box-shadow:none}.inpanel .btnrow{margin-top:0!important}.tplbar>.tpanel{flex-basis:100%;width:100%}
 .tplbar .tlabel{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-right:2px}
 .tplbtn{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px}
 .tplbtn .dot{width:9px;height:9px}
@@ -256,6 +286,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .wrow input.winp{width:3.8em}
 .wrow input.wt{width:2.5em}
 .wrow .w1rm{margin-left:auto}
+.w1rm small.u{margin-left:2px;font-weight:600}
 .ubtn{border:1px dashed var(--line);background:none;color:var(--muted);border-radius:6px;padding:3px 5px;font-size:12px;font-weight:700;line-height:1.2}
 .ubtn.on{border-style:solid;border-color:var(--accent);color:var(--accent)}
 .wx{margin-left:-1px}
@@ -280,6 +311,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .wmline .ml{font-size:12px;color:var(--muted);font-weight:700;flex:none}
 .wno{font-family:var(--f-num);font-size:15px;font-weight:700;color:var(--muted);text-align:center}
 .wrow input{font:inherit;font-size:16px;font-family:var(--f-num);font-weight:600;width:100%;min-width:0;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:6px 6px;text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:600px){.wrow input{padding:2px 5px;border-radius:7px;line-height:1.25}.wrow input.winp{width:3.1em}.wrow input.wt{width:2.1em}}
 .wrow input::placeholder{color:var(--muted);opacity:.4;font-weight:500}
 .wu{font-size:12px;color:var(--muted)}
 .w1rm{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;min-width:0}
@@ -368,7 +400,9 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .tedit select{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:7px;padding:4px;width:5.6em;flex:none}
 .tadd{display:flex;gap:5px;flex-wrap:wrap}
 .tnew{border:1.5px dashed var(--line);background:transparent;border-radius:9px;padding:8px 10px;text-align:left;font-size:14px;font-weight:700;color:var(--muted)}
+.thead.fhead.top{position:sticky;top:calc(var(--abh,64px) + var(--dsh,0px) - 1px);z-index:30;box-shadow:0 4px 8px -6px rgba(0,0,0,.5)}
 .fhead.drop-into{outline:3px dashed var(--accent);outline-offset:2px}
+.tadd input:focus,.tadd input:focus-visible{outline:none;box-shadow:none;border-color:var(--line)}
 .tadd input{font:inherit;font-size:16px;border:1px dashed var(--line);background:transparent;color:var(--fg);border-radius:7px;padding:4px 7px;flex:1 1 8em;min-width:0}
 /* ドラッグ並び替え */
 .drag-src{opacity:.3}
@@ -515,6 +549,14 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
   .day .flag{top:2px;right:2px;min-width:15px;height:15px;font-size:10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}
+.lnkwrap{display:block;flex:1;min-width:0}
+.lnkview{display:block;min-height:1.6em;padding:2px 4px;border-bottom:1px dashed var(--line);white-space:pre-wrap;word-break:break-all;cursor:text;font-size:15px;line-height:1.45}
+.lnkview[hidden]{display:none}
+.lnkview.big{min-height:72px;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:8px 10px}
+.lname{font:inherit;font-size:11px;font-weight:700;margin:0 4px 0 3px;padding:0 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--muted);vertical-align:1px}
+.lnform{display:flex;gap:6px;align-items:center}.lnform input{flex:1;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:7px;padding:3px 6px}
+a.mlink{color:#4ea1ff;text-decoration:underline;text-underline-offset:2px;word-break:break-all}
 </style>
 </head>
 <body>
@@ -575,23 +617,23 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
     <div class="days" id="days"></div>
   </section>
 
-  <section class="panel">
-    <div class="dayhead" id="dayhead"></div>
+  <div class="daygroup" id="dayGroup">
+  <div class="daystick" id="dayStick"><div class="dayhead" id="dayhead"></div><div class="dsum" id="dsum"></div></div>
+  <section class="panel daypanel">
     <div class="daytags" id="dayTags"></div>
     <div class="tagedit" id="tagEdit" hidden></div>
-    <div class="dsum" id="dsum"></div>
     <div class="tplbar" id="tplBar"></div>
     <div class="tplconfirm" id="tplConfirm" hidden></div>
     <div class="wlog" id="wlog"></div>
     <div class="memoblock">
       <label class="label" for="dayNote">この日のトレーニングのメモ</label>
-      <textarea id="dayNote"></textarea>
+      <span class="lnkwrap"><textarea id="dayNote"></textarea><span class="lnkview big" id="dayNoteV" role="button" tabindex="0" hidden></span></span>
     </div>
   </section>
 
   <section class="panel">
     <div class="palhead">
-      <div class="label">種目リスト <span class="hint">タップでこの日に追加／長押しで並び替え</span></div>
+      <div class="label">種目リスト<span class="hint" style="display:block;margin-top:2px">タップでこの日に追加／長押しで並び替え</span></div>
       <button class="edittoggle" id="editBtn">編集</button>
     </div>
     <div class="cats" id="cats"></div>
@@ -600,6 +642,7 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
       <button class="primary" id="addCatBtn">フォルダを追加</button>
     </div>
   </section>
+  </div>
 
   <section class="panel">
     <div class="palhead"><div class="label">トレーニング頻度 <span class="hint" id="statsSub"></span></div></div>
@@ -609,7 +652,7 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
   <section class="panel" id="reflPanel">
     <div class="label">この期間の振り返り <span class="hint" id="reflSub"></span></div>
     <div class="memoblock">
-      <textarea id="weekMemo" aria-label="この期間の振り返り"></textarea>
+      <span class="lnkwrap"><textarea id="weekMemo" aria-label="この期間の振り返り"></textarea><span class="lnkview big" id="weekMemoV" role="button" tabindex="0" hidden></span></span>
     </div>
   </section>
   </div>
@@ -620,7 +663,7 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
     <div class="palhead"></div>
     <div class="btnrow" style="margin-top:8px">
       <button class="ghost" id="tplNewBtn">＋新しいテンプレート</button>
-      <button class="ghost" id="tplFromDayBtn">選んでいる日のメニューから作る</button>
+      <button class="ghost" id="tplFromDayBtn" hidden>選んでいる日のメニューから作る</button>
     </div>
     <div class="tpls" id="tpls"></div>
   </section>
@@ -652,7 +695,6 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
 </div>
 <nav class="tabbar" aria-label="画面の切り替え">
   <button data-tab="menu" class="on"><span class="ti">☰</span>メニュー</button>
-  <button data-tab="tpl"><span class="ti">▤</span>テンプレート</button>
   <button data-tab="rec"><span class="ti">◷</span>記録</button>
 </nav>
 <div class="toast" id="toast"></div>
@@ -698,7 +740,7 @@ const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
-let logs={},templates=[],tplEditing=null,tplConfirm=null,exNotes={},openEx=new Set(),skipLog=false;
+let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},openEx=new Set(),skipLog=false;
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recAsc=false,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -828,29 +870,29 @@ function renderInner(){
     const keys=allPeriodDays();
     $("plen").textContent=periods.length+"個の期間・"+keys.length+"日";
     if(viewMode==="list"){if(!keys.length)days.append(el("div",{class:"noper"},"期間がありません。"));else listRows(days,keys,true)}
-    else renderMonth(days);
+    else{renderMonth(days);if(isCompact())calPreview(days)}
   } else if(!p){$("plen").textContent="";days.append(el("div",{class:"noper"},"まず期間（開始日〜終了日）を決めてください。"))}
   else{
     $("plen").replaceChildren(document.createTextNode(plen(p)+"日間"));
     const keys=[];for(let i=0;i<plen(p);i++)keys.push(addK(p.start,i));
     if(viewMode==="list")listRows(days,keys,false);
-    else renderPeriodMonths(days,p);
+    else{renderPeriodMonths(days,p);if(isCompact())calPreview(days)}
   }
   renderPerEdit();
   renderPerEdit();
 
   // selected day
   const sd=parse(sel),ids=p?dayItems(sel):[];
-  $("dayhead").replaceChildren(el("span",{class:"big"},md(sd)),el("span",{class:"dw"},"("+DOW[sd.getDay()]+")"),el("span",{class:"note"},ids.length?ids.length+"種目":"休み"));
+  $("dayhead").replaceChildren(el("span",{class:"yr"},sd.getFullYear()+"年"),el("span",{class:"big"},md(sd)),el("span",{class:"dw"+(sd.getDay()===0?" sun":"")+(sd.getDay()===6?" sat":"")},"("+DOW[sd.getDay()]+")"),...dayTagList(sel).map(t=>el("span",{class:"dht",style:"color:"+t.color},t.name)),...(ids.length?[]:[el("span",{class:"note"},"休み")]));
   renderDayTags(p);
   renderTplBar(p);
   renderDsum(p,ids);
   if(!skipLog)renderLog(p,ids);
-  const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";
+  const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
 
   renderCats();renderTemplates();
 
-  const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";
+  const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";if($("weekMemoV"))linkSync(wm,$("weekMemoV"));
 
   let sp=p;
   if(allMode){if(!calMonth)calMonth=sel.slice(0,7);const [yy,mm]=calMonth.split("-").map(Number);sp={start:calMonth+"-01",end:key(new Date(yy,mm,0))};$("statsSub").textContent=yy+"年"+mm+"月";}
@@ -883,13 +925,30 @@ function listRows(days,keys,monthHeads){let pm="";
     if(monthHeads&&ym!==pm){days.append(el("div",{class:"lmon"},d.getFullYear()+"年 "+(d.getMonth()+1)+"月"))}
     const newM=ym!==pm;pm=ym;
     const chips=el("div",{class:"lchips"});
-    if(!ids.length)chips.append(el("span",{class:"rest"},"種目なし"));
     ids.forEach(id=>{const r=itemById(id),n=doneSets(dk,id).length;chips.append(el("span",{class:"lchip",style:"background:"+r.cat.color},r.item.name,n?el("span",{class:"ls"},n+"set"):null))});
     const head=el("div",{class:"lhead"},el("span",{class:"ldate"},(!monthHeads&&(i===0||newM)?(d.getMonth()+1)+"/":"")+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)));
     if(notes[dk])head.append(el("span",{class:"lmemo","aria-label":"メモあり"},"✎"));
-    days.append(el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{pickDay(dk);if(window.innerWidth<700)$("dayhead").scrollIntoView({behavior:"smooth",block:"start"})},"aria-label":md(d)+"("+DOW[w]+")"},head,chips))});
+    days.append(el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{pickDay(dk);if(window.innerWidth<700)$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})},"aria-label":md(d)+"("+DOW[w]+")"},head,chips))});
 }
-function calCell(dk,out){const d=parse(dk),ids=dayItems(dk),w=d.getDay();
+const isCompact=()=>window.innerWidth<600;
+function calCellC(dk,out){const d=parse(dk),ids=dayItems(dk),w=d.getDay(),tl=dayTagList(dk);
+  const dots=el("div",{class:"cdots"});ids.slice(0,6).forEach(id=>{const r=itemById(id);dots.append(el("span",{class:"cdot",style:"background:"+r.cat.color}))});
+  if(ids.length>6)dots.append(el("span",{class:"cmore"},"+"+(ids.length-6)));
+  const b=el("button",{class:"day cday"+(w===0?" sun":"")+(w===6?" sat":"")+(dk===todayK?" today":"")+(dk===sel?" selected":"")+(out?" out":""),onclick:()=>pickDay(dk),"aria-label":md(d)+"("+DOW[w]+")"+(tl.length?"・"+tl.map(t=>t.name).join("・"):"")+"・"+(ids.length?ids.length+"種目":"種目なし")},
+    el("span",{class:"dn"},String(d.getDate())),el("div",{class:"ctag"},tl.length?el("span",{class:"dt",style:"color:"+tl[0].color},tl[0].name+(tl.length>1?"+":"")):null),dots);
+  if(ids.length)b.append(el("span",{class:"ccnt"},ids.length+"種目"));
+  if(notes[dk])b.append(el("span",{class:"memo","aria-label":"メモあり"},"✎"));
+  return b}
+// 選んだ日の中身（カレンダーの下）
+function calPreview(days){const dk=sel,d=parse(dk),ids=dayItems(dk),w=d.getDay();
+  const box=el("div",{class:"cprev"});
+  box.append(el("div",{class:"cph"},el("span",{class:"cpd"},(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
+    el("button",{class:"mini cpgo",onclick:()=>$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})},"記録する ↓")));
+  const chips=el("div",{class:"lchips"});
+  ids.forEach(id=>{const r=itemById(id),n=doneSets(dk,id).length;chips.append(el("span",{class:"lchip",style:"background:"+r.cat.color},r.item.name,n?el("span",{class:"ls"},n+"set"):null))});
+  if(ids.length)box.append(chips);if(notes[dk])box.append(el("div",{class:"cpn"},"✎ ",...linkNodes(notes[dk])));
+  days.append(box)}
+function calCell(dk,out){if(isCompact())return calCellC(dk,out);const d=parse(dk),ids=dayItems(dk),w=d.getDay();
   const tags=el("div",{class:"tags"});
   if(!ids.length)tags.append(el("div",{class:"rest"},"—"));
   const opened=openDays.has(dk);
@@ -949,7 +1008,7 @@ function openEditor(mode){
   perMode=mode;const p=cur();
   if(mode==="edit"&&p){$("pStart").value=p.start;$("pEnd").value=p.end}
   else{const s=sorted(),last=s[s.length-1];let st=last?addK(last.end,1):key(monday(today));const len=last?plen(last):7;$("pStart").value=st;$("pEnd").value=addK(st,len-1)}
-  render();$("pStart").focus();
+  render();
 }
 function pNote(){const a=$("pStart").value,b=$("pEnd").value;if(!a||!b){$("pNote").textContent="";return}
   if(b<a){$("pNote").textContent="終了日が開始日より前になっています";return}
@@ -1015,7 +1074,7 @@ function renderDayTags(p){
       if(!liveTags(g).length)list.append(el("span",{class:"note"},"項目がありません。「項目を編集」から追加してください。"));
       sortable(list,".topt",ids=>{const rest=tags.filter(t=>(t.group||"plan")!==g),mine=tags.filter(t=>(t.group||"plan")===g);tags=rest.concat(reorderLive(mine,t=>!t.deleted,ids));touch();render()});
       pan.append(list);
-      pan.append(el("div",{class:"tpfoot"},el("span",{class:"note"},g==="mark"?"「記録」画面で絞り込みに使えます":"いくつでも選べます"),
+      pan.append(el("div",{class:"tpfoot"},el("span",{style:"flex:1"}),
         el("button",{class:"mini",onclick:()=>{tagEditing=!tagEditing;render()}},tagEditing?"編集を終える":"項目を編集"),
         el("button",{class:"primary",onclick:()=>{tagPick=null;tagEditing=false;render()}},"完了")));
       box.append(pan);
@@ -1035,6 +1094,7 @@ function renderDayTags(p){
   ed.append(el("div",{class:"addrow"},ni,el("button",{class:"primary",onclick:addT},"追加")));
 }
 // パネルの外を押したら閉じる
+document.addEventListener("click",e=>{if(!tplOpen)return;const b=$("tplBar");if(b&&!e.composedPath().includes(b)){tplOpen=false;tplMng=false;tplEditing=null;tplSel.clear();render()}});
 document.addEventListener("click",e=>{if(!tagPick)return;if(e.target.closest&&(e.target.closest("#dayTags")||e.target.closest("#tagEdit")||e.target.closest(".toast")))return;tagPick=null;tagEditing=false;render()});
 function toggleTag(id){if(!cur())return;const a=(dayTags[sel]||[]).slice(),i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);if(a.length)dayTags[sel]=a;else delete dayTags[sel];touch();render()}
 
@@ -1133,7 +1193,8 @@ function refreshSoon(){clearTimeout(sumT);sumT=setTimeout(()=>{skipLog=true;try{
 function fill1rm(box,s,id,k){
   const fs=getFields(id);if(!hasRM(fs)){box.replaceChildren();return}
   const e=e1rm(s.w,s.r);box.replaceChildren();
-  box.append(el("span",{class:"v"},el("small",null,"1RM"),e==null?"—":f1(e)));
+  const wu=(fs.find(f=>f.id==="w")||{}).unit||"kg";
+  box.append(el("span",{class:"v"},el("small",null,"1RM"),e==null?"—":f1(e),e==null?null:el("small",{class:"u"},wu)));
   if(e!=null){const pb=bestBefore(id,k),ba=bestAll(id),w=toNum(s.w);
     if(pb>0&&e>pb+1e-9)box.append(el("span",{class:"pr"},"自己ベスト"));
   }
@@ -1141,7 +1202,7 @@ function fill1rm(box,s,id,k){
 function renderDsum(p,ids){
   let ns=0,nr=0,vol=0;ids.forEach(id=>{const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg");doneSets(sel,id).forEach(s=>{ns++;const r=parseInt(s.r)||0,w=toNum(s.w);nr+=r;if(kg&&w>0)vol+=w*r})});
   $("dsum").hidden=!p||!ids.length;
-  $("dsum").replaceChildren(...[["種目",ids.length],["セット",ns],["レップ",nr],["負荷量kg",Math.round(vol)]].map(([a,b])=>el("div",null,el("small",null,a),el("b",null,String(b)))));
+  $("dsum").replaceChildren(...[["種目数",ids.length,""],["セット数",ns,""],["レップ",nr,""],["総負荷量",Math.round(vol).toLocaleString(),"kg"]].map(([a,b,u])=>el("div",null,el("small",null,a),el("b",null,String(b),u?el("i",null,u):null))));
 }
 const exNote=(k,id)=>(exNotes[k]&&exNotes[k][id])||"";
 function setExNote(k,id,v){if(v.trim()){exNotes[k]=exNotes[k]||{};exNotes[k][id]=v}else if(exNotes[k]){delete exNotes[k][id];if(!Object.keys(exNotes[k]).length)delete exNotes[k]}}
@@ -1149,7 +1210,7 @@ function setExNote(k,id,v){if(v.trim()){exNotes[k]=exNotes[k]||{};exNotes[k][id]
 function renderLog(p,ids){
   const box=$("wlog");box.replaceChildren();
   if(!p){box.append(el("div",{class:"empty"},"期間を作ると、日付ごとに種目と記録を入れられます。"));return}
-  if(!ids.length){box.append(el("div",{class:"empty"},templates.length?"上のテンプレートを選ぶか、下の種目リストからタップして入れてください。":"下の種目リストからタップして入れてください。「テンプレート」画面でテンプレートを作っておくと、ワンタップで1日分を入れられます。"));return}
+  if(!ids.length)return;
   LOGKEYS=Object.keys(logs).sort();
   ids.forEach(id=>{
     const r=itemById(id);let sets=setsOf(sel,id);
@@ -1170,7 +1231,7 @@ function renderEditor(id){
   const pl=el("div",{class:"prevline"});
   if(prev){pl.append(el("span",null,"前回 "+mdk(prev.k)+"：",el("b",null,prev.sets.map(x=>setTxt(x,id)).join("、"))));if(!sets.some(hasAny))pl.append(el("button",{class:"mini",onclick:()=>copyPrev(id,prev)},"前回をコピー"))}
   else pl.append(el("span",null,"前回の記録なし"));
-  if(ba)pl.append(el("span",null,"自己ベスト1RM ",el("b",null,f1(ba))));
+  if(ba)pl.append(el("span",null,"自己ベスト1RM ",el("b",null,f1(ba)),((getFields(id).find(f=>f.id==="w")||{}).unit||"kg")));
   ed.append(pl);
   if(unitPick&&unitPick.id===id)ed.append(renderUnitPick(id));
   const list=el("div",{class:"wsets"});
@@ -1212,14 +1273,15 @@ function renderEditor(id){
     const del=hasAny(s)?armed("✕","消す",()=>delSet(id,i),"mini del sdel"):el("button",{class:"mini del sdel","aria-label":(i+1)+"セット目を消す",onclick:()=>delSet(id,i)},"✕");
     const memo=el("input",{type:"text",class:"wmemo",id:"lm-"+id+"-"+i,value:s.m||"","aria-label":(i+1)+"セット目のメモ"});
     memo.addEventListener("input",()=>{s.m=memo.value;touch();refreshSoon()});
-    list.append(el("div",{class:"wset"},del,row,el("label",{class:"wmline",for:"lm-"+id+"-"+i},el("span",{class:"ml"},"メモ："),memo)));
+    list.append(el("div",{class:"wset"},del,row,el("label",{class:"wmline",for:"lm-"+id+"-"+i},el("span",{class:"ml"},"メモ："),linkWrap(memo))));
   });
   ed.append(list);
   const add=el("button",{class:"primary addset","aria-label":"セットを追加",onclick:()=>addSet(id)},"＋");
   const lastSet=list.querySelector(".wset:last-of-type");if(lastSet){lastSet.classList.add("last");lastSet.append(add)}else ed.append(add);
-  const xm=el("textarea",{class:"xmemo",id:"xm-"+id,"aria-label":"種目のメモ"});xm.value=exNote(k,id);
-  xm.addEventListener("input",()=>{setExNote(k,id,xm.value);touch();refreshSoon()});
-  ed.append(el("label",{class:"label",for:"xm-"+id,style:"margin-bottom:-4px"},"メモ"),xm);
+  const xm=el("textarea",{class:"wmemo xmemo",id:"xm-"+id,rows:"1","aria-label":"種目のメモ"});xm.value=exNote(k,id);
+  const fit=()=>{xm.style.height="auto";xm.style.height=xm.scrollHeight+"px"};
+  xm.addEventListener("input",()=>{fit();setExNote(k,id,xm.value);touch();refreshSoon()});
+  ed.append(el("label",{class:"wmline xmline",for:"xm-"+id},el("span",{class:"ml"},"メモ："),linkWrap(xm)));xm.addEventListener("linkopen",()=>requestAnimationFrame(fit));requestAnimationFrame(fit);
   return ed;
 }
 // 単位を選ぶ（その種目のその項目に反映）
@@ -1248,7 +1310,7 @@ function swNow(){return sw?sw.base+(Date.now()-sw.start)/1000:0}
 function swStart(k,id,i,fid,base){if(sw)swStop();sw={k,id,i,fid,base,start:Date.now()};clearInterval(swInt);swInt=setInterval(swTick,250);render()}
 function swTick(){if(!sw)return;const sec=Math.floor(swNow()),m=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-m"),x=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-s");if(m)m.value=String(Math.floor(sec/60));if(x)x.value=String(sec%60);const r=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-r");if(r)r.textContent=fmtTime(sec)}
 function swStop(){if(!sw)return;const a=(logs[sw.k]||{})[sw.id];const sec=Math.round(swNow());if(a&&a[sw.i])a[sw.i][sw.fid]=String(sec);sw=null;clearInterval(swInt);swInt=null;touch();render()}
-function addSet(id){const a=ensureSets(sel,id),last=[...a].reverse().find(isDone),n={};if(last)Object.keys(last).forEach(k=>{if(k!=="m")n[k]=last[k]});n.m="";a.push(n);openEx.add(id);touch();render();const x=document.querySelector("#wlog .dcard[data-id='"+id+"'] .wset:last-of-type .winp");x&&x.focus()}
+function addSet(id){const a=ensureSets(sel,id),last=[...a].reverse().find(isDone),n={};if(last)Object.keys(last).forEach(k=>{if(k!=="m")n[k]=last[k]});n.m="";a.push(n);openEx.add(id);touch();render()}
 function delSet(id,i){const a=ensureSets(sel,id);a.splice(i,1);touch();render()}
 function copyPrev(id,prev){const a=ensureSets(sel,id);const keepMemo=a.map(s=>s.m||"");logs[sel][id]=prev.sets.map((s,i)=>{const n={};Object.keys(s).forEach(k=>{if(k!=="m")n[k]=s[k]});n.m=keepMemo[i]||"";return n});touch();render();toast("前回の記録を入れました。違うところだけ直してください")}
 function removeFromDay(id){removeExDay(sel,id)}
@@ -1293,6 +1355,30 @@ paintTimer();
 // ===== 記録（今日より前の日） =====
 function delDay(k){const src={plan,logs,notes,exNotes,dayTags},d={k};Object.entries(src).forEach(([f,o])=>{if(o[k]!=null){d[f]=clone(o[k]);delete o[k]}});
   const p=parse(k);trashAdd("date","日の記録",p.getFullYear()+"/"+(p.getMonth()+1)+"/"+p.getDate(),d);touch();keepY(render);toast(mdk(k)+"の記録をごみ箱に入れました")}
+// メモの中のURLをリンクにする（Notion風：入力中以外はリンク表示）
+const URL_RE=/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|https?:\/\/[^\s<>"'）」』】]+/g;
+function openURL(u){let w=null;try{w=window.open(u,"_blank")}catch(e){}if(w){try{w.opener=null}catch(e){}}else location.href=u}
+function mkLink(href,label){const a=document.createElement("a");a.href=href;a.target="_blank";a.rel="noopener noreferrer";a.className="mlink";a.textContent=label;
+  a.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();openURL(href)});a.addEventListener("pointerdown",e=>e.stopPropagation());return a}
+function linkNodes(text,onName){text=String(text||"");const out=[];let last=0,m;URL_RE.lastIndex=0;
+  while((m=URL_RE.exec(text))){if(m.index>last)out.push(document.createTextNode(text.slice(last,m.index)));
+    if(m[1]){out.push(mkLink(m[2],m[1]))}
+    else{out.push(mkLink(m[0],m[0]));if(onName){const url=m[0];const b=document.createElement("button");b.type="button";b.className="lname";b.textContent="名前";b.setAttribute("aria-label","このリンクに名前を付ける");
+      b.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();onName(url)});b.addEventListener("pointerdown",e=>e.stopPropagation());out.push(b)}}
+    last=m.index+m[0].length}
+  if(last<text.length)out.push(document.createTextNode(text.slice(last)));return out}
+const hasURL=t=>/https?:\/\/\S/.test(String(t||""));
+function linkWrap(inp){const w=el("span",{class:"lnkwrap"}),v=el("span",{class:"lnkview",role:"button",tabindex:"0"});w.append(inp,v);linkSync(inp,v);
+  v.addEventListener("click",()=>{if(v.querySelector(".lnform"))return;v.hidden=true;inp.style.display="";inp.dispatchEvent(new Event("linkopen"));inp.focus()});
+  inp.addEventListener("blur",()=>setTimeout(()=>linkSync(inp,v),0));return w}
+// URLに名前を付ける：[名前](URL) の形でメモに入る
+function nameLink(inp,v,url){const f=el("span",{class:"lnform"}),ni=el("input",{type:"text","aria-label":"リンクの名前"});
+  const ok=()=>{const n=ni.value.trim().replace(/[\[\]]/g,"");if(n){inp.value=inp.value.replace(url,"["+n+"]("+url+")");inp.dispatchEvent(new Event("input",{bubbles:true}))}linkSync(inp,v)};
+  ni.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();ok()}});
+  f.addEventListener("click",e=>e.stopPropagation());
+  f.append(ni,el("button",{class:"mini primary",type:"button",onclick:e=>{e.stopPropagation();ok()}},"決定"),el("button",{class:"mini tclose",type:"button","aria-label":"やめる",onclick:e=>{e.stopPropagation();linkSync(inp,v)}},"✕"));
+  v.replaceChildren(f);ni.focus()}
+function linkSync(inp,v){if(!v)v=inp.nextElementSibling;if(!v||!v.classList.contains("lnkview"))return;const on=document.activeElement!==inp&&hasURL(inp.value);v.hidden=!on;inp.style.display=on?"none":"";if(on)v.replaceChildren(...linkNodes(inp.value,url=>nameLink(inp,v,url)))}
 function keepY(fn){const y=window.scrollY;fn();window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y))}
 function recordDays(){const ks=new Set([...Object.keys(plan),...Object.keys(logs),...Object.keys(notes),...Object.keys(exNotes),...Object.keys(dayTags)]);
   return [...ks].filter(k=>(dayItems(k).length||Object.keys(logs[k]||{}).some(id=>itemById(id)&&doneSets(k,id).length)||notes[k]||exNotes[k]||(dayTags[k]||[]).length)).sort()}
@@ -1347,7 +1433,7 @@ function renderRecords(){
   let lastP=undefined;
   list.forEach(k=>{
     const pr=periodFor(k),pid=pr?pr.id:null;
-    if(pid!==lastP){lastP=pid;if(pr){const h=el("div",{class:"rph"},el("span",{class:"rt"},"期間 "+pLabel(pr,true)));if(pr.memo)h.append(el("div",{class:"rm"},"振り返り："+pr.memo));box.append(h)}}
+    if(pid!==lastP){lastP=pid;if(pr){const h=el("div",{class:"rph"},el("span",{class:"rt"},"期間 "+pLabel(pr,true)));if(pr.memo)h.append(el("div",{class:"rm"},"振り返り：",...linkNodes(pr.memo)));box.append(h)}}
     const d=parse(k),w=d.getDay(),ids=dayItems(k);
     const card=el("div",{class:"rday"});
     card.append(el("div",{class:"rh"},el("span",{class:"rd"},d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"rw"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(k).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
@@ -1357,11 +1443,11 @@ function renderRecords(){
       x.append(el("div",{class:"rn"},el("span",null,r.item.name),el("button",{class:"mini del rdel",onclick:()=>{recDelAsk=k+"|"+id;keepY(render)}},"削除")));
       if(recDelAsk===k+"|"+id)x.append(el("div",{class:"delconfirm rdc"},el("div",{class:"dcp"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"　"+r.item.name),el("div",{class:"dct"},"この記録を削除しますか？"),
         el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{recDelAsk=null;removeExDay(k,id,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{recDelAsk=null;keepY(render)}},"いいえ"))));
-      if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,String(s.m||"").trim()?el("small",null,"　"+s.m):null))});
+      if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,String(s.m||"").trim()?el("small",null,"　",...linkNodes(s.m)):null))});
       else x.append(el("div",{class:"rs"},el("small",null,"記録なし")));
-      if(exNote(k,id))x.append(el("div",{class:"rxm"},"メモ："+exNote(k,id)));
+      if(exNote(k,id))x.append(el("div",{class:"rxm"},"メモ：",...linkNodes(exNote(k,id))));
       card.append(x)});
-    if(notes[k]&&!eff.size)card.append(el("div",{class:"rdm"},notes[k]));
+    if(notes[k]&&!eff.size)card.append(el("div",{class:"rdm"},...linkNodes(notes[k])));
     box.append(card)});
 }
 document.addEventListener("click",e=>{if(!recExOpen)return;const box=$("recEx");if(box&&!e.composedPath().includes(box)){recExOpen=false;keepY(render)}});
@@ -1375,13 +1461,31 @@ const tplLive=t=>t.items.filter(x=>{const r=itemById(x.id);return r&&!r.item.del
 function renderTplBar(p){
   const bar=$("tplBar");bar.replaceChildren();const cf=$("tplConfirm");
   if(!p){bar.hidden=true;cf.hidden=true;return}
-  bar.hidden=false;bar.append(el("span",{class:"tlabel"},"テンプレート"));
-  if(!templates.length)bar.append(el("button",{class:"mini",onclick:()=>{tab="tpl";render();window.scrollTo({top:0})}},"テンプレートを作る ›"));
-  templates.forEach(t=>bar.append(el("button",{class:"tplbtn",onclick:()=>{if(dayItems(sel).length){tplConfirm=t.id;render()}else applyTpl(t,"add")}},el("span",{class:"dot",style:"background:"+tplColor(t)}),t.name)));
-  if(templates.length)bar.append(el("button",{class:"mini",onclick:()=>{tab="tpl";render();window.scrollTo({top:0})}},"編集 ›"));
+  bar.hidden=false;
+  const tps=templates.filter(t=>(t.items||[]).length);
+  [...tplSel].forEach(x=>{if(!tps.some(t=>t.id===x))tplSel.delete(x)});
+  const goTpl=()=>{tplMng=true;tplSel.clear();render()};
+  const row=el("div",{class:"tagrow"});
+  row.append(el("button",{class:"tpick"+(tplOpen?" on":""),"aria-expanded":String(tplOpen),onclick:()=>{tplOpen=!tplOpen;if(!tplOpen){tplSel.clear();tplMng=false;tplEditing=null}render()}},"テンプレート",el("span",{class:"tv"},tplOpen?"▲":"▼")));
+  bar.append(row);
+  if(tplOpen){
+    const pan=el("div",{class:"tpanel"}),list=el("div",{class:"tplist"});
+    if(tplMng){const sec=tplSecEl();sec.classList.add("inpanel");pan.append(sec,el("div",{class:"tpfoot"},el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{tplMng=false;tplEditing=null;render()}},"完了")));bar.append(pan);return}
+    tps.forEach(t=>{const on=tplSel.has(t.id);list.append(el("button",{class:"topt"+(on?" on":""),style:"--tc:"+tplColor(t),"aria-pressed":String(on),onclick:()=>{if(on)tplSel.delete(t.id);else tplSel.add(t.id);render()}},el("span",{class:"tbx"},on?"✓":""),t.name))});
+    if(!tps.length)list.append(el("button",{class:"mini",onclick:goTpl},"テンプレートを作る ›"));
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",onclick:goTpl},"編集 ›"),
+      el("button",{class:"primary",style:"margin-left:auto"+(tplSel.size?"":";opacity:.45"),onclick:()=>{const ts=tps.filter(t=>tplSel.has(t.id));tplOpen=false;tplSel.clear();if(ts.length)applyTpls(ts);else render()}},tplSel.size?tplSel.size+"件を追加":"追加")));
+    bar.append(pan);
+  }
   const t=templates.find(x=>x.id===tplConfirm);cf.hidden=!t;cf.replaceChildren();
   if(t)cf.append(el("div",null,"この日にはもう種目が入っています。「"+t.name+"」をどう入れますか？"),
     el("div",{class:"btnrow"},el("button",{class:"primary",onclick:()=>applyTpl(t,"replace")},"入れ替える"),el("button",{class:"ghost",onclick:()=>applyTpl(t,"add")},"後ろに追加"),el("button",{class:"ghost",onclick:()=>{tplConfirm=null;render()}},"やめる")));
+}
+function applyTpls(ts){
+  const k=sel,snap=clone({p:plan[k]||null,l:logs[k]||null});let ids=dayItems(k).slice();
+  ts.forEach(t=>tplLive(t).forEach(x=>{if(!ids.includes(x.id))ids.push(x.id);const a=ensureSets(k,x.id);while(a.length<(x.sets||0))a.push({w:"",r:"",m:""})}));
+  cleanLog(k);if(ids.length)plan[k]=ids;else delete plan[k];touch();render();
+  toastUndo(ts.map(t=>"「"+t.name+"」").join("")+"を"+mdk(k)+"に入れました",()=>{if(snap.p)plan[k]=snap.p;else delete plan[k];if(snap.l)logs[k]=snap.l;else delete logs[k];touch();render()});
 }
 function applyTpl(t,mode){
   const k=sel,snap=clone({p:plan[k]||null,l:logs[k]||null});
@@ -1391,6 +1495,7 @@ function applyTpl(t,mode){
   cleanLog(k);if(ids.length)plan[k]=ids;else delete plan[k];tplConfirm=null;touch();render();
   toastUndo("「"+t.name+"」を"+mdk(k)+"に入れました",()=>{if(snap.p)plan[k]=snap.p;else delete plan[k];if(snap.l)logs[k]=snap.l;else delete logs[k];touch();render()});
 }
+let _tplSec=null;const tplSecEl=()=>_tplSec||(_tplSec=document.querySelector("#tabTpl section"));
 function renderTemplates(){
   const box=$("tpls");box.replaceChildren();
   $("tplFromDayBtn").disabled=!(cur()&&dayItems(sel).length);
@@ -1398,7 +1503,7 @@ function renderTemplates(){
     const card=el("div",{class:"tpl","data-id":t.id});
     if(tplEditing!==t.id){
       card.append(el("div",{class:"tplh"},el("span",{class:"grip","aria-hidden":"true"},"⠿"),el("span",{class:"dot",style:"background:"+tplColor(t)}),el("span",{class:"tpln"},t.name),
-        cur()?el("button",{class:"mini",onclick:()=>{tab="menu";if(dayItems(sel).length){tplConfirm=t.id;render();$("tplConfirm").scrollIntoView({behavior:"smooth",block:"center"})}else{applyTpl(t,"add");window.scrollTo({top:0})}}},mdk(sel)+"に使う"):null,
+
         el("button",{class:"mini",onclick:()=>{tplEditing=t.id;render()}},"編集")));
       const it=el("div",{class:"tplitems"});
       if(!t.items.length)it.append(el("span",{class:"gone"},"種目なし"));
@@ -1460,15 +1565,14 @@ function renderCats(){
           node.append(row);
         }
         if(open||editing){const kids=el("div",{class:"tkids","data-parent":n.id});build(n.items||[],kids,depth+1,n);
-          if(editing){
+          {
             if(newOpen.has(n.id)){
-              const ni=el("input",{type:"text",id:"ni-"+n.id,placeholder:"名前","aria-label":n.name+"に追加する名前"});
+              const ni=el("input",{type:"text",id:"ni-"+n.id,"aria-label":n.name+"に追加する名前"});
               const addI=()=>{const v=ni.value.trim();if(!v){newOpen.delete(n.id);render();return}n.items=n.items||[];n.items.push({id:uid(),name:v});saveCfg();render();const x=$("ni-"+n.id);x&&x.focus()};
               ni.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addI()}if(e.key==="Escape"){newOpen.delete(n.id);render()}});
-              kids.append(el("div",{class:"tadd"},ni,el("button",{class:"primary",onclick:addI},"追加"),el("button",{class:"mini",onclick:()=>{newOpen.delete(n.id);render()}},"やめる")));
-            } else kids.append(el("button",{class:"tnew",onclick:()=>{newOpen.add(n.id);render();const x=$("ni-"+n.id);x&&x.focus()}},"＋ 新規"));
+              kids.append(el("div",{class:"tadd"},ni,el("button",{class:"primary",onclick:addI},"追加"),el("button",{class:"mini tclose","aria-label":"閉じる",onclick:()=>{newOpen.delete(n.id);render()}},"✕")));
+            } else kids.append(el("button",{class:"tnew",onclick:()=>{newOpen.add(n.id);render();const x=$("ni-"+n.id);x&&x.focus()}},editing?"＋ 新規":"＋ 追加"));
           }
-          else if(!(n.items||[]).some(x=>!x.deleted))kids.append(el("span",{class:"empty",style:"font-size:13px;padding:2px 0"},"中身なし（「編集」から追加）"));
           node.append(kids)}
         container.append(node);
       } else {
@@ -1557,7 +1661,7 @@ function renderArch(){
     let sessions=0;for(let i=0;i<plen(p);i++)if(dayItems(addK(p.start,i)).length)sessions++;
     box.append(el("button",{class:"arow","aria-expanded":String(openArch===p.id),onclick:()=>{openArch=openArch===p.id?null:p.id;render()}},
       el("div",null,el("div",{class:"rng"},pLabel(p)),el("div",{class:"sub"},plen(p)+"日間・トレ"+sessions+"日・ルール"+(pRules(p)||[]).length+"個"+(nb?"・違反"+nb:""))),
-      el("div",{class:"mm"+(p.memo?"":" none")},p.memo||"メモなし")));
+      el("div",{class:"mm"+(p.memo?"":" none")},...(p.memo?linkNodes(p.memo):["メモなし"]))));
     if(openArch===p.id)box.append(archDetail(p));
   });
 }
@@ -1627,17 +1731,18 @@ function goPeriod(id){userNavigated=true;perMode=null;delAsk=false;
 $("pSel").addEventListener("change",()=>goPeriod($("pSel").value));
 $("prevP").onclick=()=>{const s=sorted(),order=[null,...s.map(x=>x.id)],i=allMode?0:order.indexOf(curId);if(i>0)goPeriod(order[i-1])};
 $("nextP").onclick=()=>{const s=sorted(),order=[null,...s.map(x=>x.id)],i=allMode?0:order.indexOf(curId);if(i>=0&&i<order.length-1)goPeriod(order[i+1])};
-$("todayP").onclick=()=>{const t=periodFor(todayK);if(t){curId=t.id;sel=todayK;calMonth=todayK.slice(0,7);perMode=null;render();$("dayhead").scrollIntoView({behavior:"smooth",block:"start"})}else{toast("今日を含む期間がありません。新しく作れます");openEditor("new");$("pStart").value=todayK;$("pEnd").value=addK(todayK,6);pNote()}};
+$("todayP").onclick=()=>{const t=periodFor(todayK);if(t){curId=t.id;sel=todayK;calMonth=todayK.slice(0,7);perMode=null;render();$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})}else{toast("今日を含む期間がありません。新しく作れます");openEditor("new");$("pStart").value=todayK;$("pEnd").value=addK(todayK,6);pNote()}};
 $("editPBtn").onclick=()=>openEditor(perMode==="edit"?null:"edit");
 $("newPBtn").onclick=()=>openEditor("new");
 sortable($("wlog"),".dcard",ids=>{if(!cur())return;plan[sel]=ids;savePlan();render()},{handle:".grip"});
 sortable($("tpls"),".tpl",ids=>{const by={};templates.forEach(t=>by[t.id]=t);templates=ids.map(i=>by[i]).filter(Boolean);touch();render()},{handle:".tplh"});
-$("tplNewBtn").onclick=()=>{const t={id:"tp_"+uid(),name:"新しいテンプレート",items:[]};templates.push(t);tplEditing=t.id;touch();render();const n=$("tn-"+t.id);if(n){n.focus();n.select()}};
-$("tplFromDayBtn").onclick=()=>{const ids=dayItems(sel);if(!ids.length)return;const t={id:"tp_"+uid(),name:mdk(sel)+"のメニュー",items:ids.map(id=>({id,sets:setsOf(sel,id).length||3}))};templates.push(t);tplEditing=t.id;touch();render();const n=$("tn-"+t.id);if(n){n.scrollIntoView({behavior:"smooth",block:"center"});n.focus();n.select()}toast("名前を付けて「完了」を押してください")};
+$("tplNewBtn").onclick=()=>{const t={id:"tp_"+uid(),name:"新しいテンプレート",items:[]};templates.push(t);tplEditing=t.id;touch();render()};
+$("tplFromDayBtn").onclick=()=>{const ids=dayItems(sel);if(!ids.length)return;const t={id:"tp_"+uid(),name:mdk(sel)+"のメニュー",items:ids.map(id=>({id,sets:setsOf(sel,id).length||3}))};templates.push(t);tplEditing=t.id;touch();render();};
 
 
 
 const setView=v=>{viewMode=v;try{localStorage.setItem("kintore-view",v)}catch(e){}render()};
+(()=>{const ab=document.querySelector(".appbar"),ds=$("dayStick");const set=()=>{document.documentElement.style.setProperty("--abh",(ab?ab.offsetHeight:64)+"px");document.documentElement.style.setProperty("--dsh",(ds?ds.offsetHeight:0)+"px")};set();if(window.ResizeObserver){if(ab)new ResizeObserver(set).observe(ab);if(ds)new ResizeObserver(set).observe(ds)}let lc=isCompact();window.addEventListener("resize",()=>{set();if(isCompact()!==lc){lc=isCompact();render()}})})();
 $("vList").onclick=()=>setView("list");$("vCal").onclick=()=>{calMonth=sel.slice(0,7);setView("cal")};
 
 $("editBtn").onclick=()=>{editing=!editing;render()};
@@ -1645,6 +1750,8 @@ const addCat=()=>{const v=$("newCat").value.trim();if(!v)return;cats.push({id:ui
 $("addCatBtn").onclick=addCat;$("newCat").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addCat()}});
 $("dayNote").addEventListener("input",e=>{const v=e.target.value;if(v.trim())notes[sel]=v;else delete notes[sel];savePlan()});
 $("dayNote").addEventListener("blur",()=>render());
+[["dayNote","dayNoteV"],["weekMemo","weekMemoV"]].forEach(([a,b])=>{const v=$(b);if(!v)return;v.addEventListener("click",()=>{if(v.querySelector(".lnform"))return;v.hidden=true;$(a).style.display="";$(a).focus()})});
+$("weekMemo").addEventListener("blur",()=>setTimeout(()=>linkSync($("weekMemo"),$("weekMemoV")),0));
 $("weekMemo").addEventListener("input",e=>{const p=cur();if(!p)return;p.memo=e.target.value;savePeriods()});
 $("weekMemo").addEventListener("blur",()=>render());
 
