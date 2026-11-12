@@ -151,6 +151,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .viewsw button.on{background:var(--sel);color:var(--sel-ink)}
 .days.list{display:flex;flex-direction:column;gap:6px}
 .lrow{position:relative;display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:10px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:8px 10px}
+.lrow{grid-template-columns:4.2em minmax(0,1fr) auto}.lplan{align-self:center;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;color:var(--fg);white-space:nowrap}.lplan.on{border-color:var(--accent)}.lplan .tv{font-size:9px;color:var(--muted)}
 .lrow.today{border-color:var(--accent)}
 .lrow.selected{border-color:var(--sel);box-shadow:inset 0 0 0 1.5px var(--sel)}
 .lrow.bad{border-color:var(--bad)}
@@ -348,7 +349,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .tpled select,.tpled input[type=text]{font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px;max-width:100%;min-width:0}
 .dline .sets{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
 /* 日のメニュー（一覧） */
-.dsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px}
+.dsum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:12px}.dsum[hidden]{display:none}
 .dsum div{border:1px solid var(--line);border-radius:10px;padding:6px 4px;text-align:center;background:var(--panel2)}
 .dsum small{display:block;font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.04em}
 .dsum b{font-family:var(--f-num);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
@@ -630,6 +631,7 @@ body.catpage .catback{display:flex}
 .dmitem{display:flex;align-items:center;gap:8px;border-bottom:1px dashed var(--line);padding:3px 2px}
 .dmitem .dmt{flex:1;min-width:0;font-size:15px;white-space:pre-wrap;word-break:break-all}
 .memoline.dmadd{display:flex;gap:6px;align-items:center}.memoline.dmadd .dmemo{flex:1;min-width:0}.memoline.dmadd button{flex:none;white-space:nowrap}
+.dpcard{width:min(340px,100%);gap:8px;padding:12px 14px 14px}.dph{display:flex;align-items:center;justify-content:space-between}.dpt{font-family:var(--f-num);font-size:20px;font-weight:700}.dpgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}.dpw{font-size:11px;font-weight:700;color:var(--muted);padding:2px 0}.dpw.sun,.dpd.sun{color:var(--bad)}.dpw.sat,.dpd.sat{color:#3c74c8}.dpd{aspect-ratio:1;border:0;border-radius:50%;background:none;color:var(--fg);font-family:var(--f-num);font-size:17px;font-weight:600;padding:0;display:flex;align-items:center;justify-content:center}.dpd.today{box-shadow:inset 0 0 0 2px var(--accent);color:var(--accent);font-weight:700}.dpd.on{background:var(--accent);color:var(--accent-ink);box-shadow:none}
 .popov{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px}
 .popcard{width:min(420px,100%);max-height:75vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 16px 40px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:10px}
 .poph{display:flex;align-items:center;gap:8px}
@@ -692,7 +694,7 @@ body.catpage .catback{display:flex}
         <button class="ghost" id="pCancel">やめる</button>
       </div>
     </div>
-    <div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">リスト</button><button id="vCal">カレンダー</button></div>
+    <div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">予定</button><button id="vCal">カレンダー</button></div>
     <div class="days" id="days"></div>
   </section>
 
@@ -997,11 +999,11 @@ function renderInner(){
   // 表示
   const days=$("days");days.replaceChildren();cpShown=false;
   $("vList").classList.toggle("on",viewMode==="list");$("vCal").classList.toggle("on",viewMode==="cal");
-  days.classList.toggle("list",viewMode==="list"&&!(allMode&&!allPeriodDays().length));
+  days.classList.toggle("list",viewMode==="list");
   if(allMode){
     const keys=allPeriodDays();
     $("plen").textContent="";
-    if(viewMode==="list"&&keys.length)listRows(days,keys,true)
+    if(viewMode==="list")listMonth(days)
     else{renderMonth(days);if(isCompact())calPreview(days)}
   } else if(!p){$("plen").textContent="";days.append(el("div",{class:"noper"},"まず期間（開始日〜終了日）を決めてください。"))}
   else{
@@ -1020,7 +1022,7 @@ function renderInner(){
     el("button",{class:"sharebtn","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(sel)},SHARE_SVG()));
   renderDayTags(p);
   renderTplBar(p);
-  renderDsum(p,ids);$("dayStick").hidden=!ids.length;
+  renderDsum(p,ids);$("dayStick").hidden=false;
   if(!skipLog)renderLog(p,ids);
   const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
 
@@ -1065,8 +1067,16 @@ function listRows(days,keys,monthHeads){let pm="";
     const chips=chipsFor(dk);
     const head=el("div",{class:"lhead"},el("span",{class:"ldate"},(!monthHeads&&(i===0||newM)?(d.getMonth()+1)+"/":"")+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)));
     if(notes[dk])head.append(el("span",{class:"lmemo","aria-label":"メモあり"},"✎"));
-    days.append(el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{pickDay(dk);if(window.innerWidth<700)$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})},"aria-label":md(d)+"("+DOW[w]+")"},head,(memosOf(dk).length||notes[dk])?el("div",{class:"lright"},chips,el("div",{class:"lmemos"},...memosOf(dk).map(m=>el("div",null,"・"+m)),notes[dk]?el("div",null,"✎ "+notes[dk]):null)):chips))});
+    days.append(el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{pickDay(dk);if(window.innerWidth<700)$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})},"aria-label":md(d)+"("+DOW[w]+")"},head,(memosOf(dk).length||notes[dk])?el("div",{class:"lright"},chips,el("div",{class:"lmemos"},...memosOf(dk).map(m=>el("div",null,"・"+m)),notes[dk]?el("div",null,"✎ "+notes[dk]):null)):chips,
+      el("span",{class:"lplan"+(lpOpen===dk?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:e=>{e.stopPropagation();lpOpen=lpOpen===dk?null:dk;keepY(render)}},"予定",el("span",{class:"tv"},lpOpen===dk?"▲":"▼"))));
+    if(lpOpen===dk){const on=dayTags[dk]||[],list=el("div",{class:"tplist"});
+      liveTags("plan").forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(dk,t.id)}},el("span",{class:"tbx"},isOn?"✓":""),t.name))});
+      days.append(el("div",{class:"tpanel lppanel",id:"lpPanel",onclick:e=>e.stopPropagation()},list,el("div",{class:"tpfoot"},el("span",{style:"flex:1"}),el("button",{class:"primary",onclick:()=>{lpOpen=null;keepY(render)}},"完了"))))}
+  });
 }
+let lpOpen=null;
+function toggleTagAt(k,id){const a=(dayTags[k]||[]).slice(),i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);if(a.length)dayTags[k]=a;else delete dayTags[k];touch();keepY(render)}
+document.addEventListener("click",e=>{if(!lpOpen)return;const p=$("lpPanel");if(p&&e.composedPath().includes(p))return;if(e.target.closest&&e.target.closest(".lplan"))return;lpOpen=null;keepY(render)});
 const isCompact=()=>window.innerWidth<600;
 function calCellC(dk,out){const d=parse(dk),ids=visIds(dk),w=d.getDay(),tl=allMode||!out?dayTagList(dk):[];
   const dots=el("div",{class:"cdots"});ids.slice(0,6).forEach(id=>{const r=itemById(id);dots.append(el("span",{class:"cdot",style:"background:"+r.cat.color}))});
@@ -1115,6 +1125,12 @@ function monthGrid(days,y,m,outFn,nav,onlyWeeksIn){
   for(let i=1;i<=n;i++){const k=key(new Date(y,m-1,i));days.append(calCell(k,outFn(k)))}
 }
 // 一覧：その月の全部の日（期間に入っていない日は薄く）
+function listMonth(days){
+  if(!calMonth)calMonth=sel.slice(0,7);
+  const [y,m]=calMonth.split("-").map(Number),n=new Date(y,m,0).getDate();
+  const mv=d=>{const t=new Date(y,m-1+d,1);calMonth=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0");render()};
+  days.append(el("div",{class:"monhead"},el("button",{class:"navbtn","aria-label":"前の月",onclick:()=>mv(-1)},"‹"),el("span",{class:"mt"},y+"年 "+m+"月"),el("button",{class:"navbtn","aria-label":"次の月",onclick:()=>mv(1)},"›")));
+  listRows(days,Array.from({length:n},(_,i)=>key(new Date(y,m-1,i+1))),false)}
 function renderMonth(days){
   if(!calMonth)calMonth=sel.slice(0,7);
   const [y,m]=calMonth.split("-").map(Number),n=new Date(y,m,0).getDate();
@@ -1300,7 +1316,6 @@ function renderStats(p,showZero){
     g.append(el("div",{class:"srow cat"+(cn?"":" zero")},el("span",{class:"nm"},el("span",{class:"dot",style:"background:"+c.color}),c.name),el("span",{class:"ct"},String(cn),el("small",null,"日")),strip(conOn,c.color)));
     itemRows.forEach(x=>g.append(el("div",{class:"srow item"+(x.n?"":" zero")},el("span",{class:"nm",title:x.i.name},x.i.name),el("span",{class:"ct"},String(x.n),el("small",null,"回")),strip(x.on,c.color))));
     box.append(g)});
-  if(!any)box.append(el("div",{class:"empty"},"この期間はまだ種目が入っていません。"));
   return box;
 }
 // ===== トレーニング記録（重量・回数・推定1RM・セットごとのメモ） =====
@@ -1593,7 +1608,8 @@ async function shareDay(k){const d=parse(k),name="kintore-"+d.getFullYear()+"-"+
   card.addEventListener("click",e=>e.stopPropagation());document.body.append(el("div",{class:"popov",id:"dayPop",onclick:closeDayPop},card))}
 // メニュー画面：その日の内容を見るだけ（編集は「記録」で）
 let cpShown=false;
-function renderDayView(){const box=$("dayView");if(!box)return;dayViewInto(box,sel,!cpShown)}
+function renderDayView(){const box=$("dayView");if(!box)return;dayViewInto(box,sel,!cpShown);
+  const t=box.querySelector(".dvtags");if(t)t.remove()}
 function memoEdit(k){const w=el("div",{class:"mmemo"});
   memosOf(k).forEach((m,i)=>w.append(el("div",{class:"dmitem"},el("span",{class:"dmt"},...linkNodes(m)),el("button",{class:"mini tclose","aria-label":"このメモを消す",onclick:e=>{e.stopPropagation();const a=memosOf(k);a.splice(i,1);setMemos(k,a);touch();keepY(render)}},"✕"))));
   const mi=el("input",{type:"text",class:"dmemo",id:"mmemo-"+k,"aria-label":"メモを追加"});
@@ -1609,6 +1625,23 @@ function openDayPop(k){closeDayPop();const d=parse(k),w=d.getDay(),body=el("div"
   card.addEventListener("click",e=>e.stopPropagation());
   const ov=el("div",{class:"popov",id:"dayPop",onclick:closeDayPop},card);document.body.append(ov)}
 function closeDayPop(){const o=$("dayPop");if(o)o.remove()}
+// 日付入力：アプリのカレンダーで選ぶ（今日がわかる）
+function openDatePick(inp){closeDatePick();let v=inp.value||todayK,ym=v.slice(0,7);
+  const ov=el("div",{class:"popov dpov",id:"dpPop",onclick:closeDatePick}),card=el("div",{class:"popcard dpcard",onclick:e=>e.stopPropagation()});
+  const draw=()=>{const [y,m]=ym.split("-").map(Number),first=new Date(y,m-1,1),n=new Date(y,m,0).getDate();
+    const mv=d=>{const t=new Date(y,m-1+d,1);ym=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0");draw()};
+    const g=el("div",{class:"dpgrid"});["月","火","水","木","金","土","日"].forEach((w,i)=>g.append(el("span",{class:"dpw"+(i===5?" sat":"")+(i===6?" sun":"")},w)));
+    for(let i=0;i<(first.getDay()+6)%7;i++)g.append(el("span"));
+    for(let i=1;i<=n;i++){const k=key(new Date(y,m-1,i)),w=new Date(y,m-1,i).getDay();
+      g.append(el("button",{class:"dpd"+(k===todayK?" today":"")+(k===inp.value?" on":"")+(w===0?" sun":"")+(w===6?" sat":""),onclick:()=>{inp.value=k;inp.dispatchEvent(new Event("input",{bubbles:true}));inp.dispatchEvent(new Event("change",{bubbles:true}));closeDatePick()}},String(i)))}
+    card.replaceChildren(el("div",{class:"dph"},el("button",{class:"navbtn","aria-label":"前の月",onclick:()=>mv(-1)},"‹"),el("span",{class:"dpt"},y+"年 "+m+"月"),el("button",{class:"navbtn","aria-label":"次の月",onclick:()=>mv(1)},"›")),g)};
+  draw();ov.append(card);document.body.append(ov)}
+function closeDatePick(){const o=$("dpPop");if(o)o.remove()}
+{let tAt=0;const isD=e=>e.target&&e.target.matches&&e.target.matches('input[type="date"]');
+  document.addEventListener("touchend",e=>{if(!isD(e))return;e.preventDefault();tAt=Date.now();openDatePick(e.target)},{capture:true,passive:false});
+  document.addEventListener("mousedown",e=>{if(isD(e))e.preventDefault()},true);
+  document.addEventListener("click",e=>{if(!isD(e))return;e.preventDefault();if(Date.now()-tAt>800)openDatePick(e.target)},true);
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDatePick()})}
 function dayViewInto(box,k,edit){box.replaceChildren();const ids=dayItems(k);
   const tl=dayTagList(k);if(tl.length)box.append(el("div",{class:"dvtags"},...tl.map(t=>el("span",{class:"dvtag",style:"color:"+t.color},t.name))));
   ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),ds=doneSets(k,id),x=el("div",{class:"dvex",style:"--c:"+r.cat.color});
