@@ -324,6 +324,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .w1rm .v{font-family:var(--f-num);font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .w1rm .v small{font-size:10px;font-weight:600;color:var(--muted);margin-right:2px}
 .w1rm .pc{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.maxrm{display:inline-block;margin-left:6px;padding:0 4px;border-radius:3px;background:#e3262f;color:#fff;font-family:var(--f-num);font-size:10.5px;font-weight:700;line-height:1.5;vertical-align:1px;white-space:nowrap}.w1rm .maxrm{margin-left:0}
 .w1rm .pr{font-size:10px;font-weight:700;color:#fff;background:var(--ok);border-radius:4px;padding:0 4px}
 .wmemo{font:inherit;font-size:16px;width:100%;min-width:0;border:0;border-bottom:1px dashed var(--line);background:transparent;color:var(--fg);padding:2px 4px}
 .wmemo:focus{border-bottom-color:var(--line);outline:none}
@@ -558,7 +559,7 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (pointer:coarse){input,textarea,select{font-size:16px!important}}
 .wrow input.winp{font-size:18px!important;width:2.8em}@media (min-width:601px){.wrow input.winp{width:3.4em}}
-@media (max-width:340px){.popov{padding:12px!important}.poph{gap:6px!important}.poph .popd{font-size:17px!important}.abin{flex-wrap:wrap;row-gap:6px;padding-inline:10px}.hleft{flex:1 0 auto}.htimer{margin-left:auto;flex:none}.wrap{padding-inline:8px}.panel{padding:10px}.dcard .db{padding:4px 6px 8px}.wrow .wno{width:1em}.wrow{gap:3px 4px}.wrow input.winp{width:2.4em}.ubtn{padding:3px 3px}}
+@media (max-width:340px){.popov{padding:12px!important}.poph{gap:6px!important}.poph .popd{font-size:17px!important}.abin{flex-wrap:wrap;row-gap:6px;padding-inline:10px}.hleft{flex:1 0 auto}.htimer{margin-left:auto;flex:none}.wrap{padding-inline:8px}.panel{padding:10px}.dcard .db{padding:4px 6px 8px}.wrow .wno{width:1em}.wrow{gap:3px 4px}.wrow input.winp{width:2.75em}.ubtn{padding:3px 3px}}
 .lnkwrap{display:block;flex:1;min-width:0}
 .lnkview{display:block;min-height:1.6em;padding:2px 4px;border-bottom:1px dashed var(--line);white-space:pre-wrap;word-break:break-all;cursor:text;font-size:15px;line-height:1.45}
 .lnkview[hidden]{display:none}
@@ -1346,6 +1347,8 @@ function setTxt(s,id){const fs=getFields(id);
 let sumT=null;
 // 入力中は種目カードを作り直さず、ほかの部分（合計・一覧・頻度）だけ更新する
 function refreshSoon(){clearTimeout(sumT);sumT=setTimeout(()=>{skipLog=true;try{render()}finally{skipLog=false}},500)}
+function dayMaxRM(k,id){const fs=getFields(id);if(!hasRM(fs))return 0;let m=0;doneSets(k,id).forEach(s2=>{const e=e1rm(s2.w,s2.r);if(e&&e>m)m=e});return m}
+const isMaxRM=(e,m)=>e!=null&&m>0&&f1(e)===f1(m);
 function fill1rm(box,s,id,k){
   const fs=getFields(id);if(!hasRM(fs)){box.replaceChildren();return}
   const e=e1rm(s.w,s.r);box.replaceChildren();
@@ -1353,6 +1356,7 @@ function fill1rm(box,s,id,k){
   box.append(el("span",{class:"v"},el("small",null,"1RM"),e==null?"—":f1(e),e==null?null:el("small",{class:"u"},wu)));
   if(e!=null){const pb=bestBefore(id,k),ba=bestAll(id),w=toNum(s.w);
     if(pb>0&&e>pb+1e-9)box.append(el("span",{class:"pr"},"自己ベスト"));
+    if(isDone(s)&&isMaxRM(e,dayMaxRM(k,id)))box.append(el("span",{class:"maxrm"},"MAX RM"));
   }
 }
 function renderDsum(p,ids){
@@ -1562,11 +1566,11 @@ function dayShareCanvas(k){const d=parse(k),ids=dayItems(k),S=3,W=380,P=18,cs=ge
   const NUM='"Barlow Condensed","Zen Kaku Gothic New",system-ui,sans-serif',JP='"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif';
   const cv=document.createElement("canvas"),c=cv.getContext("2d");
   // 文字を幅で折り返す（パーツごとにフォントと色を持つ）
-  const flow=(parts,x0,maxW,lh)=>{const lines=[];let line=[],x=x0;parts.forEach(p=>{c.font=p.f;for(const ch of String(p.t)){if(ch==="\n"){lines.push(line);line=[];x=x0;continue}const w=c.measureText(ch).width;if(x+w>x0+maxW&&line.length){lines.push(line);line=[];x=x0}line.push({ch,x,f:p.f,col:p.c});x+=w}});lines.push(line);return {lines,lh}};
+  const flow=(parts,x0,maxW,lh)=>{const lines=[];let line=[],x=x0;parts.forEach(p=>{c.font=p.f;if(p.bg){const w=c.measureText(p.t).width+8;if(x+w>x0+maxW&&line.length){lines.push(line);line=[];x=x0}line.push({ch:p.t,x,f:p.f,col:p.c,bg:p.bg,w});x+=w;return}for(const ch of String(p.t)){if(ch==="\n"){lines.push(line);line=[];x=x0;continue}const w=c.measureText(ch).width;if(x+w>x0+maxW&&line.length){lines.push(line);line=[];x=x0}line.push({ch,x,f:p.f,col:p.c});x+=w}});lines.push(line);return {lines,lh}};
   const blocks=[];let ns=0,nr=0,vol=0;
   ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg"),ds=doneSets(k,id),items=[];
     ds.forEach((s2,i)=>{ns++;const rr=parseInt(s2.r)||0,w=toNum(s2.w);nr+=rr;if(kg&&w>0)vol+=w*rr;const e=hasRM(fs)?e1rm(s2.w,s2.r):null;
-      const parts=[{t:(i+1)+"　"+setTxt(s2,id),f:"500 14px "+NUM,c:FG}];if(e)parts.push({t:"　1RM "+f1(e)+"kg",f:"400 12.5px "+NUM,c:MU});if(String(s2.m||"").trim())parts.push({t:"　"+plainLinks(s2.m),f:"400 12.5px "+JP,c:MU});
+      const parts=[{t:(i+1)+"　"+setTxt(s2,id),f:"500 14px "+NUM,c:FG}];if(e)parts.push({t:"　1RM "+f1(e)+"kg",f:"400 12.5px "+NUM,c:MU});if(isMaxRM(e,dayMaxRM(k,id)))parts.push({t:" ",f:"400 12.5px "+NUM,c:MU},{t:"MAX RM",f:"700 11px "+NUM,c:"#fff",bg:"#e3262f"});if(String(s2.m||"").trim())parts.push({t:"　"+plainLinks(s2.m),f:"400 12.5px "+JP,c:MU});
       items.push(flow(parts,P+14,W-P*2-14,22))});
     if(exNote(k,id).trim())items.push(flow([{t:"メモ："+plainLinks(exNote(k,id)),f:"400 12.5px "+JP,c:MU}],P+14,W-P*2-14,19));
     blocks.push({name:flow([{t:r.item.name,f:"700 15px "+JP,c:FG}],P+14,W-P*2-14,22),color:r.cat.color,items})});
@@ -1593,7 +1597,7 @@ function dayShareCanvas(k){const d=parse(k),ids=dayItems(k),S=3,W=380,P=18,cs=ge
     c.font="700 22px "+NUM;const bt=String(b),btw=c.measureText(bt).width;c.font="600 11px "+NUM;const uw=u?c.measureText(u).width+2:0;
     c.textAlign="left";const sx=bx+bw/2-(btw+uw)/2;c.fillStyle=FG;c.font="700 22px "+NUM;c.fillText(bt,sx,y+46);if(u){c.fillStyle=MU;c.font="600 11px "+NUM;c.fillText(u,sx+btw+2,y+46)}});
   y+=56+14;c.strokeStyle=LN;c.beginPath();c.moveTo(0,y-7);c.lineTo(W,y-7);c.stroke();
-  const draw=(f,y0)=>{f.lines.forEach((ln,i)=>{ln.forEach(g=>{c.font=g.f;c.fillStyle=g.col;c.fillText(g.ch,g.x,y0+i*f.lh+f.lh*0.75)})});return y0+hgt(f)};
+  const draw=(f,y0)=>{f.lines.forEach((ln,i)=>{ln.forEach(g=>{const by=y0+i*f.lh+f.lh*0.75;c.font=g.f;if(g.bg){c.fillStyle=g.bg;c.beginPath();c.roundRect(g.x,by-11,g.w,15,3);c.fill();c.fillStyle=g.col;c.fillText(g.ch,g.x+4,by)}else{c.fillStyle=g.col;c.fillText(g.ch,g.x,by)}})});return y0+hgt(f)};
   // 種目
   blocks.forEach(b=>{c.fillStyle=b.color;c.fillRect(P,y,4,b.h);let yy=draw(b.name,y+2);b.items.forEach(it=>yy=draw(it,yy));y+=b.h+12});
   memos.forEach(m=>y=draw(m,y));if(memos.length)y+=6;
@@ -1648,7 +1652,7 @@ function dayViewInto(box,k,edit){box.replaceChildren();const ids=dayItems(k);
   const tl=dayTagList(k);if(tl.length)box.append(el("div",{class:"dvtags"},...tl.map(t=>el("span",{class:"dvtag",style:"color:"+t.color},t.name))));
   ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),ds=doneSets(k,id),x=el("div",{class:"dvex",style:"--c:"+r.cat.color});
     x.append(el("div",{class:"dvn"},r.item.name+(String(id).includes("#")?" "+String(id).split("#")[1]+"回目":""),covering(k).length>1?(()=>{const q=srcOf(k,id)||{start:k,end:k};return el("small",null,q.name||pLabel(q),q.name?el("i",{class:"dvpd"},pLabel(q)):null)})():null));
-    ds.forEach((s2,i)=>{const e=hasRM(fs)?e1rm(s2.w,s2.r):null;x.append(el("div",{class:"dvs"},(i+1)+"　"+setTxt(s2,id),e?el("small",null,"　1RM "+f1(e)+"kg"):null,String(s2.m||"").trim()?el("small",null,"　",...linkNodes(s2.m)):null))});
+    const mx=dayMaxRM(k,id);ds.forEach((s2,i)=>{const e=hasRM(fs)?e1rm(s2.w,s2.r):null;x.append(el("div",{class:"dvs"},(i+1)+"　"+setTxt(s2,id),e?el("small",null,"　1RM "+f1(e)+"kg"):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s2.m||"").trim()?el("small",null,"　",...linkNodes(s2.m)):null))});
     if(exNote(k,id))x.append(el("div",{class:"dvx"},"メモ：",...linkNodes(exNote(k,id))));
     box.append(x)});
   memosOf(k).forEach(m=>box.append(el("div",{class:"dvmemo"},"・",...linkNodes(m))));
@@ -1729,7 +1733,7 @@ function renderRecords(){
       x.append(el("div",{class:"rn"},el("span",null,r.item.name),el("button",{class:"mini del rdel",onclick:()=>{recDelAsk=k+"|"+id;keepY(render)}},"削除")));
       if(recDelAsk===k+"|"+id)x.append(el("div",{class:"delconfirm rdc"},el("div",{class:"dcp"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"　"+r.item.name),el("div",{class:"dct"},"この記録を削除しますか？"),
         el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{recDelAsk=null;removeExDay(k,id,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{recDelAsk=null;keepY(render)}},"いいえ"))));
-      if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,String(s.m||"").trim()?el("small",null,"　",...linkNodes(s.m)):null))});
+      const mx=dayMaxRM(k,id);if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s.m||"").trim()?el("small",null,"　",...linkNodes(s.m)):null))});
       else x.append(el("div",{class:"rs"},el("small",null,"記録なし")));
       if(exNote(k,id))x.append(el("div",{class:"rxm"},"メモ：",...linkNodes(exNote(k,id))));
       card.append(x)});
