@@ -1428,7 +1428,7 @@ function renderEditor(id){
     });
     if(i===0)row.append(el("button",{class:"ubtn addf","aria-label":"記録する欄を増やす",onclick:()=>{const n={id:"n_"+uid(),type:"num",unit:""};ownFields(id).push(n);unitPick={id,fid:n.id};saveCfg();render()}},"＋"));
     const rmBox=el("div",{class:"w1rm"});if(rm){fill1rm(rmBox,s,id,k);row.append(rmBox)}
-    inputs.forEach((inp,ii)=>inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const nx=inputs[ii+1];if(nx)nx.focus();else{const n=document.querySelector("#wlog .dcard[data-id='"+id+"'] .wset:nth-child("+(i+2)+") .winp");if(n)n.focus();else inp.blur()}}}));
+    inputs.forEach((inp,ii)=>inp.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();const nx=inputs[ii+1];if(nx){nx.focus();nx.select()}else{const n=document.querySelector("#wlog .dcard[data-id='"+id+"'] .wset:nth-child("+(i+2)+") .winp");if(n)n.focus();else if(inputs.every(x=>x.value.trim())){addSet(id);const m=document.querySelector("#wlog .dcard[data-id='"+id+"'] .wset:nth-child("+(i+2)+") .winp");if(m){m.focus();m.select()}}else inp.blur()}}}));
     const del=el("button",{class:"mini del sdel","aria-label":(i+1)+"セット目を消す",onclick:()=>delSet(id,i)},"✕");
     const memo=el("input",{type:"text",class:"wmemo",id:"lm-"+id+"-"+i,value:s.m||"","aria-label":(i+1)+"セット目のメモ"});
     memo.addEventListener("input",()=>{s.m=memo.value;touch();refreshSoon()});
