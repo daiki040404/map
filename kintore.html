@@ -151,7 +151,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .viewsw button.on{background:var(--sel);color:var(--sel-ink)}
 .days.list{display:flex;flex-direction:column;gap:6px}
 .lrow{position:relative;display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:10px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:8px 10px}
-.lrow{grid-template-columns:4.2em minmax(0,1fr) auto}.lplan{align-self:center;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;color:var(--fg);white-space:nowrap}.lplan.on{border-color:var(--accent)}.lplan .tv{font-size:9px;color:var(--muted)}
+.lrow{grid-template-columns:4.2em minmax(0,1fr) auto}.lplan{align-self:center;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;color:var(--fg);white-space:nowrap}.lplan.on{border-color:var(--accent)}.lppanel{position:relative;padding-right:44px}.lppanel .lpx{position:absolute;top:8px;right:8px}.lplan .tv{font-size:9px;color:var(--muted)}
 .lrow.today{border-color:var(--accent)}
 .lrow.selected{border-color:var(--sel);box-shadow:inset 0 0 0 1.5px var(--sel)}
 .lrow.bad{border-color:var(--bad)}
@@ -1072,12 +1072,12 @@ function listRows(days,keys,monthHeads){let pm="";
       el("span",{class:"lplan"+(lpOpen===dk?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:e=>{e.stopPropagation();lpOpen=lpOpen===dk?null:dk;keepY(render)}},"予定",el("span",{class:"tv"},lpOpen===dk?"▲":"▼"))));
     if(lpOpen===dk){const on=dayTags[dk]||[],list=el("div",{class:"tplist"});
       liveTags("plan").forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(dk,t.id)}},el("span",{class:"tbx"},isOn?"✓":""),t.name))});
-      days.append(el("div",{class:"tpanel lppanel",id:"lpPanel",onclick:e=>e.stopPropagation()},list,el("div",{class:"tpfoot"},el("span",{style:"flex:1"}),el("button",{class:"primary",onclick:()=>{lpOpen=null;keepY(render)}},"完了"))))}
+      days.append(el("div",{class:"tpanel lppanel",id:"lpPanel",onclick:e=>e.stopPropagation()},el("button",{class:"mini tclose lpx","aria-label":"閉じる",onclick:()=>{lpOpen=null;keepY(render)}},"✕"),list))}
   });
 }
 let lpOpen=null;
 function toggleTagAt(k,id){const a=(dayTags[k]||[]).slice(),i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);if(a.length)dayTags[k]=a;else delete dayTags[k];touch();keepY(render)}
-document.addEventListener("click",e=>{if(!lpOpen)return;const p=$("lpPanel");if(p&&e.composedPath().includes(p))return;if(e.target.closest&&e.target.closest(".lplan"))return;lpOpen=null;keepY(render)});
+document.addEventListener("pointerdown",e=>{if(!lpOpen)return;const p=$("lpPanel");if(p&&e.composedPath().includes(p))return;if(e.target.closest&&e.target.closest(".lplan"))return;lpOpen=null;keepY(render)});
 const isCompact=()=>window.innerWidth<600;
 function calCellC(dk,out){const d=parse(dk),ids=visIds(dk),w=d.getDay(),tl=allMode||!out?dayTagList(dk):[];
   const dots=el("div",{class:"cdots"});ids.slice(0,6).forEach(id=>{const r=itemById(id);dots.append(el("span",{class:"cdot",style:"background:"+r.cat.color}))});
