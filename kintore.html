@@ -1068,16 +1068,11 @@ function listRows(days,keys,monthHeads){let pm="";
     const chips=chipsFor(dk);
     const head=el("div",{class:"lhead"},el("span",{class:"ldate"},(!monthHeads&&(i===0||newM)?(d.getMonth()+1)+"/":"")+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(dk).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)));
     if(notes[dk])head.append(el("span",{class:"lmemo","aria-label":"メモあり"},"✎"));
-    days.append(el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{pickDay(dk);if(window.innerWidth<700)$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})},"aria-label":md(d)+"("+DOW[w]+")"},head,(memosOf(dk).length||notes[dk])?el("div",{class:"lright"},chips,el("div",{class:"lmemos"},...memosOf(dk).map(m=>el("div",null,"・"+m)),notes[dk]?el("div",null,"✎ "+notes[dk]):null)):chips,
-      el("span",{class:"lplan"+(lpOpen===dk?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:e=>{e.stopPropagation();lpOpen=lpOpen===dk?null:dk;keepY(render)}},"予定",el("span",{class:"tv"},lpOpen===dk?"▲":"▼"))));
-    if(lpOpen===dk){const on=dayTags[dk]||[],list=el("div",{class:"tplist"});
-      liveTags("plan").forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(dk,t.id)}},el("span",{class:"tbx"},isOn?"✓":""),t.name))});
-      days.append(el("div",{class:"tpanel lppanel",id:"lpPanel",onclick:e=>e.stopPropagation()},el("button",{class:"mini tclose lpx","aria-label":"閉じる",onclick:()=>{lpOpen=null;keepY(render)}},"✕"),list))}
+    days.append(el("button",{class:"lrow"+(dk===todayK?" today":"")+(dk===sel?" selected":""),onclick:()=>{if(sel===dk){openDayPop(dk);return}pickDay(dk)},"aria-label":md(d)+"("+DOW[w]+")"},head,(memosOf(dk).length||notes[dk])?el("div",{class:"lright"},chips,el("div",{class:"lmemos"},...memosOf(dk).map(m=>el("div",null,"・"+m)),notes[dk]?el("div",null,"✎ "+notes[dk]):null)):chips));
   });
 }
-let lpOpen=null;
 function toggleTagAt(k,id){const a=(dayTags[k]||[]).slice(),i=a.indexOf(id);if(i>=0)a.splice(i,1);else a.push(id);if(a.length)dayTags[k]=a;else delete dayTags[k];touch();keepY(render)}
-document.addEventListener("pointerdown",e=>{if(!lpOpen)return;const p=$("lpPanel");if(p&&e.composedPath().includes(p))return;if(e.target.closest&&e.target.closest(".lplan"))return;lpOpen=null;keepY(render)});
+
 const isCompact=()=>window.innerWidth<600;
 function calCellC(dk,out){const d=parse(dk),ids=visIds(dk),w=d.getDay(),tl=allMode||!out?dayTagList(dk):[];
   const dots=el("div",{class:"cdots"});ids.slice(0,6).forEach(id=>{const r=itemById(id);dots.append(el("span",{class:"cdot",style:"background:"+r.cat.color}))});
