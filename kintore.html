@@ -360,6 +360,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .dcard .dh .grip{color:rgba(255,255,255,.8)}
 .dcard .dh .nm{flex:1;min-width:0;font-weight:700;font-size:15px;overflow-wrap:anywhere}
 .dcard .dh .path{font-size:10.5px;opacity:.85;font-weight:500;display:block}
+.dcard:has(.exmenu){overflow:visible;position:relative;z-index:25}.dcard:has(.exmenu)>.dh{border-radius:11px 11px 0 0}.dcard:not(.open):has(.exmenu)>.dh{border-radius:11px}.exmwrap{position:relative;display:inline-flex}.dcard .dh .exkebab{color:#fff;width:28px;height:28px}.exmenu{position:absolute;top:calc(100% + 4px);right:0;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.25)}.dcard .dh .exmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--bad);white-space:nowrap}
 .dcard .dh .mini{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4);color:#fff}
 .dcard .dh .mini.armed{background:var(--bad);border-color:var(--bad)}
 .dcard .db{padding:4px 10px 8px}
@@ -428,7 +429,7 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .rule.editing-now{outline:2px solid var(--accent);outline-offset:2px}
 .rbtns{display:flex;flex-direction:column;gap:6px;align-self:center}
 /* 回数の集計 */
-.stats{display:flex;flex-direction:column;gap:12px}
+.stats{display:flex;flex-direction:column;gap:12px}.sthead{position:sticky;top:var(--abh,64px);z-index:5;background:var(--panel);display:flex;flex-direction:column;gap:12px;padding:6px 0;margin:-6px 0;box-shadow:0 6px 8px -8px rgba(0,0,0,.35)}
 .srow{display:grid;grid-template-columns:minmax(6.5em,9em) 2.6em minmax(0,1fr);gap:8px;align-items:center}
 .srow .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .srow.cat .nm{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
@@ -829,7 +830,7 @@ const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
-let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),foldSel=null,skipLog=false;
+let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),exMenuId=null,foldSel=null,skipLog=false;
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recDay="",recAsc=false,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -1303,8 +1304,7 @@ function renderStats(p,showZero){
   const ym=el("div",{class:"strip ym",style:"--n:"+L});let py=null,pm=null;
   days.forEach(d=>{const dt=parse(d.k),y=dt.getFullYear(),m=dt.getMonth()+1;let t="";
     if(y!==py){t=y+"年 "+m+"月"}else if(m!==pm){t=m+"月"}py=y;pm=m;ym.append(el("span",{class:"cell"},t))});
-  box.append(el("div",{class:"srow"},el("span"),el("span"),ym));
-  box.append(el("div",{class:"srow"},el("span",{class:"nm note"}),el("span"),head));
+  box.append(el("div",{class:"sthead"},el("div",{class:"srow"},el("span"),el("span"),ym),el("div",{class:"srow"},el("span",{class:"nm note"}),el("span"),head)));
   let any=false;
   cats.forEach(c=>{const fr=IDX.folders[c.id],all=fr?fr.all:[];
     const itemRows=all.map(id=>{const x=IDX.items[id];const on=days.map(d=>d.ids.some(x=>baseId(x)===id));return {i:x.item,dead:x.deleted,on,n:on.filter(Boolean).length}}).filter(x=>x.n>0||(showZero&&!x.dead));
@@ -1378,7 +1378,8 @@ function renderLog(p,ids){
     const r=itemById(id);let sets=setsOf(sel,id);
     if(!sets.length){logs[sel]=logs[sel]||{};logs[sel][id]=[{w:"",r:"",m:""}];sets=logs[sel][id]}
     const sub=r.path.length>1?r.path.slice(1).map(f=>f.name).join(" › "):"";
-    const rm=el("button",{class:"mini",onclick:()=>removeFromDay(id)},"外す");
+    const rm=el("span",{class:"exmwrap"},el("button",{class:"kebab exkebab","aria-label":"メニュー","aria-expanded":String(exMenuId===id),onclick:()=>{exMenuId=exMenuId===id?null:id;keepY(render)}},"⋮"),
+      exMenuId===id?el("div",{class:"exmenu",id:"exMenu"},el("button",{class:"mini del",onclick:()=>{exMenuId=null;removeFromDay(id)}},"削除")):null);
     const isOpen=openedEx.has(id);
     const fold=el("button",{class:"mini exfold","aria-label":isOpen?"セットを閉じる":"セットを開く","aria-expanded":String(isOpen),onclick:()=>{if(isOpen)openedEx.delete(id);else openedEx.add(id);keepY(render)}},isOpen?"▲":"▼");
     const card=el("div",{class:"dcard"+(isOpen?" open":""),"data-id":id,style:"--c:"+r.cat.color});
@@ -1477,6 +1478,7 @@ function swNow(){return sw?sw.base+(Date.now()-sw.start)/1000:0}
 function swStart(k,id,i,fid,base){if(sw)swStop();sw={k,id,i,fid,base,start:Date.now()};clearInterval(swInt);swInt=setInterval(swTick,250);render()}
 function swTick(){if(!sw)return;const sec=Math.floor(swNow()),m=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-m"),x=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-s");if(m)m.value=String(Math.floor(sec/60));if(x)x.value=String(sec%60);const r=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-r");if(r)r.textContent=fmtTime(sec)}
 function swStop(){if(!sw)return;const a=(logs[sw.k]||{})[sw.id];const sec=Math.round(swNow());if(a&&a[sw.i])a[sw.i][sw.fid]=String(sec);sw=null;clearInterval(swInt);swInt=null;touch();render()}
+document.addEventListener("pointerdown",e=>{if(!exMenuId)return;const t=e.target;if(t.closest&&(t.closest("#exMenu")||t.closest(".exkebab")))return;exMenuId=null;keepY(render)});
 // 日付が変わったら、種目はすべて閉じた状態から始める
 function foldReset(){if(foldSel!==sel){foldSel=sel;openedEx.clear()}}
 function addSet(id){foldReset();openedEx.add(id);const a=ensureSets(sel,id),last=[...a].reverse().find(isDone),n={};if(last)Object.keys(last).forEach(k=>{if(k!=="m")n[k]=last[k]});n.m="";a.push(n);openEx.add(id);touch();render()}
@@ -1629,7 +1631,7 @@ let popPlan=false;
 function openDayPop(k,keep){closeDayPop();if(!keep)popPlan=false;const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
   const ids=dayItems(k);
   const card=el("div",{class:"popcard",role:"dialog","aria-label":"この日の内容"},
-    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
+    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
     popPlan?(()=>{const on=dayTags[k]||[],list=el("div",{class:"tplist"});liveTags("plan").forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(k,t.id);openDayPop(k,true)}},el("span",{class:"tbx"},isOn?"✓":""),t.name))});return el("div",{class:"tpanel"},list)})():null,
     body.childNodes.length?body:el("div",{class:"note"},"—"));
   card.addEventListener("click",e=>e.stopPropagation());
@@ -1731,7 +1733,7 @@ function renderRecords(){
     const d=parse(k),w=d.getDay(),ids=dayItems(k);
     const card=el("div",{class:"rday"});
     card.append(el("div",{class:"rh"},el("span",{class:"rd"},d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"rw"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(k).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
-      el("button",{class:"mini",onclick:()=>{const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="menu";render();window.scrollTo({top:0,behavior:"smooth"})}},"メニューで開く")));
+      el("button",{class:"mini",onclick:()=>openDayPop(k)},"記録")));
     const exIds=ids.slice();Object.keys(logs[k]||{}).forEach(id=>{if(!exIds.includes(id)&&itemById(id))exIds.push(id)});
     exIds.forEach(id=>{const r=itemById(id);if(!r||(eff.size&&!eff.has(baseId(id))))return;const ds=doneSets(k,id),x=el("div",{class:"rex",style:"--c:"+r.cat.color});
       x.append(el("div",{class:"rn"},el("span",null,r.item.name),el("button",{class:"mini del rdel",onclick:()=>{recDelAsk=k+"|"+id;keepY(render)}},"削除")));
