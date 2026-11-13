@@ -193,7 +193,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .daystick .dsum b{font-size:16px}
 .daystick .dsum i{font-style:normal;font-size:10px;color:var(--muted);margin-left:2px;font-weight:600}
 .dayhead .sharebtn{margin-left:auto;align-self:center;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--fg);padding:0}
-.dayhead .editbtn{margin-left:auto;align-self:center}.dayhead .editbtn+.sharebtn{margin-left:6px}
+.popshare{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--fg);padding:0;flex:none}.dayhead .editbtn{margin-left:auto;align-self:center}.dayhead .editbtn+.sharebtn{margin-left:6px}
 .dayhead .yr{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
 .dayhead .dw.sun{color:var(--bad)}.dayhead .dw.sat{color:#3c74c8}
 .dayhead .dht{font-size:11px;font-weight:700;border:1px solid currentColor;border-radius:5px;padding:0 5px;align-self:center}
@@ -1673,6 +1673,7 @@ function memoEdit(k){const w=el("div",{class:"mmemo"});
 // カレンダーの日付を押したとき：小さい画面でその日の内容を見せる（✕か外側で閉じる）
 let popPlan=false;
 function openDayPop(k,keep){closeDayPop();if(!keep)popPlan=false;const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
+  {const sb=el("button",{class:"sharebtn popshare","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(k)},SHARE_SVG());const t=body.querySelector(".dvtags");if(t)t.append(sb);else body.prepend(el("div",{class:"dvtags"},sb))}
   const ids=dayItems(k);
   const card=el("div",{class:"popcard",role:"dialog","aria-label":"この日の内容"},
     el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
