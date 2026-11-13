@@ -827,7 +827,7 @@ const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
-let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),skipLog=false;
+let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),closedEx=new Set(),skipLog=false;
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recDay="",recAsc=false,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -1373,11 +1373,13 @@ function renderLog(p,ids){
     if(!sets.length){logs[sel]=logs[sel]||{};logs[sel][id]=[{w:"",r:"",m:""}];sets=logs[sel][id]}
     const sub=r.path.length>1?r.path.slice(1).map(f=>f.name).join(" › "):"";
     const rm=el("button",{class:"mini",onclick:()=>removeFromDay(id)},"外す");
-    const card=el("div",{class:"dcard open","data-id":id,style:"--c:"+r.cat.color});
+    const ck=sel+"|"+id,isOpen=!closedEx.has(ck);
+    const fold=el("button",{class:"mini exfold","aria-label":isOpen?"セットを閉じる":"セットを開く","aria-expanded":String(isOpen),onclick:()=>{if(isOpen)closedEx.add(ck);else closedEx.delete(ck);keepY(render)}},isOpen?"▲":"▼");
+    const card=el("div",{class:"dcard"+(isOpen?" open":""),"data-id":id,style:"--c:"+r.cat.color});
     card.append(el("div",{class:"dh"},el("span",{class:"grip","aria-hidden":"true"},"⠿"),el("span",{class:"nm"},sub?el("span",{class:"path"},sub):null,r.item.name,String(id).includes("#")?el("small",{class:"nth"}," "+String(id).split("#")[1]+"回目"):null),
       ...(covering(sel).length>1?[(()=>{const cs=covering(sel),q=srcOf(sel,id);return el("button",{class:"ptag","aria-label":"どの計画の種目か（押すと切り替え）",title:"押すと計画を切り替え",onclick:()=>{const n=cs[(cs.indexOf(q)+1)%cs.length];setSrc(sel,id,n.id);touch();render()}},q.name||pLabel(q))})()]:[]),
-      rm));
-    card.append(renderEditor(id));
+      fold,rm));
+    if(isOpen)card.append(renderEditor(id));
     box.append(card);
   });
   // Tab（次へ）は重量・回数などの数字欄だけを順に移る
