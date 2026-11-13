@@ -360,7 +360,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .dcard .dh .grip{color:rgba(255,255,255,.8)}
 .dcard .dh .nm{flex:1;min-width:0;font-weight:700;font-size:15px;overflow-wrap:anywhere}
 .dcard .dh .path{font-size:10.5px;opacity:.85;font-weight:500;display:block}
-.dcard:has(.exmenu){overflow:visible;position:relative;z-index:25}.dcard:has(.exmenu)>.dh{border-radius:11px 11px 0 0}.dcard:not(.open):has(.exmenu)>.dh{border-radius:11px}.exmwrap{position:relative;display:inline-flex}.dcard .dh .exkebab{color:#fff;width:28px;height:28px}.exmenu{position:absolute;top:calc(100% + 4px);right:0;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.25)}.dcard .dh .exmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--bad);white-space:nowrap}
+.dcard:has(.exmenu){overflow:visible;position:relative;z-index:25}.dcard:has(.exmenu)>.dh{border-radius:11px 11px 0 0}.dcard:not(.open):has(.exmenu)>.dh{border-radius:11px}.exmwrap{position:relative;display:inline-flex}.exmlist{display:flex;flex-direction:column;gap:6px}.dcard .dh .exmenu .exmlist .mini:not(.del){color:var(--fg)}.rmmenu{color:var(--fg);width:min(300px,80vw);display:flex;flex-direction:column;gap:8px;padding:2px}.rmh{display:flex;align-items:center;gap:6px}.rmh b{flex:1;font-size:13px}.rmlist{display:flex;flex-direction:column;gap:4px}.rmopt{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:6px;text-align:left;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}.rmopt.on{border-color:var(--accent)}.rmopt .rmn{font-weight:700;white-space:nowrap}.rmopt small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rmopt .tbx{width:16px;height:16px;border:1.5px solid var(--line);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}.rmopt.on .tbx{background:var(--accent);border-color:var(--accent);color:#fff}div.rmopt{grid-template-columns:auto 1fr auto}.rmfoot{display:flex}.rmform{display:flex;flex-direction:column;gap:6px}.rmform input{font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px;min-width:0}.rmform .primary{align-self:flex-end}.dcard .dh .rmmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--fg)}.dcard .dh .rmmenu .primary.mini{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}.exdel{color:var(--fg);font-size:13px;font-weight:700;display:flex;flex-direction:column;gap:8px;padding:4px;min-width:200px}.exdel .btnrow{display:flex;gap:6px;justify-content:flex-end}.dcard .dh .exdel button{white-space:nowrap}.dcard .dh .exdel .ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}.dcard .dh .exdel .dyes{background:var(--bad);border-color:var(--bad);color:#fff}.dcard .dh .exkebab{color:#fff;width:28px;height:28px}.exmenu{position:absolute;top:calc(100% + 4px);right:0;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.25)}.dcard .dh .exmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--bad);white-space:nowrap}
 .dcard .dh .mini{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4);color:#fff}
 .dcard .dh .mini.armed{background:var(--bad);border-color:var(--bad)}
 .dcard .db{padding:4px 10px 8px}
@@ -830,7 +830,7 @@ const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
-let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),exMenuId=null,foldSel=null,skipLog=false;
+let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recDay="",recAsc=false,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -1320,7 +1320,16 @@ function renderStats(p,showZero){
 let LOGKEYS=[];
 const toNum=v=>{const x=parseFloat(String(v==null?"":v).replace(",","."));return isFinite(x)?x:NaN};
 // 推定1RM（Epley式）：重量 ×（1 ＋ 回数 ÷ 30）。1回なら重量そのもの
-function e1rm(w,r){w=toNum(w);r=parseInt(r);if(!(w>0)||!(r>0))return null;return r===1?w:w*(1+r/30)}
+// 1RMの計算式（種目ごとに選べる。自分で式を作って追加もできる）
+const RM_PRESETS=[{id:"epley",name:"Epley",expr:"w*(1+r/30)"},{id:"oconner",name:"O'Conner",expr:"w*(1+r/40)"},{id:"brzycki",name:"Brzycki",expr:"w*36/(37-r)"},{id:"lombardi",name:"Lombardi",expr:"w*r^0.1"}];
+let rmF={custom:[],sel:{}};const rmFnCache={};
+function rmFormulas(){return RM_PRESETS.concat(rmF.custom||[])}
+function rmNorm(x){return String(x).replace(/重量/g,"w").replace(/回数/g,"r").replace(/[×＊]/g,"*").replace(/[÷／]/g,"/").replace(/[＋]/g,"+").replace(/[－−ー]/g,"-").replace(/[（]/g,"(").replace(/[）]/g,")").replace(/＾/g,"^").replace(/[０-９．]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))}
+function rmCompile(expr){const e=rmNorm(expr);if(rmFnCache[e]!==undefined)return rmFnCache[e];let f=null;
+  if(/^[0-9wr+\-*/^().\s]+$/.test(e)&&/w/.test(e)){try{const g=new Function("w","r","return ("+e.replace(/\^/g,"**")+")");const t=g(100,5);if(isFinite(t)&&t>0)f=g}catch(_){}}
+  rmFnCache[e]=f;return f}
+function rmFormulaOf(id){const fid=(rmF.sel||{})[baseId(id)]||"epley";return rmFormulas().find(x=>x.id===fid)||RM_PRESETS[0]}
+function e1rm(w,r,id){w=toNum(w);r=parseInt(r);if(!(w>0)||!(r>0))return null;if(r===1)return w;const f=rmCompile(rmFormulaOf(id).expr)||rmCompile(RM_PRESETS[0].expr);const v=f(w,r);return isFinite(v)&&v>0?v:null}
 const f1=x=>x==null?"—":String(Math.round(x*10)/10);
 const setsOf=(k,id)=>(logs[k]&&logs[k][id])||[];
 // ===== 記録する項目（種目ごと）と単位 =====
@@ -1340,19 +1349,19 @@ function cleanLog(k){if(!logs[k])return;for(const id of Object.keys(logs[k]))if(
 const instKeys=(d,id)=>{const b=baseId(id);return Object.keys(logs[d]||{}).filter(x=>baseId(x)===b)};
 const setsAll=(d,id)=>instKeys(d,id).flatMap(x=>setsOf(d,x));
 function prevSession(id,k){for(let i=LOGKEYS.length-1;i>=0;i--){const d=LOGKEYS[i];if(d>=k)continue;const s=setsAll(d,id).filter(isDone);if(s.length)return {k:d,sets:s}}return null}
-function bestBefore(id,k){if(!hasRM(getFields(id)))return 0;let b=0;for(const d of LOGKEYS){if(d>=k)break;for(const s of setsAll(d,id)){const e=e1rm(s.w,s.r);if(e&&e>b)b=e}}return b}
-function bestAll(id){if(!hasRM(getFields(id)))return 0;let b=0;for(const d of LOGKEYS)for(const s of setsAll(d,id)){const e=e1rm(s.w,s.r);if(e&&e>b)b=e}return b}
+function bestBefore(id,k){if(!hasRM(getFields(id)))return 0;let b=0;for(const d of LOGKEYS){if(d>=k)break;for(const s of setsAll(d,id)){const e=e1rm(s.w,s.r,id);if(e&&e>b)b=e}}return b}
+function bestAll(id){if(!hasRM(getFields(id)))return 0;let b=0;for(const d of LOGKEYS)for(const s of setsAll(d,id)){const e=e1rm(s.w,s.r,id);if(e&&e>b)b=e}return b}
 function setTxt(s,id){const fs=getFields(id);
   if(hasRM(fs)&&fs.length===2){const w=rmField(fs);return (toNum(s.w)>0?f1(toNum(s.w))+w.unit:"自重")+"×"+(parseInt(s.r)||"?")+"回"}
   return fs.map(f=>{const v=s[f.id];if(v==null||String(v).trim()==="")return null;return f.type==="time"?fmtTime(+v):f1(toNum(v))+(f.unit||"")}).filter(Boolean).join("・")||"—"}
 let sumT=null;
 // 入力中は種目カードを作り直さず、ほかの部分（合計・一覧・頻度）だけ更新する
 function refreshSoon(){clearTimeout(sumT);sumT=setTimeout(()=>{skipLog=true;try{render()}finally{skipLog=false}},500)}
-function dayMaxRM(k,id){const fs=getFields(id);if(!hasRM(fs))return 0;let m=0;doneSets(k,id).forEach(s2=>{const e=e1rm(s2.w,s2.r);if(e&&e>m)m=e});return m}
+function dayMaxRM(k,id){const fs=getFields(id);if(!hasRM(fs))return 0;let m=0;doneSets(k,id).forEach(s2=>{const e=e1rm(s2.w,s2.r,id);if(e&&e>m)m=e});return m}
 const isMaxRM=(e,m)=>e!=null&&m>0&&f1(e)===f1(m);
 function fill1rm(box,s,id,k){
   const fs=getFields(id);if(!hasRM(fs)){box.replaceChildren();return}
-  const e=e1rm(s.w,s.r);box.replaceChildren();
+  const e=e1rm(s.w,s.r,id);box.replaceChildren();
   const wu=(fs.find(f=>f.id==="w")||{}).unit||"kg";
   box.append(el("span",{class:"v"},el("small",null,"1RM"),e==null?"—":f1(e),e==null?null:el("small",{class:"u"},wu)));
   if(e!=null){const pb=bestBefore(id,k),ba=bestAll(id),w=toNum(s.w);
@@ -1378,8 +1387,8 @@ function renderLog(p,ids){
     const r=itemById(id);let sets=setsOf(sel,id);
     if(!sets.length){logs[sel]=logs[sel]||{};logs[sel][id]=[{w:"",r:"",m:""}];sets=logs[sel][id]}
     const sub=r.path.length>1?r.path.slice(1).map(f=>f.name).join(" › "):"";
-    const rm=el("span",{class:"exmwrap"},el("button",{class:"kebab exkebab","aria-label":"メニュー","aria-expanded":String(exMenuId===id),onclick:()=>{exMenuId=exMenuId===id?null:id;keepY(render)}},"⋮"),
-      exMenuId===id?el("div",{class:"exmenu",id:"exMenu"},el("button",{class:"mini del",onclick:()=>{exMenuId=null;removeFromDay(id)}},"削除")):null);
+    const rm=el("span",{class:"exmwrap"},el("button",{class:"kebab exkebab","aria-label":"メニュー","aria-expanded":String(exMenuId===id),onclick:()=>{exMenuId=exMenuId===id?null:id;exDelAsk=false;exRmMode=null;keepY(render)}},"⋮"),
+      exMenuId===id?el("div",{class:"exmenu",id:"exMenu"},exRmMode?rmMenu(id):exDelAsk?el("div",{class:"exdel"},el("div",{class:"dct"},"「"+r.item.name+"」を削除しますか？"),el("div",{class:"btnrow"},el("button",{class:"ghost",onclick:()=>{exDelAsk=false;keepY(render)}},"戻る"),el("button",{class:"primary dyes",onclick:()=>{exMenuId=null;exDelAsk=false;removeFromDay(id)}},"削除する"))):el("div",{class:"exmlist"},hasRM(getFields(id))?el("button",{class:"mini",onclick:()=>{exRmMode="pick";keepY(render)}},"RM計算式"):null,el("button",{class:"mini del",onclick:()=>{exDelAsk=true;keepY(render)}},"削除"))):null);
     const isOpen=openedEx.has(id);
     const fold=el("button",{class:"mini exfold","aria-label":isOpen?"セットを閉じる":"セットを開く","aria-expanded":String(isOpen),onclick:()=>{if(isOpen)openedEx.delete(id);else openedEx.add(id);keepY(render)}},isOpen?"▲":"▼");
     const card=el("div",{class:"dcard"+(isOpen?" open":""),"data-id":id,style:"--c:"+r.cat.color});
@@ -1478,7 +1487,26 @@ function swNow(){return sw?sw.base+(Date.now()-sw.start)/1000:0}
 function swStart(k,id,i,fid,base){if(sw)swStop();sw={k,id,i,fid,base,start:Date.now()};clearInterval(swInt);swInt=setInterval(swTick,250);render()}
 function swTick(){if(!sw)return;const sec=Math.floor(swNow()),m=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-m"),x=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-s");if(m)m.value=String(Math.floor(sec/60));if(x)x.value=String(sec%60);const r=$("lt-"+sw.id+"-"+sw.i+"-"+sw.fid+"-r");if(r)r.textContent=fmtTime(sec)}
 function swStop(){if(!sw)return;const a=(logs[sw.k]||{})[sw.id];const sec=Math.round(swNow());if(a&&a[sw.i])a[sw.i][sw.fid]=String(sec);sw=null;clearInterval(swInt);swInt=null;touch();render()}
-document.addEventListener("pointerdown",e=>{if(!exMenuId)return;const t=e.target;if(t.closest&&(t.closest("#exMenu")||t.closest(".exkebab")))return;exMenuId=null;keepY(render)});
+document.addEventListener("pointerdown",e=>{if(!exMenuId)return;const t=e.target;if(t.closest&&(t.closest("#exMenu")||t.closest(".exkebab")))return;exMenuId=null;exDelAsk=false;exRmMode=null;keepY(render)});
+function rmMenu(id){const w=el("div",{class:"rmmenu"}),cur=rmFormulaOf(id).id,b=baseId(id);
+  const close=el("button",{class:"mini tclose","aria-label":"閉じる",onclick:()=>{exMenuId=null;exRmMode=null;keepY(render)}},"✕");
+  if(exRmMode==="pick"){
+    w.append(el("div",{class:"rmh"},el("b",null,"RM計算式"),close));
+    const l=el("div",{class:"rmlist"});
+    rmFormulas().forEach(f=>{const on=f.id===cur;l.append(el("button",{class:"rmopt"+(on?" on":""),"aria-pressed":String(on),onclick:()=>{rmF.sel=rmF.sel||{};if(f.id==="epley")delete rmF.sel[b];else rmF.sel[b]=f.id;touch();keepY(render)}},el("span",{class:"tbx"},on?"✓":""),el("span",{class:"rmn"},f.name),el("small",null,rmShow(f.expr))))});
+    w.append(l,el("div",{class:"rmfoot"},el("button",{class:"mini",onclick:()=>{exRmMode="edit";keepY(render)}},"編集")));
+  }else{
+    w.append(el("div",{class:"rmh"},el("button",{class:"mini",onclick:()=>{exRmMode="pick";keepY(render)}},"‹"),el("b",null,"計算式を編集"),close));
+    const l=el("div",{class:"rmlist"});
+    (rmF.custom||[]).forEach(f=>l.append(el("div",{class:"rmopt"},el("span",{class:"rmn"},f.name),el("small",null,rmShow(f.expr)),el("button",{class:"mini tclose","aria-label":"この式を消す",onclick:()=>{rmF.custom=rmF.custom.filter(x=>x.id!==f.id);Object.keys(rmF.sel||{}).forEach(k=>{if(rmF.sel[k]===f.id)delete rmF.sel[k]});touch();keepY(render)}},"✕"))));
+    const nm=el("input",{type:"text",id:"rmName","aria-label":"式の名前",placeholder:"名前"}),ex=el("input",{type:"text",id:"rmExpr","aria-label":"計算式",placeholder:"例：重量*(1+回数/40)"});
+    const add=()=>{const n=nm.value.trim(),e=ex.value.trim();if(!n){toast("名前を入力してください");nm.focus();return}if(!e||!rmCompile(e)){toast("式を確認してください");ex.focus();return}
+      rmF.custom=rmF.custom||[];rmF.custom.push({id:"rm_"+uid(),name:n,expr:rmNorm(e)});touch();exRmMode="pick";keepY(render);toast("「"+n+"」を追加しました")};
+    [nm,ex].forEach(x=>x.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();add()}}));
+    w.append(l,el("div",{class:"rmform"},nm,ex,el("button",{class:"primary mini",onclick:add},"追加")));
+  }
+  return w}
+function rmShow(e){return String(e).replace(/w/g,"重量").replace(/r/g,"回数").replace(/\*/g,"×")}
 // 日付が変わったら、種目はすべて閉じた状態から始める
 function foldReset(){if(foldSel!==sel){foldSel=sel;openedEx.clear()}}
 function addSet(id){foldReset();openedEx.add(id);const a=ensureSets(sel,id),last=[...a].reverse().find(isDone),n={};if(last)Object.keys(last).forEach(k=>{if(k!=="m")n[k]=last[k]});n.m="";a.push(n);openEx.add(id);touch();render()}
@@ -1561,7 +1589,7 @@ function dayShareText(k){const d=parse(k),ids=dayItems(k),L=[];
     L.push("");L.push("■ "+r.item.name);
     if(!ds.length)L.push("  （記録なし）");
     ds.forEach((s2,i)=>{ns++;const rr=parseInt(s2.r)||0,w=toNum(s2.w);nr+=rr;if(kg&&w>0)vol+=w*rr;
-      const e=hasRM(fs)?e1rm(s2.w,s2.r):null;L.push("  "+(i+1)+". "+setTxt(s2,id)+(e?"（1RM "+f1(e)+"kg）":"")+(String(s2.m||"").trim()?" "+plainLinks(s2.m):""))});
+      const e=hasRM(fs)?e1rm(s2.w,s2.r,id):null;L.push("  "+(i+1)+". "+setTxt(s2,id)+(e?"（1RM "+f1(e)+"kg）":"")+(String(s2.m||"").trim()?" "+plainLinks(s2.m):""))});
     const xn=exNote(k,id);if(xn.trim())L.push("  メモ："+plainLinks(xn))});
   if(ids.length){L.push("");L.push(ids.length+"種目 / "+ns+"セット / "+nr+"レップ / 総負荷量 "+Math.round(vol).toLocaleString()+"kg")}
   if(notes[k])L.push("","📝 "+plainLinks(notes[k]));
@@ -1575,7 +1603,7 @@ function dayShareCanvas(k){const d=parse(k),ids=dayItems(k),S=3,W=380,P=18,cs=ge
   const flow=(parts,x0,maxW,lh)=>{const lines=[];let line=[],x=x0;parts.forEach(p=>{c.font=p.f;if(p.bg){const w=c.measureText(p.t).width+8;if(x+w>x0+maxW&&line.length){lines.push(line);line=[];x=x0}line.push({ch:p.t,x,f:p.f,col:p.c,bg:p.bg,w});x+=w;return}for(const ch of String(p.t)){if(ch==="\n"){lines.push(line);line=[];x=x0;continue}const w=c.measureText(ch).width;if(x+w>x0+maxW&&line.length){lines.push(line);line=[];x=x0}line.push({ch,x,f:p.f,col:p.c});x+=w}});lines.push(line);return {lines,lh}};
   const blocks=[];let ns=0,nr=0,vol=0;
   ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg"),ds=doneSets(k,id),items=[];
-    ds.forEach((s2,i)=>{ns++;const rr=parseInt(s2.r)||0,w=toNum(s2.w);nr+=rr;if(kg&&w>0)vol+=w*rr;const e=hasRM(fs)?e1rm(s2.w,s2.r):null;
+    ds.forEach((s2,i)=>{ns++;const rr=parseInt(s2.r)||0,w=toNum(s2.w);nr+=rr;if(kg&&w>0)vol+=w*rr;const e=hasRM(fs)?e1rm(s2.w,s2.r,id):null;
       const parts=[{t:(i+1)+"　"+setTxt(s2,id),f:"500 14px "+NUM,c:FG}];if(e)parts.push({t:"　1RM "+f1(e)+"kg",f:"400 12.5px "+NUM,c:MU});if(isMaxRM(e,dayMaxRM(k,id)))parts.push({t:" ",f:"400 12.5px "+NUM,c:MU},{t:"MAX RM",f:"700 11px "+NUM,c:"#fff",bg:"#e3262f"});if(String(s2.m||"").trim())parts.push({t:"　"+plainLinks(s2.m),f:"400 12.5px "+JP,c:MU});
       items.push(flow(parts,P+14,W-P*2-14,22))});
     if(exNote(k,id).trim())items.push(flow([{t:"メモ："+plainLinks(exNote(k,id)),f:"400 12.5px "+JP,c:MU}],P+14,W-P*2-14,19));
@@ -1658,7 +1686,7 @@ function dayViewInto(box,k,edit){box.replaceChildren();const ids=dayItems(k);
   const tl=dayTagList(k);if(tl.length)box.append(el("div",{class:"dvtags"},...tl.map(t=>el("span",{class:"dvtag",style:"color:"+t.color},t.name))));
   ids.forEach(id=>{const r=itemById(id);if(!r)return;const fs=getFields(id),ds=doneSets(k,id),x=el("div",{class:"dvex",style:"--c:"+r.cat.color});
     x.append(el("div",{class:"dvn"},r.item.name+(String(id).includes("#")?" "+String(id).split("#")[1]+"回目":""),covering(k).length>1?(()=>{const q=srcOf(k,id)||{start:k,end:k};return el("small",null,q.name||pLabel(q),q.name?el("i",{class:"dvpd"},pLabel(q)):null)})():null));
-    const mx=dayMaxRM(k,id);ds.forEach((s2,i)=>{const e=hasRM(fs)?e1rm(s2.w,s2.r):null;x.append(el("div",{class:"dvs"},(i+1)+"　"+setTxt(s2,id),e?el("small",null,"　1RM "+f1(e)+"kg"):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s2.m||"").trim()?el("small",null,"　",...linkNodes(s2.m)):null))});
+    const mx=dayMaxRM(k,id);ds.forEach((s2,i)=>{const e=hasRM(fs)?e1rm(s2.w,s2.r,id):null;x.append(el("div",{class:"dvs"},(i+1)+"　"+setTxt(s2,id),e?el("small",null,"　1RM "+f1(e)+"kg"):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s2.m||"").trim()?el("small",null,"　",...linkNodes(s2.m)):null))});
     if(exNote(k,id))x.append(el("div",{class:"dvx"},"メモ：",...linkNodes(exNote(k,id))));
     box.append(x)});
   memosOf(k).forEach(m=>box.append(el("div",{class:"dvmemo"},"・",...linkNodes(m))));
@@ -1739,7 +1767,7 @@ function renderRecords(){
       x.append(el("div",{class:"rn"},el("span",null,r.item.name),el("button",{class:"mini del rdel",onclick:()=>{recDelAsk=k+"|"+id;keepY(render)}},"削除")));
       if(recDelAsk===k+"|"+id)x.append(el("div",{class:"delconfirm rdc"},el("div",{class:"dcp"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"　"+r.item.name),el("div",{class:"dct"},"この記録を削除しますか？"),
         el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{recDelAsk=null;removeExDay(k,id,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{recDelAsk=null;keepY(render)}},"いいえ"))));
-      const mx=dayMaxRM(k,id);if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s.m||"").trim()?el("small",null,"　",...linkNodes(s.m)):null))});
+      const mx=dayMaxRM(k,id);if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r,id):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s.m||"").trim()?el("small",null,"　",...linkNodes(s.m)):null))});
       else x.append(el("div",{class:"rs"},el("small",null,"記録なし")));
       if(exNote(k,id))x.append(el("div",{class:"rxm"},"メモ：",...linkNodes(exNote(k,id))));
       card.append(x)});
@@ -2088,8 +2116,8 @@ const FB_COLLECTION="kintoreMenu";
 const LS="kintore-menu-v3";
 const SEED={"cats": [{"color": "#d4561c", "id": "7synawt", "items": [{"id": "c8b941y", "name": "ベンチ9割"}, {"id": "6pb4x0y", "name": "ベンチ7割"}, {"id": "daiyvo3", "name": "ダンベルプレス"}], "name": "胸"}, {"color": "#2f6fd0", "id": "i1us2f2", "items": [{"id": "45uah5d", "name": "デッドリフト"}, {"id": "l5rbud5", "name": "懸垂"}, {"id": "81mflf5", "name": "ローイング"}], "name": "背中"}, {"color": "#2f8a57", "id": "e9b6h5u", "items": [{"id": "117e0pf", "name": "スクワット"}, {"id": "wu4kol4", "name": "レッグプレス"}], "name": "脚"}, {"color": "#8a4fc4", "id": "xotib05", "items": [{"id": "h5hk2c7", "name": "ショルダープレス"}, {"id": "4fq1afl", "name": "サイドレイズ"}], "name": "肩"}, {"color": "#c23a6b", "id": "bk3mpcs", "items": [{"id": "7uez3o6", "name": "カール"}, {"id": "ih9sd1l", "name": "トライセプス"}], "name": "腕"}], "plan": {"2026-10-02": ["6pb4x0y"]}, "notes": {}, "periods": [{"end": "2026-10-04", "id": "p0928", "rules": [], "start": "2026-09-28"}], "updatedAt": 0};
 let updatedAt=0,fbUser=null,fbDb=null,unsub=null,pushT=null;
-const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,updatedAt});
-function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rebuildIdx();updatedAt=s.updatedAt||0}
+const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF,updatedAt});
+function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rmF=clone(s.rmF||{custom:[],sel:{}});rebuildIdx();updatedAt=s.updatedAt||0}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(storeObj()))}catch(e){}}
 function lsLoad(){try{const s=JSON.parse(localStorage.getItem(LS)||"null");if(s&&s.cats){applyStore(s);return}}catch(e){}applyStore(SEED)}
 function setSync(msg,state){$("sync").replaceChildren(el("span",{class:"sync-dot"+(state?" "+state:"")}),document.createTextNode(msg))}
@@ -2097,14 +2125,14 @@ const stamp=t=>{if(!t)return"";const d=new Date(t);return (d.getMonth()+1)+"/"+d
 function touch(){updatedAt=Date.now();lsSave();push();if(!histApplying)histNote()}
 // ===== 戻す／進む（操作の履歴） =====
 let hist=[],hpos=-1,histT=null,histApplying=false;
-const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","tags","dayTags","logs","templates","exNotes","trash"];
-function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits})}
+const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","tags","dayTags","logs","templates","exNotes","trash","rmF"];
+function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF})}
 function histCommit(){clearTimeout(histT);histT=null;const st=snapState();if(hist[hpos]===st)return;hist=hist.slice(0,hpos+1);hist.push(st);if(hist.length>60)hist.shift();hpos=hist.length-1;paintHist()}
 // 文字入力中はまとめて1回分、ボタン操作などはその都度1回分として記録
 function histNote(){const a=document.activeElement;if(a&&a.matches&&a.matches("input[type=text],input:not([type]),textarea")&&!a.closest("#appbar")){clearTimeout(histT);histT=setTimeout(histCommit,900);paintHist(true)}else histCommit()}
 function histReset(){hist=[snapState()];hpos=0;paintHist()}
 function histGo(d){if(histT)histCommit();const to=hpos+d;if(to<0||to>=hist.length)return;hpos=to;const o=JSON.parse(hist[hpos]);
-  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];
+  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];rmF=o.rmF||{custom:[],sel:{}};
   rebuildIdx();if(curId&&!P(curId))pickInitial();histApplying=true;try{touch()}finally{histApplying=false}render();toast(d<0?"ひとつ前に戻しました":"やり直しました")}
 function paintHist(pending){const u=$("hUndo"),r=$("hRedo");if(!u)return;const pend=!!(pending||histT);u.disabled=!(hpos>0||pend);r.disabled=pend||!(hpos<hist.length-1);const n=$("hTrashN");if(n){n.hidden=!trash.length;n.textContent=String(trash.length)}}
 $("hBrand").onclick=()=>{tab="menu";perMode=null;render();window.scrollTo({top:0,behavior:"smooth"})};
