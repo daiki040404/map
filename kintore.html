@@ -76,7 +76,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);fon
 .rday .rd{font-family:var(--f-num);font-size:18px;font-weight:700}
 .rday .rw{font-size:13px;font-weight:700;color:var(--muted)}
 .rday .rw.sun{color:var(--bad)} .rday .rw.sat{color:#3c74c8}
-.rday .rh .mini{margin-left:auto}.rday .rh .mini.rdel{margin-left:0}
+.rday .rh .mini{margin-left:auto}.rday .rh .rfold+.mini{margin-left:0}.rday .rh .rfold{min-width:30px}.rday .rh .mini.rdel{margin-left:0}
 .rex{border-left:4px solid var(--c);padding-left:8px}
 .rex .rn{font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;justify-content:space-between}
 .rex .rs{font-family:var(--f-num);font-size:14px;line-height:1.5;font-variant-numeric:tabular-nums}
@@ -152,6 +152,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .days.list{display:flex;flex-direction:column;gap:6px}
 .lrow{position:relative;display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:10px;align-items:start;text-align:left;width:100%;border:1px solid var(--line);background:var(--panel2);border-radius:12px;padding:8px 10px}
 .lrow{grid-template-columns:4.2em minmax(0,1fr) auto}.lplan{align-self:center;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;color:var(--fg);white-space:nowrap}.tplsaverow{display:flex;align-items:center;gap:6px;margin-top:8px}.tplsaverow input{flex:1;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px}
+.ubtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.uopt.uedit{display:inline-flex;align-items:center;gap:6px;padding-right:6px}.uopt.uedit .tclose{width:22px;height:22px;font-size:11px}
+.wset{position:relative}.sgrip{position:absolute;left:2px;top:4px;color:var(--muted);font-size:15px;line-height:1;padding:4px;cursor:grab;touch-action:none;user-select:none}
 .lplan.on{border-color:var(--accent)}.lppanel{position:relative;padding-right:44px}.lppanel .lpx{position:absolute;top:8px;right:8px}.lplan .tv{font-size:9px;color:var(--muted)}
 .lrow.today{border-color:var(--accent)}
 .lrow.selected{border-color:var(--sel);box-shadow:inset 0 0 0 1.5px var(--sel)}
@@ -332,8 +334,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .wmemo::placeholder{color:var(--muted);opacity:.6;font-size:13px}
 .wbtns{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .addset{font-size:18px;font-weight:700;line-height:1;width:30px;height:30px;border-radius:50%;padding:0;display:inline-flex;align-items:center;justify-content:center}
-.wset .addset{position:absolute;right:0;bottom:4px}
-.wset.last .wmline{padding-right:38px}
+.wset .addset{position:absolute;right:0;bottom:4px}.setaddrow{display:flex;justify-content:flex-end;margin-top:6px}
+
 .lchip .ls{font-weight:500;opacity:.85;margin-left:4px;font-size:11px}
 .tpls{display:flex;flex-direction:column;gap:10px;margin-top:8px}
 .tpl{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px}
@@ -360,7 +362,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .dcard .dh .grip{color:rgba(255,255,255,.8)}
 .dcard .dh .nm{flex:1;min-width:0;font-weight:700;font-size:15px;overflow-wrap:anywhere}
 .dcard .dh .path{font-size:10.5px;opacity:.85;font-weight:500;display:block}
-.dcard:has(.exmenu){overflow:visible;position:relative;z-index:25}.dcard:has(.exmenu)>.dh{border-radius:11px 11px 0 0}.dcard:not(.open):has(.exmenu)>.dh{border-radius:11px}.exmwrap{position:relative;display:inline-flex}.exmlist{display:flex;flex-direction:column;gap:6px}.dcard .dh .exmenu .exmlist .mini:not(.del){color:var(--fg)}.rmmenu{color:var(--fg);width:min(300px,80vw);display:flex;flex-direction:column;gap:8px;padding:2px}.rmh{display:flex;align-items:center;gap:6px}.rmh b{flex:1;font-size:13px}.rmlist{display:flex;flex-direction:column;gap:4px}.rmopt{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:6px;text-align:left;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}.rmopt.on{border-color:var(--accent)}.rmopt .rmn{font-weight:700;white-space:nowrap}.rmopt small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rmopt .tbx{width:16px;height:16px;border:1.5px solid var(--line);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}.rmopt.on .tbx{background:var(--accent);border-color:var(--accent);color:#fff}div.rmopt{grid-template-columns:auto 1fr auto}.rmfoot{display:flex}.rmsub{font-size:11px;font-weight:700;color:var(--muted);margin-top:2px}.rmbtns{display:flex;gap:4px}.rmrow{grid-template-columns:auto 1fr auto!important}.rmcol{display:flex;flex-direction:column;min-width:0;gap:2px}.rmni{font:inherit;font-size:16px;font-weight:700;border:1px solid transparent;background:transparent;color:var(--fg);border-radius:6px;padding:2px 4px;min-width:0}.rmni:focus{border-color:var(--accent);background:var(--panel);outline:none}.rmgrip{cursor:grab;color:var(--muted);font-size:16px;padding:0 2px;touch-action:none}.rmmenu{max-height:min(70vh,520px);overflow:auto}.rmform{display:flex;flex-direction:column;gap:6px}.rmform input{font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px;min-width:0}.rmform .primary{align-self:flex-end}.dcard .dh .rmmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--fg)}.dcard .dh .rmmenu .primary.mini{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}.exdel{color:var(--fg);font-size:13px;font-weight:700;display:flex;flex-direction:column;gap:8px;padding:4px;min-width:200px}.exdel .btnrow{display:flex;gap:6px;justify-content:flex-end}.dcard .dh .exdel button{white-space:nowrap}.dcard .dh .exdel .ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}.dcard .dh .exdel .dyes{background:var(--bad);border-color:var(--bad);color:#fff}.dcard .dh .exkebab{color:#fff;width:28px;height:28px}.exmenu{position:absolute;top:calc(100% + 4px);right:0;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.25)}.dcard .dh .exmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--bad);white-space:nowrap}
+.dcard:has(.exmenu){overflow:visible;position:relative;z-index:25}.dcard:has(.exmenu)>.dh{border-radius:11px 11px 0 0}.dcard:not(.open):has(.exmenu)>.dh{border-radius:11px}.exmwrap{position:relative;display:inline-flex}.exmlist{display:flex;flex-direction:column;gap:6px}.dcard .dh .exmenu .exmlist .mini:not(.del){color:var(--fg)}.rmmenu{color:var(--fg);width:min(300px,80vw);display:flex;flex-direction:column;gap:8px;padding:2px}.rmh{display:flex;align-items:center;gap:6px}.rmh b{flex:1;font-size:13px}.rmlist{display:flex;flex-direction:column;gap:4px}.rmopt{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:6px;text-align:left;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px}.rmopt.on{border-color:var(--accent)}.rmopt .rmn{font-weight:700;white-space:nowrap}.rmopt small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rmopt .tbx{width:16px;height:16px;border:1.5px solid var(--line);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:11px}.rmopt.on .tbx{background:var(--accent);border-color:var(--accent);color:#fff}div.rmopt{grid-template-columns:auto 1fr auto}.rmfoot{display:flex}.rmsub{font-size:11px;font-weight:700;color:var(--muted);margin-top:2px}.rmbtns{display:flex;gap:4px}.rmrow{grid-template-columns:auto 1fr auto!important}.rmcol{display:flex;flex-direction:column;min-width:0;gap:2px}.rmni{font:inherit;font-size:16px;font-weight:700;border:1px solid transparent;background:transparent;color:var(--fg);border-radius:6px;padding:2px 4px;min-width:0}.rmni:focus{border-color:var(--accent);background:var(--panel);outline:none}.rmgrip{cursor:grab;color:var(--muted);font-size:16px;padding:0 2px;touch-action:none}.rmmenu{max-height:min(70vh,520px);overflow:auto}.rmform{display:flex;flex-direction:column;gap:6px}.rmform input{font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px;min-width:0}.rmform .primary{align-self:flex-end}.dcard .dh .rmmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--fg)}.dcard .dh .rmmenu .primary.mini{background:var(--accent);border-color:var(--accent);color:var(--accent-ink,#fff)}.exdel{color:var(--fg);font-size:13px;font-weight:700;display:flex;flex-direction:column;gap:8px;padding:2px}.exdel .btnrow{display:flex;gap:6px}.dcard .dh .exdel button{white-space:nowrap}.dcard .dh .exdel .ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line)}.dcard .dh .exdel .dyes{background:var(--bad);border-color:var(--bad);color:#fff}.dcard .dh .exkebab{color:#fff;width:28px;height:28px}.exmenu{position:absolute;top:calc(100% + 4px);right:0;z-index:30;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px;box-shadow:0 8px 20px rgba(0,0,0,.25)}.dcard .dh .exmenu .mini{background:var(--panel2);border-color:var(--line);color:var(--bad);white-space:nowrap}
 .dcard .dh .mini{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4);color:#fff}
 .dcard .dh .mini.armed{background:var(--bad);border-color:var(--bad)}
 .dcard .db{padding:4px 10px 8px}
@@ -597,6 +599,7 @@ body.catpage #catSec{margin-top:0!important;border-top:0;border-radius:0 0 14px 
 .catback{display:none;align-items:center;gap:10px;margin-bottom:10px}
 body.catpage .catback{display:flex}
 .catback .cbt{font-weight:700;font-size:16px}
+body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:790;height:56px;min-width:96px;padding:0 22px;border-radius:28px;font-size:17px;font-weight:700;background:var(--panel);color:var(--fg);border:2px solid var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.35)}body.catopen #editBtn.on{background:var(--accent);color:#fff}
 .fab{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:790;width:60px;height:60px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:34px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.4);padding:0}
 .fab[hidden]{display:none}
 .pselrow{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
@@ -721,7 +724,7 @@ body.catpage .catback{display:flex}
   <section class="panel" id="catSec">
     <div class="catback"><button class="ghost" id="catBack">‹ 戻る</button><span class="cbt">種目を追加</span></div>
     <div class="palhead">
-      <div class="label">種目リスト<span class="hint" style="display:block;margin-top:2px">タップでこの日に追加／長押しで並び替え</span></div>
+      <div class="label">種目リスト</div>
       <button class="edittoggle" id="editBtn">編集</button>
     </div>
     <div class="cats" id="cats"></div>
@@ -830,7 +833,7 @@ const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
-let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
+let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),recFold={},exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recFrom="",recTo="",recDay="",recAsc=false,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -939,14 +942,13 @@ const pResults=p=>(pRules(p)||[]).map(r=>({r,res:evalRule(r,p)}));
 // ---------- helpers ----------
 const $=id=>document.getElementById(id);
 function el(tag,attrs,...kids){const e=document.createElement(tag);if(attrs)for(const[k,v]of Object.entries(attrs)){if(k==="class")e.className=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(k==="style")e.style.cssText=v;else e.setAttribute(k,v)}for(const k of kids){if(k==null)continue;e.append(k.nodeType?k:document.createTextNode(k))}return e}
-// 削除などの確認：「〇〇しますか？」＋［戻る］［削除する］
+// 削除などの確認：［削除する］［戻る］だけ
 const ARM_Q={"✕":["この種目を削除しますか？","削除する"],"ごみ箱を空にする":["ごみ箱を空にしますか？","空にする"],"テンプレートを削除":["このテンプレートを削除しますか？","削除する"],
   "保存を外す":["保存を外しますか？","外す"],"外す":["記録も一緒に外しますか？","外す"],"完全に削除":["完全に削除しますか？","削除する"]};
 function armed(label,armedLabel,fn,cls){const b=el("button",{class:cls||"mini del"},label);
   b.addEventListener("click",e=>{e.stopPropagation();const [q,act]=ARM_Q[label]||[label+"しますか？","削除する"];
-    const note=/記録の表示/.test(armedLabel)?el("div",{class:"note"},"記録の表示も消えます"):null;
-    const box=el("div",{class:"delconfirm armbox"},el("div",{class:"dct"},q),note,
-      el("div",{class:"btnrow"},el("button",{class:"ghost",onclick:ev=>{ev.stopPropagation();box.replaceWith(b)}},"戻る"),el("button",{class:"primary dyes",onclick:ev=>{ev.stopPropagation();fn()}},act)));
+    const box=el("div",{class:"delconfirm armbox"},
+      el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:ev=>{ev.stopPropagation();fn()}},act),el("button",{class:"ghost",onclick:ev=>{ev.stopPropagation();box.replaceWith(b)}},"戻る")));
     box.addEventListener("click",ev=>ev.stopPropagation());b.replaceWith(box)});
   return b}
 let tt;function toast(m){const t=$("toast");t.classList.remove("act");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2000)}
@@ -986,7 +988,7 @@ function renderInner(){
       r.append(el("button",{class:"plb",onclick:()=>{pOpen=false;renId=null;goPeriod(id||"__all__")}},el("span",{class:"pck"},on?"✓":""),el("span",{class:"pln"},label,q&&q.name?el("small",{class:"pld"},pLabel(q,true)):null)));
       if(id){r.append(el("button",{class:"kebab","aria-label":"メニュー",onclick:()=>{pMenuId=pMenuId===id?null:id;pDelId=null;render()}},"⋮"),el("span",{class:"pgrip","aria-label":"長押しで並び替え"},"⠿"));
         if(pMenuId===id){const m=el("div",{class:"pmenu"});
-          if(pDelId===id)m.append(el("div",{class:"delconfirm armbox"},el("div",{class:"dct"},"この期間を削除しますか？"),el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{pMenuId=pDelId=null;pOpen=false;deletePeriod(q,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{pDelId=null;render()}},"いいえ"))));
+          if(pDelId===id)m.append(el("div",{class:"delconfirm armbox"},el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{pMenuId=pDelId=null;pOpen=false;deletePeriod(q,true)}},"削除する"),el("button",{class:"ghost",onclick:()=>{pDelId=null;render()}},"戻る"))));
           else m.append(el("button",{class:"mini",onclick:()=>{pMenuId=null;renId=id;render()}},"名前を変更"),el("button",{class:"mini del",onclick:()=>{pDelId=id;render()}},"削除"));
           r.dataset.id="";const w=el("div",{class:"pliw","data-id":id});w.append(r,m);return w}}
       return r};
@@ -1146,8 +1148,8 @@ function renderPerEdit(){
   const dw=$("delPWrap");dw.replaceChildren();const cp=allMode?null:cur();
   if(cp)dw.append(el("button",{class:"ghost danger",onclick:()=>{delAsk=!delAsk;render()}},"期間を削除"));
   const dc=$("delConfirm");dc.hidden=!(cp&&delAsk);dc.replaceChildren();
-  if(cp&&delAsk)dc.append(el("div",{class:"dcp"},pLabel(cp,true)),el("div",{class:"dct"},"この期間を削除しますか？"),
-    el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{delAsk=false;deletePeriod(cp,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{delAsk=false;render()}},"いいえ")));
+  if(cp&&delAsk)dc.append(
+    el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{delAsk=false;deletePeriod(cp,true)}},"削除する"),el("button",{class:"ghost",onclick:()=>{delAsk=false;render()}},"戻る")));
   const box=$("perEdit");box.hidden=!perMode;if(!perMode)return;
   const p=cur();
   $("perTitle").textContent=perMode==="new"?"トレーニング計画を作成":"";
@@ -1339,7 +1341,8 @@ const setsOf=(k,id)=>(logs[k]&&logs[k][id])||[];
 // ===== 記録する項目（種目ごと）と単位 =====
 const DEF_FIELDS=[{id:"w",type:"num",unit:"kg"},{id:"r",type:"num",unit:"回"}];
 const BASE_UNITS=["kg","lb","回","km","m","kcal"];
-const allUnits=()=>BASE_UNITS.concat(customUnits.filter(u=>!BASE_UNITS.includes(u)));
+const allUnits=()=>BASE_UNITS.filter(u=>!customUnits.includes("!"+u)).concat(customUnits.filter(u=>!BASE_UNITS.includes(u)&&u[0]!=="!"));
+let unitEdit=false;
 function getFields(id){const r=itemById(id);return (r&&r.item.fields&&r.item.fields.length)?r.item.fields:DEF_FIELDS}
 function ownFields(id){const r=itemById(id);if(!r)return null;if(!r.item.fields||!r.item.fields.length)r.item.fields=clone(DEF_FIELDS);return r.item.fields}
 const rmField=f=>f.find(x=>x.id==="w"&&x.type==="num"&&(x.unit==="kg"||x.unit==="lb"));
@@ -1392,7 +1395,7 @@ function renderLog(p,ids){
     if(!sets.length){logs[sel]=logs[sel]||{};logs[sel][id]=[{w:"",r:"",m:""}];sets=logs[sel][id]}
     const sub=r.path.length>1?r.path.slice(1).map(f=>f.name).join(" › "):"";
     const rm=el("span",{class:"exmwrap"},el("button",{class:"kebab exkebab","aria-label":"メニュー","aria-expanded":String(exMenuId===id),onclick:()=>{exMenuId=exMenuId===id?null:id;exDelAsk=false;exRmMode=null;keepY(render)}},"⋮"),
-      exMenuId===id?el("div",{class:"exmenu",id:"exMenu"},exRmMode?rmMenu(id):exDelAsk?el("div",{class:"exdel"},el("div",{class:"dct"},"「"+r.item.name+"」を削除しますか？"),el("div",{class:"btnrow"},el("button",{class:"ghost",onclick:()=>{exDelAsk=false;keepY(render)}},"戻る"),el("button",{class:"primary dyes",onclick:()=>{exMenuId=null;exDelAsk=false;removeFromDay(id)}},"削除する"))):el("div",{class:"exmlist"},hasRM(getFields(id))?el("button",{class:"mini",onclick:()=>{exRmMode="pick";keepY(render)}},"RM計算式"):null,el("button",{class:"mini del",onclick:()=>{exDelAsk=true;keepY(render)}},"削除"))):null);
+      exMenuId===id?el("div",{class:"exmenu",id:"exMenu"},exRmMode?rmMenu(id):exDelAsk?el("div",{class:"exdel"},el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{exMenuId=null;exDelAsk=false;removeFromDay(id)}},"削除する"),el("button",{class:"ghost",onclick:()=>{exDelAsk=false;keepY(render)}},"戻る"))):el("div",{class:"exmlist"},hasRM(getFields(id))?el("button",{class:"mini",onclick:()=>{exRmMode="pick";keepY(render)}},"RM計算式"):null,el("button",{class:"mini del",onclick:()=>{exDelAsk=true;keepY(render)}},"削除"))):null);
     const isOpen=openedEx.has(id);
     const fold=el("button",{class:"mini exfold","aria-label":isOpen?"セットを閉じる":"セットを開く","aria-expanded":String(isOpen),onclick:()=>{if(isOpen)openedEx.delete(id);else openedEx.add(id);keepY(render)}},isOpen?"▲":"▼");
     const card=el("div",{class:"dcard"+(isOpen?" open":""),"data-id":id,style:"--c:"+r.cat.color});
@@ -1454,35 +1457,33 @@ function renderEditor(id){
     const del=el("button",{class:"mini del sdel","aria-label":(i+1)+"セット目を消す",onclick:()=>delSet(id,i)},"✕");
     const memo=el("input",{type:"text",class:"wmemo",id:"lm-"+id+"-"+i,value:s.m||"","aria-label":(i+1)+"セット目のメモ"});
     memo.addEventListener("input",()=>{s.m=memo.value;touch();refreshSoon()});
-    list.append(el("div",{class:"wset"},del,row,el("label",{class:"wmline",for:"lm-"+id+"-"+i},el("span",{class:"ml"},"メモ："),linkWrap(memo))));
+    list.append(el("div",{class:"wset","data-id":String(i)},el("span",{class:"sgrip","aria-label":"長押しで並び替え"},"⠿"),del,row,el("label",{class:"wmline",for:"lm-"+id+"-"+i},el("span",{class:"ml"},"メモ："),linkWrap(memo))));
   });
   ed.append(list);
+  sortable(list,".wset",ord=>{const a=ensureSets(sel,id),b=ord.map(x=>a[+x]).filter(Boolean);if(b.length!==a.length)return;a.splice(0,a.length,...b);touch();keepY(render)},{handle:".sgrip"});
   const add=el("button",{class:"primary addset","aria-label":"セットを追加",onclick:()=>addSet(id)},"＋");
-  const lastSet=list.querySelector(".wset:last-of-type");if(lastSet){lastSet.classList.add("last");lastSet.append(add)}else ed.append(add);
+  const lastSet=list.querySelector(".wset:last-of-type");if(lastSet)lastSet.classList.add("last");
   const xm=el("textarea",{class:"wmemo xmemo",id:"xm-"+id,rows:"1","aria-label":"種目のメモ"});xm.value=exNote(k,id);
   const fit=()=>{xm.style.height="auto";xm.style.height=xm.scrollHeight+"px"};
   xm.addEventListener("input",()=>{fit();setExNote(k,id,xm.value);touch();refreshSoon()});
-  ed.append(el("label",{class:"wmline xmline",for:"xm-"+id},el("span",{class:"ml"},"メモ："),linkWrap(xm)));xm.addEventListener("linkopen",()=>requestAnimationFrame(fit));requestAnimationFrame(fit);
+  ed.append(el("label",{class:"wmline xmline",for:"xm-"+id},el("span",{class:"ml"},"メモ："),linkWrap(xm)),el("div",{class:"setaddrow"},add));xm.addEventListener("linkopen",()=>requestAnimationFrame(fit));requestAnimationFrame(fit);
   return ed;
 }
 // 単位を選ぶ（その種目のその項目に反映）
 function renderUnitPick(id){
   const fs=ownFields(id),f=fs.find(x=>x.id===unitPick.fid);if(!f)return el("span");
-  const pan=el("div",{class:"upanel"},el("div",{class:"uph"},"単位を選ぶ"));
+  const pan=el("div",{class:"upanel"});
   const list=el("div",{class:"ulist"});
   const isT=f.type==="time";
   const setU=u=>{if(sw&&sw.id===id&&sw.fid===f.id)swStop();f.type="num";delete f.mode;f.unit=u;unitPick=null;saveCfg();render()};
-  allUnits().forEach(u=>list.append(el("button",{class:"uopt"+(!isT&&f.unit===u?" on":""),onclick:()=>setU(u)},u)));
+  const delU=u=>{if(BASE_UNITS.includes(u))customUnits.push("!"+u);else customUnits=customUnits.filter(x=>x!==u);saveCfg();keepY(render)};
+  allUnits().forEach(u=>list.append(unitEdit?el("span",{class:"uopt uedit"},u,el("button",{class:"mini tclose","aria-label":"単位「"+u+"」を消す",onclick:()=>delU(u)},"✕")):el("button",{class:"uopt"+(!isT&&f.unit===u?" on":""),onclick:()=>setU(u)},u)));
   list.append(el("button",{class:"uopt"+(isT?" on":""),onclick:()=>{if(!isT){f.type="time";delete f.unit;delete f.mode;saveCfg()}unitPick=null;render()}},"⏱ ストップウォッチで記録"));
   pan.append(list);
-  const fx=el("div",{class:"ulist"});
-  if(fs.length>1)fx.append(el("button",{class:"mini del",onclick:()=>{if(sw&&sw.id===id&&sw.fid===f.id)swStop();fs.splice(fs.indexOf(f),1);unitPick=null;saveCfg();render()}},"この欄を消す"));
-  fx.append(el("button",{class:"mini",onclick:()=>{const n={id:"n_"+uid(),type:"num",unit:""};fs.push(n);unitPick={id,fid:n.id};saveCfg();render()}},"＋欄を増やす"));
-  pan.append(fx);
   const ni=el("input",{type:"text",id:"newUnit-"+id,"aria-label":"新しい単位"});
-  const addU=()=>{const v=ni.value.trim();if(!v)return;if(!allUnits().includes(v))customUnits.push(v);setU(v);toast("単位「"+v+"」を作りました")};
+  const addU=()=>{const v=ni.value.trim();if(!v){toast("単位を入力してください");ni.focus();return}customUnits=customUnits.filter(x=>x!=="!"+v);if(!allUnits().includes(v))customUnits.push(v);unitEdit=false;setU(v);toast("単位「"+v+"」を作りました")};
   ni.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addU()}});
-  pan.append(el("div",{class:"uadd"},el("span",{class:"wu"},"新しい単位"),ni,el("button",{class:"primary",onclick:addU},"追加"),el("button",{class:"mini",onclick:()=>{unitPick=null;render()}},"閉じる")));
+  pan.append(el("div",{class:"uadd"},el("span",{class:"wu"},"新しい単位"),ni),el("div",{class:"ubtns"},el("button",{class:"mini"+(unitEdit?" on":""),onclick:()=>{unitEdit=!unitEdit;keepY(render)}},unitEdit?"完了":"編集"),el("button",{class:"primary",onclick:addU},"追加"),el("button",{class:"mini",onclick:()=>{unitPick=null;unitEdit=false;render()}},"閉じる")));
   if(f.id==="w"&&!isT)pan.append(el("div",{class:"note"},"単位を変えても、入力済みの数字はそのままです（kg⇄lbの換算はしません）。"));
   return pan;
 }
@@ -1776,14 +1777,16 @@ function renderRecords(){
     const pr=periodFor(k),pid=pr?pr.id:null;
     if(pid!==lastP){lastP=pid;if(pr){const h=el("div",{class:"rph"},el("span",{class:"rt"},"期間 "+pLabel(pr,true)));if(pr.memo)h.append(el("div",{class:"rm"},"振り返り：",...linkNodes(pr.memo)));box.append(h)}}
     const d=parse(k),w=d.getDay(),ids=dayItems(k);
-    const card=el("div",{class:"rday"});
+    const card=el("div",{class:"rday"}),rOpen=recFold[k]!==undefined?recFold[k]:k===sel;
     card.append(el("div",{class:"rh"},el("span",{class:"rd"},d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"rw"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(k).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
+      el("button",{class:"mini rfold","aria-label":rOpen?"閉じる":"開く","aria-expanded":String(rOpen),onclick:()=>{recFold[k]=!rOpen;keepY(render)}},rOpen?"▲":"▼"),
       el("button",{class:"mini",onclick:()=>openDayPop(k)},"記録")));
+    if(!rOpen){box.append(card);return}
     const exIds=ids.slice();Object.keys(logs[k]||{}).forEach(id=>{if(!exIds.includes(id)&&itemById(id))exIds.push(id)});
     exIds.forEach(id=>{const r=itemById(id);if(!r||(eff.size&&!eff.has(baseId(id))))return;const ds=doneSets(k,id),x=el("div",{class:"rex",style:"--c:"+r.cat.color});
       x.append(el("div",{class:"rn"},el("span",null,r.item.name),el("button",{class:"mini del rdel",onclick:()=>{recDelAsk=k+"|"+id;keepY(render)}},"削除")));
-      if(recDelAsk===k+"|"+id)x.append(el("div",{class:"delconfirm rdc"},el("div",{class:"dcp"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()+"　"+r.item.name),el("div",{class:"dct"},"この記録を削除しますか？"),
-        el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{recDelAsk=null;removeExDay(k,id,true)}},"はい"),el("button",{class:"ghost",onclick:()=>{recDelAsk=null;keepY(render)}},"いいえ"))));
+      if(recDelAsk===k+"|"+id)x.append(el("div",{class:"delconfirm rdc"},
+        el("div",{class:"btnrow"},el("button",{class:"primary dyes",onclick:()=>{recDelAsk=null;removeExDay(k,id,true)}},"削除する"),el("button",{class:"ghost",onclick:()=>{recDelAsk=null;keepY(render)}},"戻る"))));
       const mx=dayMaxRM(k,id);if(ds.length)ds.forEach((s,i)=>{const e=hasRM(getFields(id))?e1rm(s.w,s.r,id):null;x.append(el("div",{class:"rs"},(i+1)+"　"+setTxt(s,id)+(e?"　":""),e?el("small",null,"1RM "+f1(e)):null,isMaxRM(e,mx)?el("span",{class:"maxrm"},"MAX RM"):null,String(s.m||"").trim()?el("small",null,"　",...linkNodes(s.m)):null))});
       else x.append(el("div",{class:"rs"},el("small",null,"記録なし")));
       if(exNote(k,id))x.append(el("div",{class:"rxm"},"メモ：",...linkNodes(exNote(k,id))));
