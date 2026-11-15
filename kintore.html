@@ -445,7 +445,7 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .srow.item .nm{padding-left:18px;color:var(--fg)}
 .srow.item .ct{font-size:15px}
 .srow.zero .nm,.srow.zero .ct{color:var(--muted);opacity:.7}
-.strip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}.sscroll{overflow-x:auto;scrollbar-width:none;min-width:0;touch-action:pan-y}.sscroll::-webkit-scrollbar{display:none}.sscroll .strip.ym{margin-bottom:0;padding-top:2px}.strip.fixw{grid-template-columns:repeat(var(--n),16px);width:max-content}
+.strip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}.sscroll{overflow:hidden;min-width:0;touch-action:pan-y;cursor:grab}.sscroll>.strip{will-change:transform}.sscroll::-webkit-scrollbar{display:none}.sscroll .strip.ym{margin-bottom:0;padding-top:2px}.strip.fixw{grid-template-columns:repeat(var(--n),16px);width:max-content}
 .strip .cell{height:14px;border-radius:3px;background:var(--line);opacity:.55}
 .srow.cat .strip .cell{height:18px}
 .strip .cell.on{opacity:1}
@@ -1326,19 +1326,21 @@ function renderStats(p,showZero){
     g.append(el("div",{class:"srow cat"+(cn?"":" zero")},el("span",{class:"nm"},el("span",{class:"dot",style:"background:"+c.color}),c.name),el("span",{class:"ct"},String(cn),el("small",null,"日")),strip(conOn,c.color)));
     itemRows.forEach(x=>g.append(el("div",{class:"srow item"+(x.n?"":" zero")},el("span",{class:"nm",title:x.i.name},x.i.name),el("span",{class:"ct"},String(x.n),el("small",null,"回")),strip(x.on,c.color))));
     box.append(g)});
-  // 横スクロールは全部の行でそろえて動かす。最初は今日のあたりを表示
-  if(sc){let busy=false;const all=()=>box.querySelectorAll(".sscroll");
-    box.addEventListener("scroll",e=>{const t=e.target;if(!t.classList||!t.classList.contains("sscroll")||busy)return;busy=true;statsX[p.id]=t.scrollLeft;all().forEach(x=>{if(x!==t)x.scrollLeft=t.scrollLeft});busy=false},true);
-    // 指で横になぞったときも、こちらで横に動かす（画面側のスワイプに取られないように）
-    box.addEventListener("pointerdown",e=>{const sx=e.target.closest&&e.target.closest(".sscroll");if(!sx||e.pointerType==="mouse")return;
-      const x0=e.clientX,y0=e.clientY,l0=sx.scrollLeft;let mode=null;
-      const mv=ev=>{if(ev.pointerId!==e.pointerId)return;const dx=ev.clientX-x0,dy=ev.clientY-y0;if(!mode){if(Math.abs(dx)>6&&Math.abs(dx)>Math.abs(dy))mode="x";else if(Math.abs(dy)>6)mode="y"}
-        if(mode==="x"){ev.preventDefault();const v=l0-dx;all().forEach(x=>x.scrollLeft=v);statsX[p.id]=sx.scrollLeft}};
-      const up=ev=>{if(ev.pointerId!==e.pointerId)return;window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up)};
+  // 横の動きは全部の行でそろえる。スクロールではなく位置をずらすだけなので軽い。最初は今日のあたりを表示
+  if(sc){const key=p.id||p.start,W=N*16+(N-1)*2;let x=statsX[key],raf=0,vel=0,ani=0;
+    const strips=()=>box.querySelectorAll(".sscroll>.strip"),maxX=()=>{const f=box.querySelector(".sscroll");return Math.max(0,W-(f?f.clientWidth:0))};
+    const paint=()=>{raf=0;const t="translate3d("+(-x)+"px,0,0)";strips().forEach(e=>e.style.transform=t)};
+    const setX=v=>{x=Math.min(maxX(),Math.max(0,v));statsX[key]=x;if(!raf)raf=requestAnimationFrame(paint)};
+    box.addEventListener("pointerdown",e=>{if(!(e.target.closest&&e.target.closest(".sscroll"))||e.button>0)return;cancelAnimationFrame(ani);
+      const x0=e.clientX,y0=e.clientY,s0=x;let mode=null,lx=x0,lt=performance.now();vel=0;
+      const mv=ev=>{if(ev.pointerId!==e.pointerId)return;const dx=ev.clientX-x0,dy=ev.clientY-y0;
+        if(!mode){if(Math.abs(dx)>3&&Math.abs(dx)>=Math.abs(dy))mode="x";else if(Math.abs(dy)>8)mode="y"}
+        if(mode==="x"){if(ev.cancelable)ev.preventDefault();const now=performance.now(),dt=Math.max(1,now-lt);vel=0.7*vel+0.3*((lx-ev.clientX)/dt);lx=ev.clientX;lt=now;setX(s0-dx)}};
+      const up=ev=>{if(ev.pointerId!==e.pointerId)return;window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);
+        if(mode==="x"&&Math.abs(vel)>0.05){let v=vel*16;const step=()=>{v*=0.94;if(Math.abs(v)<0.3)return;const b=x;setX(x+v);if(x===b)return;ani=requestAnimationFrame(step)};ani=requestAnimationFrame(step)}};
       window.addEventListener("pointermove",mv,{passive:false});window.addEventListener("pointerup",up);window.addEventListener("pointercancel",up)});
-    box.addEventListener("touchmove",e=>{if(e.target.closest&&e.target.closest(".sscroll")&&e.cancelable){const t=e.touches[0];if(t&&box._tx!=null&&Math.abs(t.clientX-box._tx)>Math.abs(t.clientY-box._ty))e.preventDefault()}},{passive:false});
-    box.addEventListener("touchstart",e=>{const t=e.touches[0];box._tx=t?t.clientX:null;box._ty=t?t.clientY:null},{passive:true});
-    requestAnimationFrame(()=>{const xs=all();if(!xs.length)return;let x=statsX[p.id];if(x==null){const ti=days.findIndex(d=>d.k===todayK);x=ti>=0?Math.max(0,ti*18-xs[0].clientWidth/2):0}xs.forEach(e=>e.scrollLeft=x)})}
+    box.addEventListener("wheel",e=>{if(!(e.target.closest&&e.target.closest(".sscroll")))return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:(e.shiftKey?e.deltaY:0);if(d){e.preventDefault();setX(x+d)}},{passive:false});
+    requestAnimationFrame(()=>{if(x==null){const ti=days.findIndex(d=>d.k===todayK),f=box.querySelector(".sscroll");x=ti>=0&&f?ti*18-f.clientWidth/2:0}setX(x)})}
   return box;
 }
 const statsX={};
