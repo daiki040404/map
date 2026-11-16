@@ -188,7 +188,6 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
 <nav class="tabs" id="tabs">
   <button data-tab="summary" class="active">サマリー</button>
   <button data-tab="hourly">時間別</button>
-  <button data-tab="season">シーズン比較</button>
   <button data-tab="map">地図</button>
   <button data-tab="data">データ</button>
 </nav>
@@ -226,9 +225,21 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <input type="date" id="fFrom"><span class="muted small">〜</span><input type="date" id="fTo">
       <button class="icon-btn" id="fClear" style="padding:3px 8px">×</button>
     </div>
-    <div class="grp" id="grpCmp">
+    <div class="grp" id="grpCmp" style="position:relative">
       <label class="chip">シーズン比較</label>
       <select id="fCmpA"><option value="">なし</option></select><span class="muted small">×</span><select id="fCmpB"><option value="">なし</option></select>
+      <button class="icon-btn" id="seaEditBtn" style="padding:3px 8px">＋シーズン</button>
+      <div id="seaPop" class="cal-pop" style="display:none; width:340px">
+        <div class="small muted" style="margin-bottom:6px">期間を選んで名前をつけて追加</div>
+        <div class="row" style="gap:6px; align-items:flex-end; flex-wrap:wrap">
+          <div class="field"><label class="small">名前</label><input type="text" id="seaPopName" placeholder="お盆" style="min-width:100px"></div>
+          <div class="field"><label class="small">開始</label><input type="date" id="seaPopStart"></div>
+          <div class="field"><label class="small">終了</label><input type="date" id="seaPopEnd"></div>
+          <button class="icon-btn" id="seaPopAdd">追加</button>
+        </div>
+        <div class="small muted" style="margin:10px 0 4px; padding-top:8px; border-top:1px solid var(--border)">登録済み（名前・期間を直す／削除）</div>
+        <div id="seaPopList"></div>
+      </div>
     </div>
     <div class="grp" id="grpCal" style="position:relative">
       <label class="chip">乗務日</label>
@@ -307,49 +318,6 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     </div>
   </section>
 
-
-  <!-- SEASON / 期間比較 -->
-  <section class="view" id="view-season">
-    <div class="card">
-      <h2>期間比較 <span class="sub">シーズン・月度・単日を重ねて比較</span></h2>
-      <div class="filters">
-        <div class="field"><label>指標</label>
-          <select id="cmpMetric">
-            <option value="uriage">営収</option>
-            <option value="count">乗車数</option>
-            <option value="jitsu">実車時間</option>
-            <option value="rate">実車率</option>
-            <option value="wage">実質時給</option>
-            <option value="tanka">客単価</option>
-          </select></div>
-        <div class="field"><label>集計</label>
-          <select id="cmpAgg">
-            <option value="total">合計</option>
-            <option value="avg">1乗務平均</option>
-          </select></div>
-        <div class="field"><label>表示</label>
-          <select id="cmpAxis">
-            <option value="sum">まとめ(棒)</option>
-            <option value="hour">時間帯(折れ線)</option>
-            <option value="wday">曜日(折れ線)</option>
-          </select></div>
-      </div>
-      <div id="cmpItems" style="margin-bottom:10px"></div>
-      <div class="chart-wrap"><canvas id="cmpChart"></canvas></div>
-      <p class="note">シーズン・月度・単日をチェックで複数選んで比較。上の条件（配車・天候・曜日・出庫・外れ値）を設定すると、その条件で絞った上で各シーズンを比較できる。指標（営収／乗車数／実車時間／実車率／実質時給／客単価）と、合計か1乗務平均かを切り替えられる。「まとめ(棒)」は対象ごとに1本、「時間帯／曜日(折れ線)」は営収・乗車数・実車時間の時間プロファイル。実車率・実質時給・客単価はまとめ(棒)で表示。月度=出庫日16日〜翌月15日（締め月で命名）。数値を出すには右上「数値」をON。下の「シーズンを登録」で期間に名前をつけて保存すると、ここで比較できる。</p>
-    </div>
-    <div class="card">
-      <h2>シーズンを登録 <span class="sub">期間（◯日〜◯日）に名前をつけて保存</span></h2>
-      <div class="row" style="margin-bottom:10px">
-        <div class="field"><label>名前</label><input type="text" id="seaName" placeholder="お盆シーズン"></div>
-        <div class="field"><label>開始</label><input type="date" id="seaStart"></div>
-        <div class="field"><label>終了</label><input type="date" id="seaEnd"></div>
-        <button class="icon-btn" id="seaAdd">保存</button>
-      </div>
-      <div id="seaList"></div>
-      <p class="note">同じ名前で期間を複数足すと1項目にまとまる（毎年のお盆など）。名前・期間はその場で直せる。各期間に「除外」を足すと、その日/期間は平均から抜ける。</p>
-    </div>
-  </section>
 
   <!-- MAP -->
   <section class="view" id="view-map">
@@ -918,148 +886,28 @@ function renderHrCompare(){
 }
 
 /* ---------- シーズン比較 ---------- */
-let cmpSelected=new Set(['__all__']);
-let cmpDays=new Set();   // 個別に選んだ営業日(YYYY-MM-DD)
-function renderCmpItems(){
-  const box=document.getElementById('cmpItems'); if(!box) return;
-  const names=[...new Set(SEASONS.map(s=>s.name))];
-  const items=[{key:'__all__',label:'通常期(全期間)'}].concat(names.map(n=>({key:n,label:n})));
-  // 月度の一覧（データから自動生成・新しい順）
-  const fmMap={}; [...DB].forEach(d=>{ const f=fiscalMonth(d.date); fmMap[f.key]=f.label; });
-  const months=Object.keys(fmMap).sort((a,b)=>a<b?1:-1).map(k=>({key:'M:'+k, label:fmMap[k]}));
-  // 期間(シーズン)のチェック
-  let html='<div class="small muted" style="margin-bottom:4px">シーズン:</div>'+
-    items.map(it=>`<label class="small" style="display:inline-block;margin:2px 12px 2px 0"><input type="checkbox" class="cmpit" value="${esc(it.key)}" ${cmpSelected.has(it.key)?'checked':''}> ${esc(it.label)}</label>`).join('');
-  // 月度のチェック
-  if(months.length){
-    html+='<div class="small muted" style="margin:8px 0 4px">月度:</div>'+
-      months.map(it=>`<label class="small" style="display:inline-block;margin:2px 12px 2px 0"><input type="checkbox" class="cmpit" value="${esc(it.key)}" ${cmpSelected.has(it.key)?'checked':''}> ${esc(it.label)}</label>`).join('');
-  }
-  // 営業日の選択
-  const allDates=[...DB].map(d=>d.date).sort((a,b)=>a<b?1:-1);   // 新しい順
-  const avail=allDates.filter(dt=>!cmpDays.has(dt));
-  html+='<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'+
-    '<div class="small muted" style="margin-bottom:4px">営業日を選択（単日で重ねて比較）:</div>'+
-    '<div class="row" style="align-items:center;gap:6px">'+
-      `<select id="cmpDaySel"><option value="">${avail.length?'日付を選ぶ…':'追加できる営業日なし'}</option>`+
-        avail.map(dt=>`<option value="${dt}">${dt}(${wdayOf(dt)})</option>`).join('')+'</select>'+
-      '<button class="icon-btn" id="cmpDayAdd" style="padding:5px 10px">追加</button>'+
-      (cmpDays.size?'<button class="icon-btn" id="cmpDayClear" style="padding:5px 10px">全解除</button>':'')+
-    '</div>';
-  if(cmpDays.size){
-    html+='<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">'+
-      [...cmpDays].sort().map(dt=>`<span class="pill">${dt}(${wdayOf(dt)}) <button class="cmpDayDel" data-d="${dt}" style="background:none;border:none;color:var(--s8);cursor:pointer;padding:0 2px">×</button></span>`).join('')+
-      '</div>';
-  }
-  html+='</div>';
-  box.innerHTML=html;
-  box.querySelectorAll('.cmpit').forEach(c=>c.onchange=()=>{ if(c.checked)cmpSelected.add(c.value); else cmpSelected.delete(c.value); drawCompare(); });
-  const addBtn=box.querySelector('#cmpDayAdd');
-  if(addBtn) addBtn.onclick=()=>{ const v=box.querySelector('#cmpDaySel').value; if(v){ cmpDays.add(v); renderCmpItems(); drawCompare(); } };
-  const clrBtn=box.querySelector('#cmpDayClear');
-  if(clrBtn) clrBtn.onclick=()=>{ cmpDays.clear(); renderCmpItems(); drawCompare(); };
-  box.querySelectorAll('.cmpDayDel').forEach(b=>b.onclick=()=>{ cmpDays.delete(b.dataset.d); renderCmpItems(); drawCompare(); });
-}
-function renderSeasonTab(){
-  renderCmpItems();
-  const list=document.getElementById('seaList');
-  if(!SEASONS.length){ list.innerHTML='<p class="empty">まだ期間が無い。お盆などを登録してみて。</p>'; drawCompare(); return; }
-  list.innerHTML=SEASONS.map((s,i)=>{
-    const exc=(s.excludes||[]).map((x,j)=>`<span class="pill">${x.start.slice(5)}〜${x.end.slice(5)} <button class="exdel" data-i="${i}" data-j="${j}" style="background:none;border:none;color:var(--s8);cursor:pointer">×</button></span>`).join(' ');
-    return `<div class="day-det">
-      <div class="row" style="align-items:flex-end">
-        <div class="field"><label class="small">名前</label><input type="text" class="snm" data-i="${i}" value="${esc(s.name)}"></div>
-        <div class="field"><label class="small">開始</label><input type="date" class="sst" data-i="${i}" value="${s.start}"></div>
-        <div class="field"><label class="small">終了</label><input type="date" class="sen" data-i="${i}" value="${s.end}"></div>
-        <button class="del sdel" data-i="${i}">削除</button>
-      </div>
-      <div class="row" style="margin-top:6px"><span class="small muted">除外:</span> ${exc||'<span class="small muted">なし</span>'}</div>
-      <div class="row" style="margin-top:4px; align-items:flex-end">
-        <div class="field"><label class="small">除外開始</label><input type="date" class="exs" data-i="${i}"></div>
-        <div class="field"><label class="small">除外終了</label><input type="date" class="exe" data-i="${i}"></div>
-        <button class="icon-btn exadd" data-i="${i}" style="padding:3px 8px">除外を追加</button>
-      </div>
-    </div>`;
-  }).join('');
-  const rerender=()=>{ saveSeasons(); refreshSeasonSelectors(); renderSeasonTab(); };
-  list.querySelectorAll('.snm').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].name=el.value.trim()||'(無名)'; rerender(); });
-  list.querySelectorAll('.sst').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].start=el.value; saveSeasons(); drawCompare(); });
-  list.querySelectorAll('.sen').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].end=el.value; saveSeasons(); drawCompare(); });
-  list.querySelectorAll('.sdel').forEach(b=>b.onclick=()=>{ if(confirm(SEASONS[+b.dataset.i].name+' の この期間を削除?')){ SEASONS.splice(+b.dataset.i,1); rerender(); } });
-  list.querySelectorAll('.exadd').forEach(b=>b.onclick=()=>{ const i=+b.dataset.i;
-    const s=list.querySelector(`.exs[data-i="${i}"]`).value, e=list.querySelector(`.exe[data-i="${i}"]`).value;
-    if(!s||!e){ alert('除外の開始と終了を入れて（1日だけなら同じ日を両方に）'); return; }
-    (SEASONS[i].excludes=SEASONS[i].excludes||[]).push({start:s,end:e}); saveSeasons(); renderSeasonTab(); });
-  list.querySelectorAll('.exdel').forEach(b=>b.onclick=()=>{ SEASONS[+b.dataset.i].excludes.splice(+b.dataset.j,1); saveSeasons(); renderSeasonTab(); });
-  drawCompare();
-}
-function avgSeries(days, axis, metric){
-  // 1日あたり平均のプロファイル。axis: hour(シフト順) or wday。metric: uriage(=売上) / count / jitsu
-  const keys= axis==='hour'? SHIFT_HOURS : WD;
-  const sum={}; keys.forEach(k=>sum[k]=0);
-  const isFare=(metric==='uriage');
-  days.forEach(d=>{
-    (d.rides||[]).forEach(r=>{
-      if(!typeOK(r) || !outlierOK(r)) return;
-      if(isKuten(r)) return;
-      if(axis==='hour'){
-        if(metric==='jitsu'){ const jb=jitsuByHour(r); for(const h in jb) sum[h]=(sum[h]||0)+jb[h]; }
-        else { const ph=pickupHour(r); if(ph!=null){ sum[ph]+= isFare?(+r.fare||0):1; } }
-      } else {
-        const w=wdayOf(d.date);
-        if(metric==='jitsu'){ const jb=jitsuByHour(r); for(const h in jb) sum[w]=(sum[w]||0)+jb[h]; }
-        else sum[w]+= isFare?(+r.fare||0):1;
-      }
-    });
-  });
-  const n=Math.max(days.length,1);
-  return keys.map(k=> Math.round((sum[k]||0)/n));
-}
-/* シーズン比較で効かせる条件（天候・曜日・出庫時間）。配車/外れ値は集計側(dayMetrics/avgSeries)で反映 */
+/* シーズン比較で効かせる条件（天候・曜日・出庫時間）。配車/外れ値は集計側で反映 */
 function cmpCondDay(d){
   return (!state.weather || (d.weather||'')===state.weather)
     && (!state.wday || wdayOf(d.date)===state.wday)
     && shukkoOK(d);
 }
-/* 比較対象keyを日配列に。__all__=全期間, M:xxxx=月度, それ以外=シーズン名。条件で絞る */
-function cmpDaysForKey(key){
-  let base, label;
-  if(key==='__all__'){ base=DB.slice(); label='通常期(全期間)'; }
-  else if(key.slice(0,2)==='M:'){ const mk=key.slice(2); base=DB.filter(d=>fiscalMonth(d.date).key===mk);
-    label=fiscalMonth((DB.find(d=>fiscalMonth(d.date).key===mk)||{}).date||(mk+'-15')).label; }
-  else { base=DB.filter(d=>dayInSeason(d.date,key)); label=key; }
-  return {days:base.filter(cmpCondDay), label};
-}
-const CMP_COLORS=['--s1','--s2','--s3','--s4','--s5','--s7','--s8','--s6'];
-function drawCompare(){
-  const metric=document.getElementById('cmpMetric').value;   // uriage/count/jitsu/rate/wage/tanka
-  const agg=(document.getElementById('cmpAgg')||{}).value||'total';
-  const avg=agg==='avg';
-  let view=document.getElementById('cmpAxis').value;         // sum/hour/wday
-  // 折れ線(時間帯/曜日)は 営収・乗車数・実車時間 のみ。他はまとめ(棒)に切替
-  const lineOK=['uriage','count','jitsu'].includes(metric);
-  if((view==='hour'||view==='wday') && !lineOK) view='sum';
-  // 比較対象を集める（シーズン・月度・単日）
-  const items=[];
-  cmpSelected.forEach(key=>{ const o=cmpDaysForKey(key); items.push({days:o.days, label:o.label, dash:false}); });
-  [...cmpDays].sort().forEach(dt=>{ items.push({days:DB.filter(d=>d.date===dt).filter(cmpCondDay), label:`${dt}(${wdayOf(dt)})`, dash:true}); });
-
-  if(view==='sum'){
-    // まとめ棒：対象ごとに1本、指標の合計 or 1乗務平均
-    const labels=items.map(it=>`${it.label}(${it.days.length}日)`);
-    const data=items.map(it=>metricValue(dayMetrics(it.days), it.days.length, metric, avg));
-    const colors=items.map((it,i)=>cv(CMP_COLORS[i%CMP_COLORS.length]));
-    makeChart('cmpChart',{ type:'bar',
-      data:{labels, datasets:[{label:metricNameJP(metric)+(avg?'(1乗務平均)':'(合計)'), data, backgroundColor:colors, borderRadius:4, maxBarThickness:70}]},
-      options:{plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmtMetric(c.parsed.y,metric)}}}} });
-    return;
-  }
-  // 折れ線：時間帯/曜日プロファイル（1乗務平均）
-  const keys= view==='hour'? SHIFT_HOURS.map(h=>h+'時') : WD;
-  const ds=items.map((it,i)=>({label:`${it.label}(${it.days.length}日平均)`, data:avgSeries(it.days,view,metric),
-    borderColor:cv(CMP_COLORS[i%CMP_COLORS.length]), backgroundColor:'transparent', tension:.3, borderWidth:2, pointRadius:3, borderDash: it.dash?[6,4]:undefined}));
-  makeChart('cmpChart',{ type:'line', data:{labels:keys, datasets:ds},
-    options:{plugins:{legend:{labels:{color:cv('--ink2')}}}} });
+/* シーズンの追加・編集ポップアップ（条件バーの「＋シーズン」） */
+function renderSeaList(){
+  const box=document.getElementById('seaPopList'); if(!box) return;
+  if(!SEASONS.length){ box.innerHTML='<p class="small muted">まだシーズンが無い</p>'; return; }
+  box.innerHTML=SEASONS.map((s,i)=>`<div class="row" style="align-items:center; gap:4px; margin:5px 0; flex-wrap:wrap">
+    <input type="text" class="snm" data-i="${i}" value="${esc(s.name)}" style="min-width:84px">
+    <input type="date" class="sst" data-i="${i}" value="${esc(s.start)}">
+    <span class="muted small">〜</span>
+    <input type="date" class="sen" data-i="${i}" value="${esc(s.end)}">
+    <button class="icon-btn sdel" data-i="${i}" style="padding:2px 7px; color:var(--s8)">削除</button>
+  </div>`).join('');
+  const after=()=>{ saveSeasons(); refreshSeasonSelectors(); renderSeaList(); renderCurrent(); };
+  box.querySelectorAll('.snm').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].name=el.value.trim()||'(無名)'; after(); });
+  box.querySelectorAll('.sst').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].start=el.value; after(); });
+  box.querySelectorAll('.sen').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].end=el.value; after(); });
+  box.querySelectorAll('.sdel').forEach(b=>b.onclick=()=>{ if(confirm((SEASONS[+b.dataset.i].name||'このシーズン')+' を削除?')){ SEASONS.splice(+b.dataset.i,1); after(); } });
 }
 
 /* ---------- 地図 ---------- */
@@ -1754,14 +1602,10 @@ document.getElementById('tabs').addEventListener('click',e=>{
 });
 function renderCurrent(){
   document.getElementById('fOutlier').style.display = (curTab==='summary')?'none':'';
-  // シーズン比較では「期間・シーズン・乗務日」はチェックで選ぶので隠し、条件系(配車/天候/曜日/出庫/外れ値)だけ出す
-  const isSea=(curTab==='season');
-  ['grpSeason','grpPeriod','grpCal'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=isSea?'none':''; });
-  // シーズン比較(A×B)はサマリー・時間別だけに出す
+  // シーズン比較(A×B・＋シーズン)はサマリー・時間別だけに出す
   const gc=document.getElementById('grpCmp'); if(gc) gc.style.display=(curTab==='summary'||curTab==='hourly')?'':'none';
   if(curTab==='summary') renderSummary();
   else if(curTab==='hourly') renderHourly();
-  else if(curTab==='season') renderSeasonTab();
   else if(curTab==='map') renderMap();
   else if(curTab==='data') renderDataTab();
   document.getElementById('scopeInfo').textContent=`${scopedDays().length}日 / ${scopedRides().length}乗車`;
@@ -1964,7 +1808,6 @@ function refreshDateSelector(){
   const pop=document.getElementById('calPop');
   if(pop && pop.style.display!=='none'){ if(calYM){ const p=latestMonthStr().split('-'); } renderCal(); }
 }
-['cmpMetric','cmpAxis','cmpAgg'].forEach(id=>{ const el=document.getElementById(id); if(el) el.onchange=drawCompare; });
 function refreshSeasonSelectors(){
   const names=[...new Set(SEASONS.map(s=>s.name))];
   const fs=document.getElementById('fSeason');
@@ -1979,15 +1822,23 @@ function refreshSeasonSelectors(){
   if(!names.includes(state.cmpB)) state.cmpB='';
 }
 
-/* ---------- シーズン追加 ---------- */
-document.getElementById('seaAdd').onclick=()=>{
-  const name=document.getElementById('seaName').value.trim();
-  const s=document.getElementById('seaStart').value, e=document.getElementById('seaEnd').value;
+/* ---------- シーズン追加・編集（条件バーの「＋シーズン」ポップアップ） ---------- */
+document.getElementById('seaEditBtn').onclick=()=>{
+  const p=document.getElementById('seaPop');
+  if(p.style.display==='none'){ renderSeaList(); p.style.display='block'; } else p.style.display='none';
+};
+document.getElementById('seaPopAdd').onclick=()=>{
+  const name=document.getElementById('seaPopName').value.trim();
+  const s=document.getElementById('seaPopStart').value, e=document.getElementById('seaPopEnd').value;
   if(!name||!s||!e){ alert('名前・開始・終了を入れて'); return; }
   SEASONS.push({name, start:s, end:e, excludes:[]}); saveSeasons();
-  document.getElementById('seaName').value='';
-  renderSeasonTab(); refreshSeasonSelectors();
+  document.getElementById('seaPopName').value=''; document.getElementById('seaPopStart').value=''; document.getElementById('seaPopEnd').value='';
+  refreshSeasonSelectors(); renderSeaList(); renderCurrent();
 };
+document.addEventListener('click',e=>{ const p=document.getElementById('seaPop');
+  if(!p || p.style.display==='none') return;
+  if(e.target.closest('#seaPop')||e.target.closest('#seaEditBtn')) return;
+  p.style.display='none'; });
 
 /* ---------- データタブ ---------- */
 /* 汎用ミニカレンダー（インライン・複数選択）。avail=選択できる日付(関数), sel=選択Set, onChange=選択変化時 */
