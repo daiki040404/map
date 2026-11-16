@@ -226,6 +226,10 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <input type="date" id="fFrom"><span class="muted small">〜</span><input type="date" id="fTo">
       <button class="icon-btn" id="fClear" style="padding:3px 8px">×</button>
     </div>
+    <div class="grp" id="grpCmp">
+      <label class="chip">シーズン比較</label>
+      <select id="fCmpA"><option value="">なし</option></select><span class="muted small">×</span><select id="fCmpB"><option value="">なし</option></select>
+    </div>
     <div class="grp" id="grpCal" style="position:relative">
       <label class="chip">乗務日</label>
       <button class="icon-btn" id="calBtn" style="padding:4px 10px">📅 選択</button>
@@ -261,6 +265,11 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       </div>
       <div class="chart-wrap"><canvas id="sumChart"></canvas></div>
     </div>
+    <div class="card" id="sumCmpCard" style="display:none">
+      <h2>シーズン比較 <span class="sub" id="sumCmpSub"></span></h2>
+      <div class="chart-wrap"><canvas id="sumCmpA"></canvas></div>
+      <div class="chart-wrap" style="margin-top:14px"><canvas id="sumCmpB"></canvas></div>
+    </div>
     <div class="card">
       <h2>メモ付きの営業 <span class="sub">外れ値・覚え書き（絞り込み反映）</span></h2>
       <div id="sumMemoList"></div>
@@ -290,6 +299,11 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       </div>
       <div id="hrChartWrap" class="chart-wrap"><canvas id="hrChart"></canvas></div>
       <div id="hrTableWrap" style="display:none"></div>
+    </div>
+    <div class="card" id="hrCmpCard" style="display:none">
+      <h2>シーズン比較 <span class="sub" id="hrCmpSub"></span></h2>
+      <div class="chart-wrap"><canvas id="hrCmpA"></canvas></div>
+      <div class="chart-wrap" style="margin-top:14px"><canvas id="hrCmpB"></canvas></div>
     </div>
   </section>
 
@@ -620,7 +634,7 @@ function jitsuByHour(r){
 function pickupHour(r){ const m=toMin(r.on); return m==null?null:Math.floor(m/60)%24; }
 
 /* ---------- フィルタ ---------- */
-const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'', wday:'', dates:new Set(), shukkoFrom:'', shukkoTo:'' };
+const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'', wday:'', dates:new Set(), shukkoFrom:'', shukkoTo:'', cmpA:'', cmpB:'' };
 /* 出庫時間の絞り込み（指定時間帯に出庫した日だけ。空欄＝指定なし） */
 function shukkoOK(d){
   const sf=state.shukkoFrom, st=state.shukkoTo;
@@ -795,29 +809,41 @@ function renderSummary(){
   ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val">${v}</div></div>`).join('');
 
   // 日別の推移：全期間(日ごと)／月度／週 でグループ化し、各グループの1乗務あたり平均を表示
-  let labels, val;
-  if(sumGroup==='all'){
-    labels=days.map(d=>d.date.slice(5)+'('+wdayOf(d.date)+')');
-    val=days.map(d=>groupMetricAvg([d], sumMetric));
-  }else{
-    const groups=new Map();
-    days.forEach(d=>{
-      let k,label;
-      if(sumGroup==='month'){ const fm=fiscalMonth(d.date); k=fm.key; label=fm.label; }
-      else { const wk=weekKey(d.date); k=wk.key; label=wk.label; }
-      if(!groups.has(k)) groups.set(k,{label,days:[]});
-      groups.get(k).days.push(d);
-    });
-    const arr=[...groups.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(e=>e[1]);
-    labels=arr.map(g=>g.label);
-    val=arr.map(g=>groupMetricAvg(g.days, sumMetric));
-  }
+  const s=sumSeriesForDays(days);
   makeChart('sumChart',{ type:'bar',
-    data:{labels, datasets:[{label:metricLabel(sumMetric)+'（1乗務平均）', data:val, backgroundColor:cv('--s1'), borderRadius:4, maxBarThickness:46}]},
+    data:{labels:s.labels, datasets:[{label:metricLabel(sumMetric)+'（1乗務平均）', data:s.data, backgroundColor:cv('--s1'), borderRadius:4, maxBarThickness:46}]},
     options:{plugins:{legend:{display:false}}}
   });
   renderMemoList('sumMemoList');
+  renderSumCompare();                 // シーズン比較（2つ選択時のみ）
   state.outlier=_om;
+}
+/* 日別の推移の系列（全期間＝日ごと／月度／週、1乗務平均）を指定日配列から作る */
+function sumSeriesForDays(days){
+  if(sumGroup==='all'){
+    return { labels:days.map(d=>d.date.slice(5)+'('+wdayOf(d.date)+')'), data:days.map(d=>groupMetricAvg([d], sumMetric)) };
+  }
+  const groups=new Map();
+  days.forEach(d=>{ let k,label;
+    if(sumGroup==='month'){ const fm=fiscalMonth(d.date); k=fm.key; label=fm.label; }
+    else { const wk=weekKey(d.date); k=wk.key; label=wk.label; }
+    if(!groups.has(k)) groups.set(k,{label,days:[]}); groups.get(k).days.push(d); });
+  const arr=[...groups.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(e=>e[1]);
+  return { labels:arr.map(g=>g.label), data:arr.map(g=>groupMetricAvg(g.days, sumMetric)) };
+}
+/* シーズン比較で使う、そのシーズンの対象日（天候・曜日・出庫の条件も反映） */
+function seasonCmpDays(name){ return DB.filter(d=> dayInSeason(d.date,name) && cmpCondDay(d)).sort((a,b)=>a.date<b.date?-1:1); }
+function cmpSeasonsReady(){ return state.cmpA && state.cmpB && SEASONS.some(s=>s.name===state.cmpA) && SEASONS.some(s=>s.name===state.cmpB); }
+/* サマリー：2シーズンの日別推移グラフを2つ並べて比較 */
+function renderSumCompare(){
+  const card=document.getElementById('sumCmpCard'); if(!card) return;
+  if(!cmpSeasonsReady()){ card.style.display='none'; return; }
+  card.style.display='';
+  document.getElementById('sumCmpSub').textContent=`${state.cmpA} ／ ${state.cmpB}（${metricLabel(sumMetric)}・1乗務平均）`;
+  const draw=(cid,name,color)=>{ const days=seasonCmpDays(name); const s=sumSeriesForDays(days);
+    makeChart(cid,{ type:'bar', data:{labels:s.labels, datasets:[{label:name, data:s.data, backgroundColor:cv(color), borderRadius:4, maxBarThickness:46}]},
+      options:{plugins:{legend:{display:false}, title:{display:true, text:`${name}（${days.length}日）`, color:cv('--ink2')}}} }); };
+  draw('sumCmpA', state.cmpA, '--s1'); draw('sumCmpB', state.cmpB, '--s2');
 }
 function metricLabel(m){ return {uriage:'営収',kaisu:'乗車数',jitsu:'実車時間(分)',wage:'実質時給(¥/h)',fare:'売上(料金)',count:'営業回数',tanka:'客単価',rate:'実車率(%)'}[m]||m; }
 
@@ -858,6 +884,37 @@ function renderHourly(){
       return `<tr><td>${h}時</td><td>${fmtYen((agg.fare[h]||0)/f)}</td><td>${cShow}</td><td>${Math.round((agg.jitsu[h]||0)/f)}分</td><td>${rt}%</td><td>${c?fmtYen((agg.fare[h]||0)/c):'-'}</td></tr>`; }).join('');
     tw.innerHTML=`<table><thead><tr><th>時間帯</th><th>売上${hd}</th><th>回数${hd}</th><th>実車${hd}</th><th>実車率</th><th>客単価</th></tr></thead><tbody>${rows}</tbody></table>`;
   }
+  renderHrCompare();                  // シーズン比較（2つ選択時のみ）
+}
+/* 指定日配列からの時間帯集計・系列（時間別タブのシーズン比較用） */
+function hourlyAggDays(days){
+  const fare={},count={},jitsu={}; SHIFT_HOURS.forEach(h=>{fare[h]=0;count[h]=0;jitsu[h]=0;});
+  days.forEach(d=>(d.rides||[]).forEach(r=>{
+    if(!typeOK(r)||!outlierOK(r)||isKuten(r)) return;
+    const ph=pickupHour(r); if(ph!=null){ fare[ph]+=(+r.fare||0); count[ph]+=1; }
+    const jb=jitsuByHour(r); for(const h in jb) jitsu[h]=(jitsu[h]||0)+jb[h];
+  }));
+  return {fare,count,jitsu};
+}
+function hrSeriesForDays(days){
+  const agg=hourlyAggDays(days); const nd=days.length||1; const f=hrAgg==='avg'?nd:1;
+  return SHIFT_HOURS.map(h=>{
+    if(hrMetric==='fare') return Math.round((agg.fare[h]||0)/f);
+    if(hrMetric==='count') return hrAgg==='avg'? +((agg.count[h]||0)/nd).toFixed(1):Math.round(agg.count[h]||0);
+    if(hrMetric==='jitsu') return Math.round((agg.jitsu[h]||0)/f);
+    if(hrMetric==='rate') return Math.min(100, Math.round((agg.jitsu[h]||0)/(nd*60)*100));
+  });
+}
+function renderHrCompare(){
+  const card=document.getElementById('hrCmpCard'); if(!card) return;
+  if(!cmpSeasonsReady()){ card.style.display='none'; return; }
+  card.style.display='';
+  document.getElementById('hrCmpSub').textContent=`${state.cmpA} ／ ${state.cmpB}（${metricLabel(hrMetric)}${hrAgg==='avg'?'・1乗務平均':''}）`;
+  const labels=SHIFT_HOURS.map(h=>h+'時');
+  const draw=(cid,name,color)=>{ const days=seasonCmpDays(name); const data=hrSeriesForDays(days);
+    makeChart(cid,{ type:'bar', data:{labels, datasets:[{label:name, data, backgroundColor:cv(color), borderRadius:4, maxBarThickness:26}]},
+      options:{scales:{y:hrMetric==='rate'?{max:100}:{}}, plugins:{legend:{display:false}, title:{display:true, text:`${name}（${days.length}日）`, color:cv('--ink2')}}} }); };
+  draw('hrCmpA', state.cmpA, '--s1'); draw('hrCmpB', state.cmpB, '--s2');
 }
 
 /* ---------- シーズン比較 ---------- */
@@ -1700,6 +1757,8 @@ function renderCurrent(){
   // シーズン比較では「期間・シーズン・乗務日」はチェックで選ぶので隠し、条件系(配車/天候/曜日/出庫/外れ値)だけ出す
   const isSea=(curTab==='season');
   ['grpSeason','grpPeriod','grpCal'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=isSea?'none':''; });
+  // シーズン比較(A×B)はサマリー・時間別だけに出す
+  const gc=document.getElementById('grpCmp'); if(gc) gc.style.display=(curTab==='summary'||curTab==='hourly')?'':'none';
   if(curTab==='summary') renderSummary();
   else if(curTab==='hourly') renderHourly();
   else if(curTab==='season') renderSeasonTab();
@@ -1828,6 +1887,8 @@ document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
 document.getElementById('fSeason').onchange=e=>{ state.season=e.target.value; renderCurrent(); };
 document.getElementById('fWeather').onchange=e=>{ state.weather=e.target.value; renderCurrent(); };
 document.getElementById('fWday').onchange=e=>{ state.wday=e.target.value; renderCurrent(); };
+document.getElementById('fCmpA').onchange=e=>{ state.cmpA=e.target.value; renderCurrent(); };
+document.getElementById('fCmpB').onchange=e=>{ state.cmpB=e.target.value; renderCurrent(); };
 // 出庫時間フィルタ（0〜23時。指定なし＝全部）
 (function(){
   const opts='<option value="">指定なし</option>'+Array.from({length:24},(_,h)=>`<option value="${h}">${h}時</option>`).join('');
@@ -1908,8 +1969,14 @@ function refreshSeasonSelectors(){
   const names=[...new Set(SEASONS.map(s=>s.name))];
   const fs=document.getElementById('fSeason');
   const cur=fs.value;
-  fs.innerHTML='<option value="">全期間</option>'+names.map(n=>`<option>${n}</option>`).join('');
+  fs.innerHTML='<option value="">全期間</option>'+names.map(n=>`<option>${esc(n)}</option>`).join('');
   fs.value=cur;
+  // シーズン比較(A×B)のプルダウンも更新
+  ['fCmpA','fCmpB'].forEach(id=>{ const el=document.getElementById(id); if(!el) return; const c=el.value;
+    el.innerHTML='<option value="">なし</option>'+names.map(n=>`<option>${esc(n)}</option>`).join('');
+    el.value=names.includes(c)?c:''; });
+  if(!names.includes(state.cmpA)) state.cmpA='';
+  if(!names.includes(state.cmpB)) state.cmpB='';
 }
 
 /* ---------- シーズン追加 ---------- */
