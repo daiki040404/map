@@ -523,6 +523,10 @@ textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid
 .exrow .exn{flex:1;min-width:0;text-align:left;background:none;border:0;padding:8px 0;font:inherit;font-size:14px;color:var(--fg)}
 .exrow.fo .exn{font-weight:700}
 .exrow.on{background:color-mix(in srgb,var(--accent) 8%,transparent)}
+.exrow .exck{width:20px;text-align:center;color:var(--accent);font-weight:700}
+.fcpanel{margin-bottom:10px}.fcname{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:8px;padding:7px 9px;margin:6px 0}.fcsub{margin-bottom:4px}
+.fclist{display:flex;flex-direction:column;gap:4px}.fcopt{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:2px 6px 2px 2px}.fcopt.on{border-color:var(--accent)}
+.fcsel{flex:1;display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--fg);font:inherit;font-size:14px;text-align:left;padding:8px 6px}.fcopt .tbx{width:18px;height:18px;border:1.5px solid var(--line);border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex:none}.fcopt.on .tbx{background:var(--accent);border-color:var(--accent)}.fcn{font-weight:700}
 .exshow{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:14px;font-weight:800;color:#fff;background:var(--accent);border-radius:50%;flex:none}
 .exx{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--muted);padding:0;font-size:12px;flex:none}
 .recmk{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -741,7 +745,8 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
   </div>
 
   <section class="panel">
-    <div class="palhead"><div class="label">トレーニング頻度 <span class="hint" id="statsSub"></span></div></div>
+    <div class="palhead"><div class="label">トレーニング頻度 <span class="hint" id="statsSub"></span></div><button class="ghost" id="freqCondBtn">条件</button></div>
+    <div id="freqCondPanel"></div>
     <div id="stats"></div>
   </section>
 
@@ -850,6 +855,7 @@ const tagById=id=>tags.find(t=>t.id===id);
 const dayTagList=k=>(dayTags[k]||[]).map(tagById).filter(Boolean);
 let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list"||v==="cal")return v}catch(e){}return window.innerWidth<700?"list":"cal"})();
 let statsZero=false,editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
+let freqConds=[],freqCondId=null,freqCondOpen=false,freqCondEdit=null,freqCondName="",freqCondSel=new Set();
 let curId=null,sel=todayK;
 
 const sorted=()=>periods.slice().sort((a,b)=>((a.ord??1e9)-(b.ord??1e9))||(a.start<b.start?-1:1));
@@ -964,7 +970,7 @@ function copyMenu(src,dst){const n=Math.min(plen(src),plen(dst));for(let i=0;i<n
 function overlaps(start,end,exceptId){return periods.find(p=>p.id!==exceptId&&!(end<p.start||start>p.end))}
 
 // ---------- render ----------
-function render(){try{localStorage.setItem("kintore-ui",JSON.stringify({tab,sel,day:todayK}))}catch(e){}
+function render(){try{localStorage.setItem("kintore-ui",JSON.stringify({tab,sel,day:todayK,fc:freqCondId}))}catch(e){}
   const ae=document.activeElement,fid=ae&&ae.id&&ae.matches&&ae.matches("input,textarea")?ae.id:null;
   let ss=null,se=null;try{if(fid){ss=ae.selectionStart;se=ae.selectionEnd}}catch(e){}
   renderInner();
@@ -1042,10 +1048,12 @@ function renderInner(){
 
   const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";if($("weekMemoV"))linkSync(wm,$("weekMemoV"));
 
-  let sp=p;
-  if(allMode){if(!calMonth)calMonth=sel.slice(0,7);const [yy,mm]=calMonth.split("-").map(Number);sp={start:calMonth+"-01",end:key(new Date(yy,mm,0))};$("statsSub").textContent=yy+"年"+mm+"月";}
-  else $("statsSub").textContent=p?pLabel(p):"";
-  $("stats").replaceChildren(renderStats(sp,statsZero));
+  if(allMode&&!calMonth)calMonth=sel.slice(0,7);
+  // トレーニング頻度：今日を起点に全期間を横スクロール。条件で種目を絞れる
+  const fr=freqRange(),fcond=freqConds.find(c=>c.id===freqCondId);
+  $("statsSub").textContent=fcond?fcond.name:"";
+  $("stats").replaceChildren(renderStats(fr,true,condFilter(fcond)));
+  renderFreqCond();
   $("reflPanel").hidden=allMode||!p;$("reflSub").textContent=p&&!allMode?pLabel(p):"";
   renderRecords();
   document.querySelectorAll(".tabbar button").forEach(b=>b.classList.toggle("on",b.dataset.tab===tab));
@@ -1300,7 +1308,7 @@ function sortable(container,sel,onDrop,opt={}){
   });
 }
 // 期間内のカテゴリ別・種目別の回数とやった日のマス
-function renderStats(p,showZero){
+function renderStats(p,showZero,filterIds){
   const box=el("div",{class:"stats"});
   if(!p){box.append(el("div",{class:"empty"},"期間を作ると、ここに回数が出ます。"));return box}
   const L=plen(p),days=[];for(let i=0;i<L;i++){const k=addK(p.start,i);days.push({k,ids:dayItems(k)})}
@@ -1319,8 +1327,10 @@ function renderStats(p,showZero){
   box.append(el("div",{class:"sthead"},el("div",{class:"srow"},el("span"),el("span"),wrapS(ym)),el("div",{class:"srow"},el("span",{class:"nm note"}),el("span"),wrapS(head))));
   let any=false;
   cats.forEach(c=>{const fr=IDX.folders[c.id],all=fr?fr.all:[];
-    const itemRows=all.map(id=>{const x=IDX.items[id];const on=days.map(d=>d.ids.some(x=>baseId(x)===id));return {i:x.item,dead:x.deleted,on,n:on.filter(Boolean).length}}).filter(x=>x.n>0||(showZero&&!x.dead));
-    const conOn=days.map(d=>d.ids.some(id=>all.includes(id))),cn=conOn.filter(Boolean).length;
+    const itemRows=all.map(id=>{const x=IDX.items[id];const on=days.map(d=>d.ids.some(z=>baseId(z)===id));return {id,i:x.item,dead:x.deleted,on,n:on.filter(Boolean).length}}).filter(x=>(!filterIds||filterIds.has(x.id))&&(x.n>0||(showZero&&!x.dead)));
+    const conIds=filterIds?all.filter(id=>filterIds.has(id)):all;
+    const conOn=days.map(d=>d.ids.some(z=>conIds.includes(baseId(z)))),cn=conOn.filter(Boolean).length;
+    if(filterIds&&!itemRows.length)return;
     if(!cn&&!(showZero&&!c.deleted))return;any=true;
     const g=el("div",{class:"sgroup"});
     g.append(el("div",{class:"srow cat"+(cn?"":" zero")},el("span",{class:"nm"},el("span",{class:"dot",style:"background:"+c.color}),c.name),el("span",{class:"ct"},String(cn),el("small",null,"日")),strip(conOn,c.color)));
@@ -1344,6 +1354,51 @@ function renderStats(p,showZero){
   return box;
 }
 const statsX={};
+// 頻度の表示範囲：記録や期間のある全日付＋今日、前後に余白
+function freqRange(){const ks=recordDays();let mn=todayK,mx=todayK;
+  ks.forEach(k=>{if(/^\d{4}-\d{2}-\d{2}$/.test(k)){if(k<mn)mn=k;if(k>mx)mx=k;}});
+  periods.forEach(q=>{if(q.start&&q.start<mn)mn=q.start;if(q.end&&q.end>mx)mx=q.end;});
+  return {start:addK(mn,-14),end:addK(mx,28),id:"__freq"};}
+// 条件 → 表示する種目のbaseId集合（nullなら全種目）
+function condFilter(cond){if(!cond)return null;const sset=new Set();(cond.ids||[]).forEach(x=>{if(IDX.folders[x])IDX.folders[x].all.forEach(i=>sset.add(i));else if(IDX.items[x])sset.add(x);});return sset.size?sset:new Set(["__none__"]);}
+function closeFreqCond(){freqCondOpen=false;freqCondEdit=null;keepY(render);}
+function saveFreqCond(){const nm=freqCondName.trim();if(!nm){toast("名前を入力してください");const n=$("fcName");if(n)n.focus();return}
+  if(!freqCondSel.size){toast("種目を選んでください");return}
+  if(freqCondEdit==="new"){const id="fc_"+uid();freqConds.push({id,name:nm,ids:[...freqCondSel]});freqCondId=id;}
+  else{const c=freqConds.find(x=>x.id===freqCondEdit);if(c){c.name=nm;c.ids=[...freqCondSel];}}
+  freqCondEdit=null;touch();keepY(render);toast("保存しました");}
+function renderFreqCond(){const box=$("freqCondPanel");if(!box)return;box.replaceChildren();
+  const btn=$("freqCondBtn");if(btn)btn.classList.toggle("on",freqCondOpen);
+  if(!freqCondOpen)return;
+  const pan=el("div",{class:"tpanel fcpanel"});
+  if(freqCondEdit){
+    const ex=freqCondEdit==="new"?null:freqConds.find(c=>c.id===freqCondEdit);
+    pan.append(el("div",{class:"rmh"},el("button",{class:"mini",onclick:()=>{freqCondEdit=null;keepY(render)}},"‹"),el("b",null,ex?"条件を編集":"新しい条件"),el("button",{class:"mini tclose","aria-label":"閉じる",onclick:closeFreqCond},"✕")));
+    const ni=el("input",{type:"text",class:"fcname",id:"fcName",value:freqCondName,placeholder:"名前","aria-label":"条件の名前"});
+    ni.addEventListener("input",()=>{freqCondName=ni.value});ni.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();saveFreqCond()}});
+    pan.append(ni,el("div",{class:"note fcsub"},"表示する種目を選ぶ"));
+    const tl=el("div",{class:"extree"});
+    const row=(n,dep,isFolder)=>{const on=freqCondSel.has(n.id);
+      const r=el("div",{class:"exrow"+(on?" on":"")+(isFolder?" fo":""),style:"padding-left:"+(6+dep*16)+"px"});
+      r.append(el("button",{class:"exn",onclick:()=>{if(on)freqCondSel.delete(n.id);else freqCondSel.add(n.id);keepY(render)}},(dep?"ー":"")+n.name),el("span",{class:"exck"},on?"✓":""));
+      tl.append(r)};
+    const walk=(arr,dep)=>arr.forEach(n=>{if(n.deleted)return;const fo=dep===0||isF(n);row(n,dep,fo);if(fo)walk(n.items||[],dep+1)});
+    walk(cats,0);pan.append(tl);
+    const foot=el("div",{class:"tpfoot"});
+    if(ex)foot.append(el("button",{class:"mini del",onclick:()=>{freqConds=freqConds.filter(c=>c.id!==ex.id);if(freqCondId===ex.id)freqCondId=null;freqCondEdit=null;touch();keepY(render);toast("削除しました")}},"削除"));
+    foot.append(el("span",{style:"flex:1"}),el("button",{class:"primary mini",onclick:saveFreqCond},"保存"));
+    pan.append(foot);
+  }else{
+    pan.append(el("div",{class:"rmh"},el("b",null,"条件"),el("button",{class:"mini tclose","aria-label":"閉じる",onclick:closeFreqCond},"✕")));
+    const list=el("div",{class:"fclist"});
+    const opt=(id,name)=>{const on=freqCondId===id,r=el("div",{class:"fcopt"+(on?" on":"")});
+      r.append(el("button",{class:"fcsel",onclick:()=>{freqCondId=id;keepY(render)}},el("span",{class:"tbx"},on?"✓":""),el("span",{class:"fcn"},name)));
+      if(id!==null)r.append(el("button",{class:"mini",onclick:()=>{freqCondEdit=id;const c=freqConds.find(x=>x.id===id);freqCondName=c?c.name:"";freqCondSel=new Set(c?c.ids:[]);keepY(render)}},"編集"));
+      list.append(r)};
+    opt(null,"全種目");freqConds.forEach(c=>opt(c.id,c.name));
+    pan.append(list,el("div",{class:"tpfoot"},el("span",{style:"flex:1"}),el("button",{class:"mini",onclick:()=>{freqCondEdit="new";freqCondName="";freqCondSel=new Set();keepY(render)}},"＋ 新しい条件")));
+  }
+  box.append(pan);}
 // ===== トレーニング記録（重量・回数・推定1RM・セットごとのメモ） =====
 let LOGKEYS=[];
 const toNum=v=>{const x=parseFloat(String(v==null?"":v).replace(",","."));return isFinite(x)?x:NaN};
@@ -1843,6 +1898,8 @@ document.addEventListener("click",e=>{if(!recMkOpen)return;if(!e.composedPath().
 document.addEventListener("click",e=>{if(!recExOpen)return;const box=$("recEx");if(box&&!e.composedPath().includes(box)){recExOpen=false;keepY(render)}});
 document.querySelectorAll("#tabRec .recf .viewsw button").forEach(b=>b.addEventListener("click",()=>{recMode=b.dataset.m;if(recMode==="range"&&!recFrom){recFrom=addK(todayK,-30);recTo=addK(todayK,-1)}render()}));
 $("recSort").onclick=()=>{recAsc=!recAsc;render()};
+$("freqCondBtn").onclick=()=>{freqCondOpen=!freqCondOpen;if(!freqCondOpen)freqCondEdit=null;keepY(render)};
+document.addEventListener("pointerdown",e=>{if(!freqCondOpen||freqCondEdit)return;const pn=$("freqCondPanel"),bt=$("freqCondBtn");if((pn&&e.composedPath().includes(pn))||(bt&&e.composedPath().includes(bt)))return;freqCondOpen=false;keepY(render)});
 document.querySelectorAll("#recView button").forEach(b=>b.addEventListener("click",()=>{recView=b.dataset.v;render()}));
 // 履歴のカレンダー表示：記録がある日に種目の色を出し、押すとその日の内容を開く
 function recCalendar(box,list){const set=new Set(list);
@@ -2217,8 +2274,8 @@ const FB_COLLECTION="kintoreMenu";
 const LS="kintore-menu-v3";
 const SEED={"cats": [{"color": "#d4561c", "id": "7synawt", "items": [{"id": "c8b941y", "name": "ベンチ9割"}, {"id": "6pb4x0y", "name": "ベンチ7割"}, {"id": "daiyvo3", "name": "ダンベルプレス"}], "name": "胸"}, {"color": "#2f6fd0", "id": "i1us2f2", "items": [{"id": "45uah5d", "name": "デッドリフト"}, {"id": "l5rbud5", "name": "懸垂"}, {"id": "81mflf5", "name": "ローイング"}], "name": "背中"}, {"color": "#2f8a57", "id": "e9b6h5u", "items": [{"id": "117e0pf", "name": "スクワット"}, {"id": "wu4kol4", "name": "レッグプレス"}], "name": "脚"}, {"color": "#8a4fc4", "id": "xotib05", "items": [{"id": "h5hk2c7", "name": "ショルダープレス"}, {"id": "4fq1afl", "name": "サイドレイズ"}], "name": "肩"}, {"color": "#c23a6b", "id": "bk3mpcs", "items": [{"id": "7uez3o6", "name": "カール"}, {"id": "ih9sd1l", "name": "トライセプス"}], "name": "腕"}], "plan": {"2026-10-02": ["6pb4x0y"]}, "notes": {}, "periods": [{"end": "2026-10-04", "id": "p0928", "rules": [], "start": "2026-09-28"}], "updatedAt": 0};
 let updatedAt=0,fbUser=null,fbDb=null,unsub=null,pushT=null;
-const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF,updatedAt});
-function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rmF=clone(s.rmF||{custom:[],sel:{}});rebuildIdx();updatedAt=s.updatedAt||0}
+const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF,freqConds,updatedAt});
+function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rmF=clone(s.rmF||{custom:[],sel:{}});freqConds=clone(s.freqConds||[]);rebuildIdx();updatedAt=s.updatedAt||0}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(storeObj()))}catch(e){}}
 function lsLoad(){try{const s=JSON.parse(localStorage.getItem(LS)||"null");if(s&&s.cats){applyStore(s);return}}catch(e){}applyStore(SEED)}
 function setSync(msg,state){$("sync").replaceChildren(el("span",{class:"sync-dot"+(state?" "+state:"")}),document.createTextNode(msg))}
@@ -2226,14 +2283,14 @@ const stamp=t=>{if(!t)return"";const d=new Date(t);return (d.getMonth()+1)+"/"+d
 function touch(){updatedAt=Date.now();lsSave();push();if(!histApplying)histNote()}
 // ===== 戻す／進む（操作の履歴） =====
 let hist=[],hpos=-1,histT=null,histApplying=false;
-const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","tags","dayTags","logs","templates","exNotes","trash","rmF"];
-function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF})}
+const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","tags","dayTags","logs","templates","exNotes","trash","rmF","freqConds"];
+function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF,freqConds})}
 function histCommit(){clearTimeout(histT);histT=null;const st=snapState();if(hist[hpos]===st)return;hist=hist.slice(0,hpos+1);hist.push(st);if(hist.length>60)hist.shift();hpos=hist.length-1;paintHist()}
 // 文字入力中はまとめて1回分、ボタン操作などはその都度1回分として記録
 function histNote(){const a=document.activeElement;if(a&&a.matches&&a.matches("input[type=text],input:not([type]),textarea")&&!a.closest("#appbar")){clearTimeout(histT);histT=setTimeout(histCommit,900);paintHist(true)}else histCommit()}
 function histReset(){hist=[snapState()];hpos=0;paintHist()}
 function histGo(d){if(histT)histCommit();const to=hpos+d;if(to<0||to>=hist.length)return;hpos=to;const o=JSON.parse(hist[hpos]);
-  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];rmF=o.rmF||{custom:[],sel:{}};
+  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];rmF=o.rmF||{custom:[],sel:{}};freqConds=o.freqConds||[];
   rebuildIdx();if(curId&&!P(curId))pickInitial();histApplying=true;try{touch()}finally{histApplying=false}render();toast(d<0?"ひとつ前に戻しました":"やり直しました")}
 function paintHist(pending){const u=$("hUndo"),r=$("hRedo");if(!u)return;const pend=!!(pending||histT);u.disabled=!(hpos>0||pend);r.disabled=pend||!(hpos<hist.length-1);const n=$("hTrashN");if(n){n.hidden=!trash.length;n.textContent=String(trash.length)}}
 $("hBrand").onclick=()=>{tab="menu";perMode=null;render();window.scrollTo({top:0,behavior:"smooth"})};
@@ -2302,7 +2359,7 @@ $("authBtn").addEventListener("click",()=>{
 
 lsLoad();ensureMarks();rebuildIdx();if(purgeTrash()){rebuildIdx();lsSave()}histReset();pickInitial();
 // 再読み込みしても、開いていた画面（メニュー・記録・履歴）と日付をそのままにする
-try{const u=JSON.parse(localStorage.getItem("kintore-ui")||"null");if(u){if(["menu","log","rec"].includes(u.tab))tab=u.tab;if(u.day===todayK&&u.sel&&/^\d{4}-\d{2}-\d{2}$/.test(u.sel)){sel=u.sel;const q=periodFor(sel);if(q)curId=q.id;userNavigated=true}}}catch(e){}
+try{const u=JSON.parse(localStorage.getItem("kintore-ui")||"null");if(u){if(["menu","log","rec"].includes(u.tab))tab=u.tab;if(u.day===todayK&&u.sel&&/^\d{4}-\d{2}-\d{2}$/.test(u.sel)){sel=u.sel;const q=periodFor(sel);if(q)curId=q.id;userNavigated=true}if(u.fc)freqCondId=u.fc;}}catch(e){}
 render();initFirebase();
 // 日付が変わった状態で戻ってきたら「今日」を更新して、今日の期間を開き直す
 function refreshToday(){const t=new Date();t.setHours(0,0,0,0);const k=key(t);if(k===todayK)return;today=t;todayK=k;userNavigated=false;pickInitial();render()}
