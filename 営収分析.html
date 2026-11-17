@@ -1192,6 +1192,9 @@ function renderDayMode(){
   }
   const multiNote = selDates.length>1 ? `<br><span class="muted small">複数選択中：最新日 ${date} を表示</span>` : '';
   const day=DB.find(x=>x.date===date), rides=dayRides(date);
+  const track=shiftObj(date);
+  const hasTrack = track && track.points && track.points.length>=2;
+  if(hasTrack) drawStateRoute(track, buildStateIntervals(day, track.startT));   // GPS録跡を状態で色分け（マーカーの下に敷く）
   rides.forEach((r,i)=>{
     if(r.fromLat==null) return;
     const col = r.outlier? cv('--s4') : cv('--s1');
@@ -1200,7 +1203,7 @@ function renderDayMode(){
       .bindPopup(`<b>${i+1}. ${r.on}〜${r.off} ${r.type||''}${r.outlier?' ⚠':''}</b><br>${esc(r.from)}<br>→ ${esc(r.to)}<br>${fmtYen(r.fare)}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`)
       .addTo(layerGroup);
     if(r.toLat!=null){
-      L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.55}).addTo(layerGroup);
+      if(!hasTrack) L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.55}).addTo(layerGroup);  // 録跡が無い日は従来の直線
       L.circleMarker([r.toLat,r.toLng],{radius:5,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1})
         .bindPopup(`${i+1}. 降車 ${r.off||''}<br>${esc(r.to)}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
     }
@@ -1218,8 +1221,45 @@ function renderDayMode(){
       ['客単価', fmtYen(m.tanka)]
     ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val" style="font-size:18px">${v}</div></div>`).join('');
   }
-  legend.innerHTML='<b>営業ルート</b>'+multiNote+'<br><span class="muted small">選んだ日の営業を時刻順に番号付きで表示（青＝乗車 / 橙＝降車、⚠は外れ値）。1が最初に乗せた場所。</span>';
+  if(hasTrack){
+    legend.innerHTML='<b>営業ルート</b>'+multiNote+'<br><span class="muted small">GPS録跡を状態で色分け（番号＝乗せた順 / 橙点＝降車）。</span>'+routeLegendHTML();
+  } else {
+    legend.innerHTML='<b>営業ルート</b>'+multiNote+'<br><span class="muted small">選んだ日の営業を時刻順に番号付きで表示（青＝乗車 / 橙＝降車、⚠は外れ値）。録跡があれば走行ルートを色分け表示。</span>';
+  }
   renderDayTimeline(date, rides);
+}
+/* 状態の色・名前 */
+const STATE_COL={jitsu:'--s1', kuusha:'--muted', gei:'--s3', kaiso:'--s4', unknown:'--s5'};
+const STATE_JP ={jitsu:'実車', kuusha:'空車', gei:'迎車', kaiso:'回送', unknown:'不明'};
+function routeLegendHTML(){
+  return '<div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px">'+
+    ['jitsu','kuusha','gei','kaiso','unknown'].map(k=>`<span class="small" style="display:inline-flex;align-items:center;gap:4px"><i style="width:16px;height:4px;border-radius:2px;background:${cv(STATE_COL[k])};display:inline-block"></i>${STATE_JP[k]}</span>`).join('')+'</div>';
+}
+/* HH:MM を、その乗務（基準時刻refMs）に合うエポック時刻へ。日跨ぎは翌日扱い */
+function hmToEpochForShift(hm, refMs){ if(!hm) return null; const ref=new Date(refMs); const p=String(hm).split(':');
+  let d=new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), +p[0], +p[1], 0).getTime();
+  if(d < refMs-2*3600000) d+=86400000; return d; }
+/* 乗車(on〜off)＝実車、runの各状態 → 時刻区間リスト */
+function buildStateIntervals(day, refMs){
+  const iv=[];
+  ((day&&day.rides)||[]).forEach(r=>{ const s=hmToEpochForShift(r.on,refMs), e=hmToEpochForShift(r.off,refMs); if(s!=null&&e!=null&&e>=s) iv.push({state:'jitsu',s,e}); });
+  const run=(day&&day.run)||{};
+  ['kuusha','gei','kaiso','jitsu'].forEach(k=>(run[k]||[]).forEach(a=>{ const s=hmToEpochForShift(a[0],refMs), e=hmToEpochForShift(a[1],refMs); if(s!=null&&e!=null&&e>=s) iv.push({state:k,s,e}); }));
+  return iv;
+}
+function stateAt(ms, iv){ for(const x of iv){ if(ms>=x.s && ms<=x.e) return x.state; } return 'unknown'; }
+/* GPS録跡を状態ごとに色を変えて線で描く */
+function drawStateRoute(track, iv){
+  const pts=track.points; const s0=track.startT, e0=track.endT;
+  let cur=null;
+  const addSeg=seg=>{ if(seg.latlngs.length>=2) L.polyline(seg.latlngs,{color:cv(STATE_COL[seg.state]||'--s5'), weight:5, opacity:.85}).addTo(layerGroup); };
+  for(let i=0;i<pts.length;i++){
+    if(pts[i].t<s0-1000 || pts[i].t>e0+1000) continue;   // 乗務開始/終了で絞った範囲だけ
+    const st=stateAt(pts[i].t, iv);
+    if(!cur || cur.state!==st){ if(cur) addSeg(cur); cur={state:st, latlngs: cur? [cur.latlngs[cur.latlngs.length-1]] : []}; }
+    cur.latlngs.push([pts[i].lat, pts[i].lng]);
+  }
+  if(cur) addSeg(cur);
 }
 /* 出庫(13時)をまたぐ時間帯は勤務の頭に寄せて並べる */
 function evSortT(w){ const a=shiftMin(w.from), b=shiftMin(w.to); return b<a? 780 : a; }
