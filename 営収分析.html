@@ -366,6 +366,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <button data-m="tanka" class="active">乗降地と単価</button>
           <button data-m="heat">乗車ヒート</button>
           <button data-m="day">営業ルート</button>
+          <button data-m="nopick">乗せられない場所</button>
         </div>
         <div class="grp">
           <label class="chip">時間</label>
@@ -1145,12 +1146,13 @@ function renderMap(){
     legend.innerHTML='<b>乗車ヒート</b><div class="legend-bar"></div><span class="muted small">乗車の多さ。薄い＝少ない / 濃い＝よく拾える。</span>';
   }
   else if(mapMode==='day'){ renderDayMode(); }
-  if(mapCatFilter && mapMode!=='day'){   // カテゴリ絞り込み中はバッジと件数を先頭に出す
+  else if(mapMode==='nopick'){ renderNoPick(); }
+  if(mapCatFilter && mapMode!=='day' && mapMode!=='nopick'){   // カテゴリ絞り込み中はバッジと件数を先頭に出す
     legend.innerHTML=`<div style="margin-bottom:6px"><span class="pill">🏷 ${esc(mapCatFilter)}</span> <span class="muted small">この客だけ ${rides.length}件 表示中</span></div>`+legend.innerHTML;
   }
   // 外れ値・メモ付きマーカー(⚠)。乗車地と同じ仕組み：タップ1回目=降車地・日付・単価、2回目=編集、3回目=消す
   // tankaは乗車地の丸がその役割を持つので二重表示しない
-  if(mapMode!=='day' && mapMode!=='tanka'){
+  if(mapMode!=='day' && mapMode!=='tanka' && mapMode!=='nopick'){
     mapRides().filter(r=> r.fromLat!=null && (r.outlier||r.memo)).forEach(r=>{
       const a={lat:r.fromLat, lng:r.fromLng, fare:(+r.fare||0), n:1, rides:[r]};   // 1件だけの集計
       const mk=L.circleMarker([r.fromLat,r.fromLng],{radius:9,color:cv('--s4'),fillColor:cv('--s4'),fillOpacity:.9,weight:2});
@@ -1248,6 +1250,28 @@ function buildStateIntervals(day, refMs){
   return iv;
 }
 function stateAt(ms, iv){ for(const x of iv){ if(ms>=x.s && ms<=x.e) return x.state; } return 'unknown'; }
+/* 乗せられない場所：空車・迎車で走ったルートを線で表示（絞り込んだ日のGPS録跡を重ねる） */
+const NOPICK_COL={kuusha:'--muted', gei:'--s3'};
+function drawNoPick(track, iv){
+  const pts=track.points, s0=track.startT, e0=track.endT; let cur=null;
+  const addSeg=seg=>{ if(seg.latlngs.length>=2 && NOPICK_COL[seg.state]) L.polyline(seg.latlngs,{color:cv(NOPICK_COL[seg.state]), weight:4, opacity:.35}).addTo(layerGroup); };
+  for(let i=0;i<pts.length;i++){ if(pts[i].t<s0-1000||pts[i].t>e0+1000) continue;
+    const st=stateAt(pts[i].t, iv);
+    if(!cur||cur.state!==st){ if(cur) addSeg(cur); cur={state:st, latlngs: cur?[cur.latlngs[cur.latlngs.length-1]]:[]}; }
+    cur.latlngs.push([pts[i].lat, pts[i].lng]); }
+  if(cur) addSeg(cur);
+}
+function renderNoPick(){
+  const legend=document.getElementById('mapLegend');
+  const kpi=document.getElementById('mapDayKpi'); if(kpi) kpi.style.display='none';
+  const ml=document.getElementById('mapMemoList'); if(ml) ml.innerHTML='';
+  const days=scopedDays(); let n=0;
+  days.forEach(d=>{ const track=shiftObj(d.date); if(!track||!track.points||track.points.length<2) return;
+    drawNoPick(track, buildStateIntervals(d, track.startT)); n++; });
+  const sw=k=>`<span class="small" style="display:inline-flex;align-items:center;gap:4px"><i style="width:16px;height:4px;border-radius:2px;background:${cv(NOPICK_COL[k])};display:inline-block"></i>${STATE_JP[k]}</span>`;
+  legend.innerHTML='<b>乗せられない場所</b><br><span class="muted small">'+(n?`空車・迎車で走ったルート（録跡 ${n}日分）。線が濃い＝よく通る＝拾いにくい。`:'この絞り込みに、GPS録跡のある日がまだ無い。')+'</span>'+
+    (n?`<div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px">${sw('kuusha')}${sw('gei')}</div>`:'');
+}
 /* GPS録跡を状態ごとに色を変えて線で描く */
 function drawStateRoute(track, iv){
   const pts=track.points; const s0=track.startT, e0=track.endT;
@@ -1925,7 +1949,7 @@ function getHmSel(id){ const h=document.querySelector(`.hmsel[data-id="${id}"][d
 function renderShiftList(){
   const box=document.getElementById('shiftList'); if(!box) return;
   const dates=Object.keys(TRACKS).sort((a,b)=>a<b?1:-1);
-  box.innerHTML=dates.map(dt=>{ const s=shiftObj(dt); if(!s||!s.points||!s.points.length) return '';
+  box.innerHTML=dates.map(dt=>{ const s=shiftObj(dt); if(!s||!s.points||!s.points.length||s.archived) return '';   // 保存済みはリストから消す
     return `<button class="icon-btn shiftChip" data-date="${dt}" style="padding:3px 8px">📍 ${dt.slice(5)} ${tHM(s.startT)}–${tHM(s.endT)} <span class="muted small">${s.points.length}pt/${trackKm(s.points).toFixed(1)}km</span></button>`;
   }).join('');
   box.querySelectorAll('.shiftChip').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openShiftEdit(b.dataset.date); });
@@ -1936,7 +1960,8 @@ function openShiftEdit(date){
   pop.innerHTML=`<div class="small muted" style="margin-bottom:6px">${date} の乗務記録（${s.points.length}点・${trackKm(s.points).toFixed(1)}km）</div>
     <div style="margin:5px 0">乗務開始 <span id="seStartSel"></span></div>
     <div style="margin:5px 0">乗務終了 <span id="seEndSel"></span></div>
-    <div class="row" style="margin-top:10px; gap:6px"><button class="icon-btn" id="seDel" style="color:var(--s8)">この記録を削除</button><button class="icon-btn" id="seClose">閉じる</button></div>`;
+    <div class="row" style="margin-top:10px; gap:6px"><button class="icon-btn" id="seSave" style="border-color:var(--accent)">保存（リストから消す）</button><button class="icon-btn" id="seDel" style="color:var(--s8)">削除</button><button class="icon-btn" id="seClose">閉じる</button></div>
+    <p class="small muted" style="margin-top:6px">保存してもデータは残る（地図の営業ルート・乗せられない場所で使える）。削除は記録ごと消す。</p>`;
   document.getElementById('seStartSel').innerHTML=hmSelPlain('seS', tHM(s.startT));
   document.getElementById('seEndSel').innerHTML=hmSelPlain('seE', tHM(s.endT));
   pop.querySelectorAll('.hmsel').forEach(x=>x.onchange=()=>{
@@ -1945,6 +1970,7 @@ function openShiftEdit(date){
     s.endT  =hmToShiftMs(date, en, hm2min(st));   // 終了が開始より前なら翌日扱い
     saveTracks(); renderShiftList();
   });
+  document.getElementById('seSave').onclick=()=>{ s.archived=true; saveTracks(); renderShiftList(); pop.style.display='none'; };
   document.getElementById('seDel').onclick=()=>{ if(confirm(date+' の乗務記録を削除する？')){ delete TRACKS[date]; saveTracks(); renderShiftList(); pop.style.display='none'; } };
   document.getElementById('seClose').onclick=()=>{ pop.style.display='none'; };
 }
