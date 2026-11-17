@@ -99,9 +99,23 @@ main{padding:16px; max-width:1100px; margin:0 auto}
 /* 稼働時間（実車/空車/迎車/回送）の区間入力 */
 .run-tag{display:inline-block; min-width:40px; font-size:11px; padding:1px 7px; border-radius:6px; color:#fff; text-align:center; margin-right:4px}
 .run-tag.jitsu{background:var(--s1)} .run-tag.kuusha{background:var(--muted)} .run-tag.gei{background:var(--s3)} .run-tag.kaiso{background:var(--s4)}
-.run-iv{display:inline-flex; align-items:center; gap:2px; margin-right:8px}
-.run-iv input[type=time]{padding:2px 4px; font-size:12px}
+.run-iv{display:inline-flex; align-items:center; gap:2px; margin-right:8px; flex-wrap:wrap}
+.run-iv .rsel{padding:2px 4px; font-size:12px}
 .runDel{background:none; border:none; color:var(--s8); cursor:pointer; font-size:13px}
+/* 営業（乗車）を住所/地図で追加 */
+.eig-grid{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.eig-grid input,.eig-grid select{font-size:12px; padding:3px 5px}
+.eig-ac{position:relative}
+.eig-ac input.eaddr{min-width:200px}
+.ac-list{position:absolute; top:100%; left:0; right:0; z-index:40; background:var(--surface); border:1px solid var(--border); border-radius:8px; max-height:190px; overflow:auto; box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.ac-item{padding:6px 9px; font-size:12px; cursor:pointer; border-bottom:1px solid var(--border)}
+.ac-item:hover{background:var(--surface2)}
+/* 地図ピッカー・モーダル */
+.pick-modal{position:fixed; inset:0; z-index:3000; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center}
+.pick-box{background:var(--surface); border:1px solid var(--border); border-radius:14px; width:min(92vw,560px); padding:12px}
+.pick-box #pickMap{height:min(60vh,420px); border-radius:10px; overflow:hidden}
+.pick-head{display:flex; align-items:center; gap:8px; margin-bottom:8px}
+.pick-foot{display:flex; align-items:center; gap:8px; margin-top:8px}
 select,input[type=text],input[type=date],input[type=time],input[type=number],textarea{
   font-family:inherit; font-size:14px; background:var(--surface2); color:var(--ink);
   border:1px solid var(--border); border-radius:8px; padding:6px 8px;
@@ -369,8 +383,12 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <button class="icon-btn" id="locBtn">📍 現在地</button>
         <button class="icon-btn" id="oriBtn">🧭 N固定</button>
         <button class="icon-btn" id="fsBtn">⛶ 全画面</button>
-        <button class="icon-btn" id="shiftBtn" style="padding:3px 10px">▶ 乗務開始</button>
-        <span class="small muted" id="shiftStat"></span>
+        <span style="position:relative; display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap">
+          <button class="icon-btn" id="shiftBtn" style="padding:3px 10px">▶ 乗務開始</button>
+          <span class="small muted" id="shiftStat"></span>
+          <span id="shiftList" style="display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center"></span>
+          <div id="shiftPop" class="cal-pop" style="display:none; width:260px"></div>
+        </span>
         <span class="gc-status" id="gcStatus"></span>
       </div>
       <!-- 今日のイベント（営収とは別レイヤ） -->
@@ -468,6 +486,15 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     </div>
   </section>
 </main>
+
+<!-- 乗降地の地図ピッカー -->
+<div id="pickModal" class="pick-modal">
+  <div class="pick-box">
+    <div class="pick-head"><b id="pickTitle">地図で場所を選ぶ</b><span style="flex:1"></span><button class="icon-btn" id="pickClose">✕</button></div>
+    <div id="pickMap"></div>
+    <div class="pick-foot"><span class="small muted" id="pickAddr">地図をタップしてピンを置く（ドラッグで微調整）</span><span style="flex:1"></span><button class="icon-btn" id="pickOk">この場所にする</button></div>
+  </div>
+</div>
 
 <script>
 /* ============================================================
@@ -1816,7 +1843,7 @@ function persistActive(){ try{ localStorage.setItem(LS_TRACK_ACT, JSON.stringify
 function onRecPos(p){
   const pt={t:Date.now(), lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy||0)};
   const last=recTrack[recTrack.length-1];
-  if(last){ const d=distM(last,pt), dt=pt.t-last.t; if(d<12 && dt<8000) return; }   // 間引き（12m or 8秒）
+  if(last){ const d=distM(last,pt), dt=pt.t-last.t; if(d<4 && dt<2500) return; }   // ほぼ常時記録（4m or 2.5秒ごと）
   recTrack.push(pt); updateRecLine(); updateShiftBtn();
   const st=document.getElementById('gcStatus'); if(st) st.textContent='';
   if(Date.now()-recLastSave>5000){ persistActive(); recLastSave=Date.now(); }
@@ -1827,7 +1854,7 @@ function startShift(resume){
   if(!navigator.geolocation){ alert('この端末では位置情報が使えない'); return; }
   recOn=true;
   if(!resume){ recDate=todayStr(); recTrack=[]; persistActive(); }
-  try{ recWatchId=navigator.geolocation.watchPosition(onRecPos, onRecErr, {enableHighAccuracy:true, maximumAge:1000, timeout:20000}); }
+  try{ recWatchId=navigator.geolocation.watchPosition(onRecPos, onRecErr, {enableHighAccuracy:true, maximumAge:0, timeout:20000}); }
   catch(e){ onRecErr(e); }
   updateShiftBtn(); updateRecLine();
 }
@@ -1836,10 +1863,50 @@ function stopShift(){
   if(!confirm('乗務を終了して記録を保存する？')) return;
   if(recWatchId!=null && navigator.geolocation){ navigator.geolocation.clearWatch(recWatchId); recWatchId=null; }
   recOn=false;
-  if(recTrack.length>=2){ TRACKS[recDate]=recTrack; saveTracks(); }
+  if(recTrack.length>=2){ TRACKS[recDate]={points:recTrack, startT:recTrack[0].t, endT:recTrack[recTrack.length-1].t}; saveTracks(); }
   try{ localStorage.removeItem(LS_TRACK_ACT); }catch(e){}
-  updateShiftBtn();
+  if(recLine && map){ try{ map.removeLayer(recLine); }catch(e){} recLine=null; }
+  updateShiftBtn(); renderShiftList();
   alert(`乗務記録を保存（${recDate}・${recTrack.length}点・約${trackKm(recTrack).toFixed(1)}km）`);
+}
+/* 録跡を正規化（旧＝配列 / 新＝{points,startT,endT}） */
+function shiftObj(date){ let v=TRACKS[date]; if(!v) return null;
+  if(Array.isArray(v)){ v={points:v, startT:(v[0]||{}).t, endT:(v[v.length-1]||{}).t}; TRACKS[date]=v; } return v; }
+function pad2(n){ return String(n).padStart(2,'0'); }
+function tHM(ms){ if(ms==null) return '--:--'; const d=new Date(ms); return pad2(d.getHours())+':'+pad2(d.getMinutes()); }
+function hm2min(hm){ const p=hm.split(':'); return (+p[0])*60+(+p[1]); }
+function hmToShiftMs(date, hm, startMin){ const mins=hm2min(hm); let base=new Date(date+'T00:00:00').getTime(); if(startMin!=null && mins<startMin) base+=86400000; return base+mins*60000; }
+function hmSelPlain(id, val){ const ok=val&&val!=='--:--'; const [h,m]=String(val||'').split(':');
+  const hop='<option value="">時</option>'+Array.from({length:24},(_,i)=>`<option value="${i}" ${(ok&&+h===i)?'selected':''}>${pad2(i)}</option>`).join('');
+  const mop='<option value="">分</option>'+Array.from({length:60},(_,i)=>`<option value="${i}" ${(ok&&+m===i)?'selected':''}>${pad2(i)}</option>`).join('');
+  return `<select class="hmsel" data-id="${id}" data-p="h">${hop}</select><span class="muted small">:</span><select class="hmsel" data-id="${id}" data-p="m">${mop}</select>`; }
+function getHmSel(id){ const h=document.querySelector(`.hmsel[data-id="${id}"][data-p="h"]`), m=document.querySelector(`.hmsel[data-id="${id}"][data-p="m"]`); if(!h||h.value==='') return ''; return pad2(+h.value)+':'+pad2(+(m.value||0)); }
+/* 乗務記録の一覧（乗務開始ボタンの横）＋ タップで編集 */
+function renderShiftList(){
+  const box=document.getElementById('shiftList'); if(!box) return;
+  const dates=Object.keys(TRACKS).sort((a,b)=>a<b?1:-1);
+  box.innerHTML=dates.map(dt=>{ const s=shiftObj(dt); if(!s||!s.points||!s.points.length) return '';
+    return `<button class="icon-btn shiftChip" data-date="${dt}" style="padding:3px 8px">📍 ${dt.slice(5)} ${tHM(s.startT)}–${tHM(s.endT)} <span class="muted small">${s.points.length}pt/${trackKm(s.points).toFixed(1)}km</span></button>`;
+  }).join('');
+  box.querySelectorAll('.shiftChip').forEach(b=>b.onclick=(e)=>{ e.stopPropagation(); openShiftEdit(b.dataset.date); });
+}
+function openShiftEdit(date){
+  const pop=document.getElementById('shiftPop'); const s=shiftObj(date); if(!pop||!s) return;
+  pop.style.display='block';
+  pop.innerHTML=`<div class="small muted" style="margin-bottom:6px">${date} の乗務記録（${s.points.length}点・${trackKm(s.points).toFixed(1)}km）</div>
+    <div style="margin:5px 0">乗務開始 <span id="seStartSel"></span></div>
+    <div style="margin:5px 0">乗務終了 <span id="seEndSel"></span></div>
+    <div class="row" style="margin-top:10px; gap:6px"><button class="icon-btn" id="seDel" style="color:var(--s8)">この記録を削除</button><button class="icon-btn" id="seClose">閉じる</button></div>`;
+  document.getElementById('seStartSel').innerHTML=hmSelPlain('seS', tHM(s.startT));
+  document.getElementById('seEndSel').innerHTML=hmSelPlain('seE', tHM(s.endT));
+  pop.querySelectorAll('.hmsel').forEach(x=>x.onchange=()=>{
+    const st=getHmSel('seS'), en=getHmSel('seE'); if(!st||!en) return;
+    s.startT=hmToShiftMs(date, st, null);
+    s.endT  =hmToShiftMs(date, en, hm2min(st));   // 終了が開始より前なら翌日扱い
+    saveTracks(); renderShiftList();
+  });
+  document.getElementById('seDel').onclick=()=>{ if(confirm(date+' の乗務記録を削除する？')){ delete TRACKS[date]; saveTracks(); renderShiftList(); pop.style.display='none'; } };
+  document.getElementById('seClose').onclick=()=>{ pop.style.display='none'; };
 }
 function resumeActiveTrack(){
   let a=null; try{ a=JSON.parse(localStorage.getItem(LS_TRACK_ACT)||'null'); }catch(e){}
@@ -1893,6 +1960,11 @@ document.getElementById('locBtn').onclick=()=>doLocate(true);
 document.getElementById('oriBtn').onclick=toggleOrient;
 document.getElementById('fsBtn').onclick=toggleFullscreen;
 document.getElementById('shiftBtn').onclick=()=> recOn? stopShift() : startShift(false);
+document.getElementById('pickOk').onclick=pickConfirm;
+document.getElementById('pickClose').onclick=closePick;
+document.addEventListener('click',e=>{ const p=document.getElementById('shiftPop');
+  if(!p||p.style.display==='none') return;
+  if(e.target.closest('#shiftPop')||e.target.closest('.shiftChip')) return; p.style.display='none'; });
 document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
   state.types=new Set([...document.querySelectorAll('.ftype:checked')].map(x=>x.value));
   renderCurrent();
@@ -2083,7 +2155,8 @@ function renderDayCards(list, days){
     const dnote=`<div class="ride-edit"><span class="small" style="min-width:88px">営業メモ</span>
       <textarea class="dn" data-date="${d.date}" placeholder="この営業についての覚え書き（道路・天気・イベント・気づき など）" style="flex:1; min-width:200px; min-height:46px; resize:vertical">${esc(d.note)}</textarea></div>`;
     const runBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">稼働時間</span><div id="run_${d.date}" style="flex:1; min-width:220px"></div></div>`;
-    const rides=wsel+dnote+runBlock+(d.rides||[]).map((r,i)=>{
+    const eigBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">営業</span><div class="eigyo-add" data-date="${d.date}" style="flex:1; min-width:260px"></div></div>`;
+    const rides=wsel+dnote+runBlock+eigBlock+(d.rides||[]).map((r,i)=>{
       const kuten=isKuten(r);
       return `<div class="ride-edit" data-date="${d.date}" data-i="${i}">
         <span class="small" style="min-width:88px">${r.on}〜${r.off}${kuten?' <span class="pill">空転</span>':''}</span>
@@ -2094,12 +2167,14 @@ function renderDayCards(list, days){
         <input type="text" class="mm" placeholder="メモ" value="${esc(r.memo)}" style="flex:2; min-width:150px">
       </div>`;
     }).join('');
-    return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
+    return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="unsel" data-d="${d.date}">選択解除</button> <button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
   }).join('');
-  days.forEach(d=>renderRunEditor(d.date));
+  days.forEach(d=>{ renderRunEditor(d.date); renderEigyoAdd(d.date); });
   list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=ensureDay(sel.dataset.date); day.weather=e.target.value; save(); renderPastDays(); renderCurrent(); }; });
   // 営業メモ（その日の営業まるごとに対するメモ）
   list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=ensureDay(t.dataset.date); day.note=e.target.value.trim(); save(); renderCurrent(); }; });
+  // 選択解除（データは消さずにリストから外す）
+  list.querySelectorAll('.unsel').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); dataSelDays.delete(b.dataset.d); renderDataTab(); });
   // 削除
   list.querySelectorAll('.del').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm(b.dataset.d+' を削除?')){ DB=DB.filter(x=>x.date!==b.dataset.d); dataSelDays.delete(b.dataset.d); save(); refreshDateSelector(); renderDataTab(); renderCurrent(); } });
   // 外れ値・メモ編集
@@ -2140,24 +2215,136 @@ function runOverlaps(run){
   for(let i=1;i<segs.length;i++){ if(segs[i][0]<segs[i-1][1]) return true; }
   return false;
 }
+/* 時:分を選ぶプルダウン（入力ではなく選択） */
+function hmSelect(k,j,f,val){
+  const [h,m]=String(val||'').split(':');
+  const hop='<option value="">時</option>'+Array.from({length:24},(_,i)=>`<option value="${i}" ${(val&&+h===i)?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('');
+  const mop='<option value="">分</option>'+Array.from({length:60},(_,i)=>`<option value="${i}" ${(val&&+m===i)?'selected':''}>${String(i).padStart(2,'0')}</option>`).join('');
+  return `<select class="rsel" data-k="${k}" data-j="${j}" data-f="${f}" data-p="h">${hop}</select><span class="muted small">:</span><select class="rsel" data-k="${k}" data-j="${j}" data-f="${f}" data-p="m">${mop}</select>`;
+}
 function renderRunEditor(date){
   const box=document.getElementById('run_'+date); if(!box) return;
   const day=DB.find(x=>x.date===date); const run=(day&&day.run)||{};
   box.innerHTML=RUN_STATES.map(([k,label])=>{
     const ivs=run[k]||[];
-    const rows=ivs.map((iv,j)=>`<span class="run-iv"><input type="time" class="rin" data-k="${k}" data-j="${j}" data-f="0" value="${esc(iv[0]||'')}"><span class="muted small">〜</span><input type="time" class="rin" data-k="${k}" data-j="${j}" data-f="1" value="${esc(iv[1]||'')}"><button class="runDel" data-k="${k}" data-j="${j}">×</button></span>`).join('');
-    return `<div style="margin:4px 0"><span class="run-tag ${k}">${label}</span>${rows||'<span class="muted small">なし</span>'} <button class="runAdd icon-btn" data-k="${k}" style="padding:1px 8px">＋</button></div>`;
+    const rows=ivs.map((iv,j)=>`<span class="run-iv">${hmSelect(k,j,0,iv[0])}<span class="muted small">〜</span>${hmSelect(k,j,1,iv[1])}<button class="runDel" data-k="${k}" data-j="${j}">×</button></span>`).join('');
+    return `<div style="margin:5px 0"><span class="run-tag ${k}">${label}</span>${rows||'<span class="muted small">なし</span>'} <button class="runAdd icon-btn" data-k="${k}" style="padding:1px 8px">＋</button></div>`;
   }).join('');
   box.querySelectorAll('.runAdd').forEach(b=>b.onclick=()=>{ const d=ensureDay(date); d.run=d.run||{}; (d.run[b.dataset.k]=d.run[b.dataset.k]||[]).push(['','']); save(); renderRunEditor(date); });
   box.querySelectorAll('.runDel').forEach(b=>b.onclick=()=>{ const d=DB.find(x=>x.date===date); if(!d||!d.run||!d.run[b.dataset.k]) return; d.run[b.dataset.k].splice(+b.dataset.j,1); save(); renderRunEditor(date); renderCurrent(); });
-  box.querySelectorAll('.rin').forEach(inp=>inp.onchange=()=>{
-    const d=ensureDay(date); d.run=d.run||{}; const k=inp.dataset.k, j=+inp.dataset.j, f=+inp.dataset.f;
+  box.querySelectorAll('.rsel').forEach(sel=>sel.onchange=()=>{
+    const d=ensureDay(date); d.run=d.run||{}; const k=sel.dataset.k, j=+sel.dataset.j, f=+sel.dataset.f;
     d.run[k]=d.run[k]||[]; d.run[k][j]=d.run[k][j]||['',''];
-    const old=d.run[k][j][f]; d.run[k][j][f]=inp.value;
+    const hSel=box.querySelector(`.rsel[data-k="${k}"][data-j="${j}"][data-f="${f}"][data-p="h"]`);
+    const mSel=box.querySelector(`.rsel[data-k="${k}"][data-j="${j}"][data-f="${f}"][data-p="m"]`);
+    const hv=hSel.value;                                   // 時を選べば分は未選択なら00扱い
+    const val = hv!=='' ? `${String(+hv).padStart(2,'0')}:${String(+(mSel.value||0)).padStart(2,'0')}` : '';
+    const old=d.run[k][j][f]; d.run[k][j][f]=val;
     if(runOverlaps(d.run)){ alert('その時間は他の区間と重なってる。別の時間にして。'); d.run[k][j][f]=old; renderRunEditor(date); return; }
     save(); renderCurrent();
   });
 }
+/* ---------- 営業（乗車）を住所/地図で追加（JSONを使わず） ---------- */
+async function gsiSearch(q){   // 住所候補
+  try{ const res=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(q));
+    const j=await res.json();
+    return (j||[]).filter(x=>x.geometry&&x.geometry.coordinates).map(x=>({title:(x.properties&&x.properties.title)||q, lng:x.geometry.coordinates[0], lat:x.geometry.coordinates[1]}));
+  }catch(e){ return []; }
+}
+async function gsiReverse(lat,lng){   // 座標→だいたいの住所（丁目名）
+  try{ const r=await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${lat}&lon=${lng}`);
+    const j=await r.json(); const nm=j&&j.results&&j.results.lv01Nm; return (nm&&nm!=='-')?nm:null;
+  }catch(e){ return null; }
+}
+function renderEigyoAdd(date){
+  const box=document.querySelector(`.eigyo-add[data-date="${date}"]`); if(!box) return;
+  box.innerHTML=`<div class="eig-grid">
+    <label class="small">乗車 <span class="ehm" data-k="on"></span></label>
+    <label class="small">降車 <span class="ehm" data-k="off"></span></label>
+    <div class="eig-ac"><input type="text" class="eaddr" data-f="from" placeholder="乗車地の住所"><button class="icon-btn emap" data-f="from" style="padding:2px 7px">🗺地図</button><div class="ac-list"></div></div>
+    <div class="eig-ac"><input type="text" class="eaddr" data-f="to" placeholder="降車地の住所"><button class="icon-btn emap" data-f="to" style="padding:2px 7px">🗺地図</button><div class="ac-list"></div></div>
+    <label class="small">料金 <input type="number" class="efare" placeholder="0" style="width:84px"></label>
+    <select class="etype"><option>アプリ</option><option>無線</option><option>流し</option></select>
+    <input type="text" class="epay" placeholder="支払(任意)" style="width:110px">
+    <button class="icon-btn eadd" style="padding:3px 10px">営業を追加</button></div>`;
+  box.querySelector('.ehm[data-k="on"]').innerHTML=hmSelPlain('eon_'+date,'');
+  box.querySelector('.ehm[data-k="off"]').innerHTML=hmSelPlain('eoff_'+date,'');
+  box.querySelectorAll('.eaddr').forEach(inp=>{
+    let timer=null;
+    inp.oninput=()=>{ inp.dataset.lat=''; inp.dataset.lng='';      // 手入力したら確定座標を外す（追加時に再検索）
+      clearTimeout(timer); const q=inp.value.trim(); const list=inp.parentNode.querySelector('.ac-list');
+      if(q.length<2){ list.innerHTML=''; return; }
+      timer=setTimeout(async()=>{ const cands=await gsiSearch(q);
+        list.innerHTML=cands.slice(0,6).map(c=>`<div class="ac-item" data-lat="${c.lat}" data-lng="${c.lng}">${esc(c.title)}</div>`).join('');
+        list.querySelectorAll('.ac-item').forEach(it=>it.onclick=()=>{ inp.value=it.textContent; inp.dataset.lat=it.dataset.lat; inp.dataset.lng=it.dataset.lng; list.innerHTML=''; });
+      },300);
+    };
+    inp.onblur=()=>setTimeout(()=>{ const l=inp.parentNode.querySelector('.ac-list'); if(l) l.innerHTML=''; },200);
+  });
+  box.querySelectorAll('.emap').forEach(b=>b.onclick=()=>openPickMap(date, b.dataset.f));
+  box.querySelector('.eadd').onclick=()=>addEigyo(date);
+}
+async function addEigyo(date){
+  const box=document.querySelector(`.eigyo-add[data-date="${date}"]`); if(!box) return;
+  const fromI=box.querySelector('.eaddr[data-f="from"]'), toI=box.querySelector('.eaddr[data-f="to"]');
+  const from=fromI.value.trim(), to=toI.value.trim();
+  if(!from){ alert('乗車地を入れて（住所入力か🗺地図で選択）'); return; }
+  async function coordOf(inp){
+    if(inp.dataset.lat) return [+inp.dataset.lat, +inp.dataset.lng];
+    const v=inp.value.trim(); if(!v) return null;
+    const c=await gsi(v); return c? [c[1], c[0]] : 'NF';   // gsiは[lng,lat]
+  }
+  const fc=await coordOf(fromI); if(fc==='NF'){ alert('乗車地の住所が見つからない：'+from); return; }
+  const tc=await coordOf(toI);   if(tc==='NF'){ alert('降車地の住所が見つからない：'+to); return; }
+  const day=ensureDay(date); day.rides=day.rides||[];
+  const ride={ type:box.querySelector('.etype').value, on:getHmSel('eon_'+date), off:getHmSel('eoff_'+date),
+    from, to, pay:box.querySelector('.epay').value.trim(), fare:+box.querySelector('.efare').value||0 };
+  if(fc){ ride.fromLat=fc[0]; ride.fromLng=fc[1]; if(from) GEO[from]=[fc[1],fc[0]]; }
+  if(tc){ ride.toLat=tc[0]; ride.toLng=tc[1]; if(to) GEO[to]=[tc[1],tc[0]]; }
+  day.rides.push(ride);
+  day.rides.sort((a,b)=> shiftMin(toMin(a.on))-shiftMin(toMin(b.on)) || 0);
+  save(); saveGeo(); renderPastDays(); renderCurrent();
+}
+/* 地図ピッカー */
+let pickMap=null, pickMarker=null, pickTarget=null;
+function openPickMap(date, field){
+  pickTarget={date, field};
+  document.getElementById('pickTitle').textContent = field==='from'?'乗車地を地図で選ぶ':'降車地を地図で選ぶ';
+  const m=document.getElementById('pickModal'); m.style.display='flex';
+  const inp=document.querySelector(`.eigyo-add[data-date="${date}"] .eaddr[data-f="${field}"]`);
+  setTimeout(()=>{
+    if(!window.L){ document.getElementById('pickAddr').textContent='地図を読み込めなかった'; return; }
+    if(!pickMap){ pickMap=L.map('pickMap').setView([35.68,139.76],13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, attribution:'© OpenStreetMap'}).addTo(pickMap);
+      pickMap.on('click',e=>setPickMarker(e.latlng.lat, e.latlng.lng, true));
+    }
+    pickMap.invalidateSize();
+    if(pickMarker){ pickMap.removeLayer(pickMarker); pickMarker=null; }
+    document.getElementById('pickAddr').textContent='地図をタップしてピンを置く（ドラッグで微調整）';
+    if(inp && inp.dataset.lat){ setPickMarker(+inp.dataset.lat, +inp.dataset.lng, true); pickMap.setView([+inp.dataset.lat,+inp.dataset.lng],16); }
+  },90);
+}
+function setPickMarker(lat,lng,rev){
+  if(!pickMap || !window.L) return;
+  if(!pickMarker){ pickMarker=L.marker([lat,lng],{draggable:true}).addTo(pickMap);
+    pickMarker.on('dragend',()=>{ const p=pickMarker.getLatLng(); reverseLabel(p.lat,p.lng); }); }
+  else pickMarker.setLatLng([lat,lng]);
+  if(rev) reverseLabel(lat,lng);
+}
+async function reverseLabel(lat,lng){
+  const el=document.getElementById('pickAddr'); if(el) el.textContent='住所を取得中…';
+  const a=await gsiReverse(lat,lng);
+  if(el) el.textContent = a || `地点 (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+  el.dataset.lat=lat; el.dataset.lng=lng; el.dataset.addr=a||'';
+}
+function pickConfirm(){
+  const el=document.getElementById('pickAddr');
+  if(!pickMarker || !pickTarget || !el.dataset.lat){ closePick(); return; }
+  const inp=document.querySelector(`.eigyo-add[data-date="${pickTarget.date}"] .eaddr[data-f="${pickTarget.field}"]`);
+  if(inp){ inp.value = el.dataset.addr || '(地図で選択)'; inp.dataset.lat=el.dataset.lat; inp.dataset.lng=el.dataset.lng; }
+  closePick();
+}
+function closePick(){ document.getElementById('pickModal').style.display='none'; }
 document.getElementById('importBtn').onclick=async()=>{
   let txt=document.getElementById('pasteBox').value.trim(); if(!txt) return;
   let obj; try{ obj=JSON.parse(txt); }catch(e){ alert('JSONが読めない: '+e.message); return; }
@@ -2335,6 +2522,7 @@ refreshCatFilter();
 evWire();
 renderCurrent();
 updateShiftBtn();
+renderShiftList();
 resumeActiveTrack();     // 再読み込み前に乗務記録中なら再開
 geocodeAll(false);
 geocodeEvents(false);
