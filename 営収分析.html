@@ -1196,7 +1196,12 @@ function renderDayMode(){
   const day=DB.find(x=>x.date===date), rides=dayRides(date);
   const track=shiftObj(date);
   const hasTrack = track && track.points && track.points.length>=2;
-  if(hasTrack) drawStateRoute(track, buildStateIntervals(day, track.startT));   // GPS録跡を状態で色分け（マーカーの下に敷く）
+  if(hasTrack){
+    const ref=track.startT;
+    const winS = (day&&day.shukko)? hmToEpochForShift(day.shukko, ref) : track.startT;   // 出庫
+    const winE = (day&&day.kiko)  ? hmToEpochForShift(day.kiko, ref)   : track.endT;     // 帰庫
+    drawStateRoute(track, buildStateIntervals(day, ref), winS, winE);   // 出庫〜帰庫のルートを状態で色分け
+  }
   rides.forEach((r,i)=>{
     if(r.fromLat==null) return;
     const col = r.outlier? cv('--s4') : cv('--s1');
@@ -1252,8 +1257,8 @@ function buildStateIntervals(day, refMs){
 function stateAt(ms, iv){ for(const x of iv){ if(ms>=x.s && ms<=x.e) return x.state; } return 'unknown'; }
 /* 乗せられない場所：空車・迎車で走ったルートを線で表示（絞り込んだ日のGPS録跡を重ねる） */
 const NOPICK_COL={kuusha:'--muted', gei:'--s3'};
-function drawNoPick(track, iv){
-  const pts=track.points, s0=track.startT, e0=track.endT; let cur=null;
+function drawNoPick(track, iv, winS, winE){
+  const pts=track.points, s0=(winS!=null?winS:track.startT), e0=(winE!=null?winE:track.endT); let cur=null;
   const addSeg=seg=>{ if(seg.latlngs.length>=2 && NOPICK_COL[seg.state]) L.polyline(seg.latlngs,{color:cv(NOPICK_COL[seg.state]), weight:4, opacity:.35}).addTo(layerGroup); };
   for(let i=0;i<pts.length;i++){ if(pts[i].t<s0-1000||pts[i].t>e0+1000) continue;
     const st=stateAt(pts[i].t, iv);
@@ -1267,14 +1272,17 @@ function renderNoPick(){
   const ml=document.getElementById('mapMemoList'); if(ml) ml.innerHTML='';
   const days=scopedDays(); let n=0;
   days.forEach(d=>{ const track=shiftObj(d.date); if(!track||!track.points||track.points.length<2) return;
-    drawNoPick(track, buildStateIntervals(d, track.startT)); n++; });
+    const ref=track.startT;
+    const winS=(d.shukko)?hmToEpochForShift(d.shukko,ref):track.startT;
+    const winE=(d.kiko)  ?hmToEpochForShift(d.kiko,ref)  :track.endT;
+    drawNoPick(track, buildStateIntervals(d, ref), winS, winE); n++; });
   const sw=k=>`<span class="small" style="display:inline-flex;align-items:center;gap:4px"><i style="width:16px;height:4px;border-radius:2px;background:${cv(NOPICK_COL[k])};display:inline-block"></i>${STATE_JP[k]}</span>`;
   legend.innerHTML='<b>乗せられない場所</b><br><span class="muted small">'+(n?`空車・迎車で走ったルート（録跡 ${n}日分）。線が濃い＝よく通る＝拾いにくい。`:'この絞り込みに、GPS録跡のある日がまだ無い。')+'</span>'+
     (n?`<div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:6px">${sw('kuusha')}${sw('gei')}</div>`:'');
 }
-/* GPS録跡を状態ごとに色を変えて線で描く */
-function drawStateRoute(track, iv){
-  const pts=track.points; const s0=track.startT, e0=track.endT;
+/* GPS録跡を状態ごとに色を変えて線で描く（出庫〜帰庫の窓で絞る） */
+function drawStateRoute(track, iv, winS, winE){
+  const pts=track.points; const s0=(winS!=null?winS:track.startT), e0=(winE!=null?winE:track.endT);
   let cur=null;
   const addSeg=seg=>{ if(seg.latlngs.length>=2) L.polyline(seg.latlngs,{color:cv(STATE_COL[seg.state]||'--s5'), weight:5, opacity:.85}).addTo(layerGroup); };
   for(let i=0;i<pts.length;i++){
@@ -1913,11 +1921,14 @@ function onRecPos(p){
   if(Date.now()-recLastSave>5000){ persistActive(); recLastSave=Date.now(); }
 }
 function onRecErr(e){ const st=document.getElementById('gcStatus'); if(st) st.textContent='GPS: '+(e&&e.message||'取得エラー'); }
+/* 出庫日（13時基準）。13時より前に乗務開始したら前日の出庫として扱う */
+function shiftDateNow(){ const d=new Date(); if(d.getHours()<13) d.setDate(d.getDate()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function startShift(resume){
   if(recOn && !resume) return;
   if(!navigator.geolocation){ alert('この端末では位置情報が使えない'); return; }
   recOn=true;
-  if(!resume){ recDate=todayStr(); recTrack=[]; persistActive(); }
+  if(!resume){ recDate=shiftDateNow(); recTrack=[]; persistActive(); }
   try{ recWatchId=navigator.geolocation.watchPosition(onRecPos, onRecErr, {enableHighAccuracy:true, maximumAge:0, timeout:20000}); }
   catch(e){ onRecErr(e); }
   updateShiftBtn(); updateRecLine();
@@ -2207,6 +2218,7 @@ function renderDayCards(list, days){
     const nums=`<div class="ride-edit num-row">
       <span class="small" style="min-width:88px">基本データ</span>
       <label class="small">出庫 ${nf('shukko','13:07',d.shukko)}</label>
+      <label class="small">帰庫 ${nf('kiko','01:20',d.kiko)}</label>
       <label class="small">営収 ${nf('uriage','',d.uriage,1)}</label>
       <label class="small">ハンドル ${nf('handle','14:20',d.handle)}</label>
       <label class="small">乗車数 ${nf('kaisu','',d.kaisu,1)}</label>
@@ -2222,9 +2234,7 @@ function renderDayCards(list, days){
       <textarea class="dn" data-date="${d.date}" placeholder="この営業についての覚え書き（道路・天気・イベント・気づき など）" style="flex:1; min-width:200px; min-height:46px; resize:vertical">${esc(d.note)}</textarea></div>`;
     const tr=shiftObj(d.date);
     const trBlock = (tr&&tr.points&&tr.points.length) ?
-      `<div class="ride-edit"><span class="small" style="min-width:88px">乗務記録</span>
-        <span class="small">🚕 ${tHM(tr.startT)}–${tHM(tr.endT)} ・ ${tr.points.length}点 ・ ${trackKm(tr.points).toFixed(1)}km <span class="muted">(${tr.archived?'保存済み':'未保存'})</span>
-        <button class="icon-btn trMap" data-date="${d.date}" style="padding:2px 8px; margin-left:6px">🗺地図で見る</button></span></div>` : '';
+      `<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">乗務記録</span><div id="trk_${d.date}" style="flex:1; min-width:240px"></div></div>` : '';
     const runBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">稼働時間</span><div id="run_${d.date}" style="flex:1; min-width:220px"></div></div>`;
     const eigBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">営業</span><div class="eigyo-add" data-date="${d.date}" style="flex:1; min-width:260px"></div></div>`;
     const rides=wsel+dnote+trBlock+runBlock+eigBlock+(d.rides||[]).map((r,i)=>{
@@ -2240,19 +2250,7 @@ function renderDayCards(list, days){
     }).join('');
     return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="unsel" data-d="${d.date}">選択解除</button> <button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
   }).join('');
-  days.forEach(d=>{ renderRunEditor(d.date); renderEigyoAdd(d.date); });
-  // 乗務記録を地図の営業ルートで開く
-  list.querySelectorAll('.trMap').forEach(b=>b.onclick=()=>{
-    const dt=b.dataset.date;
-    state.dates=new Set([dt]); updateCalInfo(); mapMode='day'; curTab='map';
-    document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab==='map'));
-    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-map'));
-    document.getElementById('globalFilters').style.display='flex';
-    document.querySelectorAll('#mapMode button').forEach(x=>x.classList.toggle('active',x.dataset.m==='day'));
-    renderCurrent();
-    setTimeout(()=>{ if(map){ map.invalidateSize(); } renderMap(); },80);
-    window.scrollTo(0,0);
-  });
+  days.forEach(d=>{ renderRunEditor(d.date); renderEigyoAdd(d.date); renderTrackEditor(d.date); });
   list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=ensureDay(sel.dataset.date); day.weather=e.target.value; save(); renderPastDays(); renderCurrent(); }; });
   // 営業メモ（その日の営業まるごとに対するメモ）
   list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=ensureDay(t.dataset.date); day.note=e.target.value.trim(); save(); renderCurrent(); }; });
@@ -2387,6 +2385,35 @@ async function addEigyo(date){
   day.rides.push(ride);
   day.rides.sort((a,b)=> shiftMin(toMin(a.on))-shiftMin(toMin(b.on)) || 0);
   save(); saveGeo(); renderPastDays(); renderCurrent();
+}
+/* データタブの乗務記録：開始/終了の編集・削除・地図で見る */
+function renderTrackEditor(date){
+  const box=document.getElementById('trk_'+date); if(!box) return;
+  const s=shiftObj(date);
+  if(!s||!s.points||!s.points.length){ box.innerHTML='<span class="small muted">録跡なし</span>'; return; }
+  box.innerHTML=`<span class="small">🚕 ${s.points.length}点 ・ ${trackKm(s.points).toFixed(1)}km <span class="muted">(${s.archived?'保存済み':'未保存'})</span></span>
+    <span class="small" style="margin-left:8px">開始 <span id="trkSsel_${date}"></span></span>
+    <span class="small" style="margin-left:6px">終了 <span id="trkEsel_${date}"></span></span>
+    <button class="icon-btn trMap" style="padding:2px 8px; margin-left:6px">🗺地図で見る</button>
+    <button class="icon-btn trDel" style="padding:2px 8px; color:var(--s8)">削除</button>`;
+  document.getElementById('trkSsel_'+date).innerHTML=hmSelPlain('trkS_'+date, tHM(s.startT));
+  document.getElementById('trkEsel_'+date).innerHTML=hmSelPlain('trkE_'+date, tHM(s.endT));
+  box.querySelectorAll('.hmsel').forEach(x=>x.onchange=()=>{
+    const st=getHmSel('trkS_'+date), en=getHmSel('trkE_'+date); if(!st||!en) return;
+    s.startT=hmToShiftMs(date, st, null); s.endT=hmToShiftMs(date, en, hm2min(st)); saveTracks();
+  });
+  box.querySelector('.trMap').onclick=()=>openTrackOnMap(date);
+  box.querySelector('.trDel').onclick=()=>{ if(confirm(date+' の乗務記録を削除する？')){ delete TRACKS[date]; saveTracks(); renderPastDays(); renderCurrent(); } };
+}
+function openTrackOnMap(date){
+  state.dates=new Set([date]); updateCalInfo(); mapMode='day'; curTab='map';
+  document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab==='map'));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-map'));
+  document.getElementById('globalFilters').style.display='flex';
+  document.querySelectorAll('#mapMode button').forEach(x=>x.classList.toggle('active',x.dataset.m==='day'));
+  renderCurrent();
+  setTimeout(()=>{ if(map){ map.invalidateSize(); } renderMap(); },80);
+  window.scrollTo(0,0);
 }
 /* 地図ピッカー */
 let pickMap=null, pickMarker=null, pickTarget=null;
