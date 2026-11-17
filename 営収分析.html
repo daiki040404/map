@@ -2179,7 +2179,7 @@ function makeCal(elId, getAvail, sel, onChange){
 }
 let dataSelDays=new Set(), evSelDays=new Set(), dayCal=null, evCal=null;
 function renderDataTab(){
-  if(!dayCal) dayCal=makeCal('dataDayCal', ()=>DB.map(d=>d.date), dataSelDays, renderPastDays);
+  if(!dayCal) dayCal=makeCal('dataDayCal', ()=>[...new Set([...DB.map(d=>d.date), ...Object.keys(TRACKS)])], dataSelDays, renderPastDays);
   if(!evCal)  evCal =makeCal('dataEvCal', ()=>[...new Set(EVENTS.map(e=>e.date))], evSelDays, renderPastEvents);
   [...dataSelDays].forEach(d=>{ if(!DB.some(x=>x.date===d)) dataSelDays.delete(d); });
   [...evSelDays].forEach(d=>{ if(!EVENTS.some(x=>x.date===d)) evSelDays.delete(d); });
@@ -2220,9 +2220,14 @@ function renderDayCards(list, days){
       </select></div>`;
     const dnote=`<div class="ride-edit"><span class="small" style="min-width:88px">営業メモ</span>
       <textarea class="dn" data-date="${d.date}" placeholder="この営業についての覚え書き（道路・天気・イベント・気づき など）" style="flex:1; min-width:200px; min-height:46px; resize:vertical">${esc(d.note)}</textarea></div>`;
+    const tr=shiftObj(d.date);
+    const trBlock = (tr&&tr.points&&tr.points.length) ?
+      `<div class="ride-edit"><span class="small" style="min-width:88px">乗務記録</span>
+        <span class="small">🚕 ${tHM(tr.startT)}–${tHM(tr.endT)} ・ ${tr.points.length}点 ・ ${trackKm(tr.points).toFixed(1)}km <span class="muted">(${tr.archived?'保存済み':'未保存'})</span>
+        <button class="icon-btn trMap" data-date="${d.date}" style="padding:2px 8px; margin-left:6px">🗺地図で見る</button></span></div>` : '';
     const runBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">稼働時間</span><div id="run_${d.date}" style="flex:1; min-width:220px"></div></div>`;
     const eigBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">営業</span><div class="eigyo-add" data-date="${d.date}" style="flex:1; min-width:260px"></div></div>`;
-    const rides=wsel+dnote+runBlock+eigBlock+(d.rides||[]).map((r,i)=>{
+    const rides=wsel+dnote+trBlock+runBlock+eigBlock+(d.rides||[]).map((r,i)=>{
       const kuten=isKuten(r);
       return `<div class="ride-edit" data-date="${d.date}" data-i="${i}">
         <span class="small" style="min-width:88px">${r.on}〜${r.off}${kuten?' <span class="pill">空転</span>':''}</span>
@@ -2236,6 +2241,18 @@ function renderDayCards(list, days){
     return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="unsel" data-d="${d.date}">選択解除</button> <button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
   }).join('');
   days.forEach(d=>{ renderRunEditor(d.date); renderEigyoAdd(d.date); });
+  // 乗務記録を地図の営業ルートで開く
+  list.querySelectorAll('.trMap').forEach(b=>b.onclick=()=>{
+    const dt=b.dataset.date;
+    state.dates=new Set([dt]); updateCalInfo(); mapMode='day'; curTab='map';
+    document.querySelectorAll('#tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab==='map'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-map'));
+    document.getElementById('globalFilters').style.display='flex';
+    document.querySelectorAll('#mapMode button').forEach(x=>x.classList.toggle('active',x.dataset.m==='day'));
+    renderCurrent();
+    setTimeout(()=>{ if(map){ map.invalidateSize(); } renderMap(); },80);
+    window.scrollTo(0,0);
+  });
   list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=ensureDay(sel.dataset.date); day.weather=e.target.value; save(); renderPastDays(); renderCurrent(); }; });
   // 営業メモ（その日の営業まるごとに対するメモ）
   list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=ensureDay(t.dataset.date); day.note=e.target.value.trim(); save(); renderCurrent(); }; });
