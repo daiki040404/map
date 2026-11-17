@@ -77,13 +77,31 @@ main{padding:16px; max-width:1100px; margin:0 auto}
 .cal-dow span{text-align:center; font-size:11px; color:var(--muted)}
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
 .cal-cell{aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:12.5px; border-radius:7px; user-select:none}
-.cal-cell.off{color:var(--muted); opacity:.5; cursor:default}      /* データ無し＝通常・選択不可 */
+.cal-cell.off{color:var(--muted); opacity:.5; cursor:default}      /* データ無し＝通常（グローバル乗務日フィルタは選択不可） */
+.cal-inline .cal-cell.off.pick{cursor:pointer}                     /* データタブの過去日カレンダーは空の日も選択可 */
 .cal-cell.work{background:var(--surface2); color:var(--ink); cursor:pointer; border:1px solid var(--accent); font-weight:700}  /* データ有り＝濃く強調 */
 .cal-cell.work:hover{border-color:var(--accent)}
 .cal-cell.sel{background:var(--accent); color:#fff; font-weight:700; border-color:var(--accent)}
 .cal-empty{visibility:hidden}
 .cal-foot{display:flex; align-items:center; gap:6px; margin-top:10px; padding-top:8px; border-top:1px solid var(--border)}
 .cal-inline{max-width:320px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:12px}
+/* シーズン比較のアイテム（期間/シーズン）チップ */
+.cmp-chip{display:inline-flex; align-items:center; gap:3px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:2px 4px}
+.cmp-chip select,.cmp-chip input{font-size:12px; padding:2px 4px}
+.cmp-dot{width:10px; height:10px; border-radius:50%; display:inline-block; flex:none}
+.cmp-chip .cmpDel{background:none; border:none; color:var(--s8); cursor:pointer; font-size:14px; padding:0 2px}
+/* 比較グラフ（並び替え可） */
+.cmp-item{background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:10px}
+.cmp-item.dragging{opacity:.5; border-color:var(--accent)}
+.cmp-item-head{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.cmp-grip{cursor:grab; color:var(--muted); font-size:18px; line-height:1; padding:0 2px; touch-action:none; user-select:none}
+.cmp-grip:active{cursor:grabbing}
+/* 稼働時間（実車/空車/迎車/回送）の区間入力 */
+.run-tag{display:inline-block; min-width:40px; font-size:11px; padding:1px 7px; border-radius:6px; color:#fff; text-align:center; margin-right:4px}
+.run-tag.jitsu{background:var(--s1)} .run-tag.kuusha{background:var(--muted)} .run-tag.gei{background:var(--s3)} .run-tag.kaiso{background:var(--s4)}
+.run-iv{display:inline-flex; align-items:center; gap:2px; margin-right:8px}
+.run-iv input[type=time]{padding:2px 4px; font-size:12px}
+.runDel{background:none; border:none; color:var(--s8); cursor:pointer; font-size:13px}
 select,input[type=text],input[type=date],input[type=time],input[type=number],textarea{
   font-family:inherit; font-size:14px; background:var(--surface2); color:var(--ink);
   border:1px solid var(--border); border-radius:8px; padding:6px 8px;
@@ -227,8 +245,14 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     </div>
     <div class="grp" id="grpCmp" style="position:relative">
       <label class="chip">シーズン比較</label>
-      <select id="fCmpA"><option value="">なし</option></select><span class="muted small">×</span><select id="fCmpB"><option value="">なし</option></select>
-      <button class="icon-btn" id="seaEditBtn" style="padding:3px 8px">＋シーズン</button>
+      <span id="cmpList" style="display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center"></span>
+      <button class="icon-btn" id="cmpAddBtn" style="padding:3px 9px">＋</button>
+      <button class="icon-btn" id="seaEditBtn" style="padding:3px 8px">編集</button>
+      <div id="cmpAddPop" class="cal-pop" style="display:none; width:auto; white-space:nowrap">
+        <div class="small muted" style="margin-bottom:6px">追加するものを選ぶ</div>
+        <button class="icon-btn" id="cmpAddSeason" style="margin-right:6px">シーズン</button>
+        <button class="icon-btn" id="cmpAddPeriod">期間</button>
+      </div>
       <div id="seaPop" class="cal-pop" style="display:none; width:340px">
         <div class="small muted" style="margin-bottom:6px">期間を選んで名前をつけて追加</div>
         <div class="row" style="gap:6px; align-items:flex-end; flex-wrap:wrap">
@@ -278,8 +302,8 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     </div>
     <div class="card" id="sumCmpCard" style="display:none">
       <h2>シーズン比較 <span class="sub" id="sumCmpSub"></span></h2>
-      <div class="chart-wrap"><canvas id="sumCmpA"></canvas></div>
-      <div class="chart-wrap" style="margin-top:14px"><canvas id="sumCmpB"></canvas></div>
+      <div class="chart-wrap" id="sumCmpTopWrap"><canvas id="sumCmpTop"></canvas></div>
+      <div id="sumCmpList" style="margin-top:14px"></div>
     </div>
     <div class="card">
       <h2>メモ付きの営業 <span class="sub">外れ値・覚え書き（絞り込み反映）</span></h2>
@@ -313,8 +337,8 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     </div>
     <div class="card" id="hrCmpCard" style="display:none">
       <h2>シーズン比較 <span class="sub" id="hrCmpSub"></span></h2>
-      <div class="chart-wrap"><canvas id="hrCmpA"></canvas></div>
-      <div class="chart-wrap" style="margin-top:14px"><canvas id="hrCmpB"></canvas></div>
+      <div class="chart-wrap" id="hrCmpTopWrap"><canvas id="hrCmpTop"></canvas></div>
+      <div id="hrCmpList" style="margin-top:14px"></div>
     </div>
   </section>
 
@@ -345,6 +369,8 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <button class="icon-btn" id="locBtn">📍 現在地</button>
         <button class="icon-btn" id="oriBtn">🧭 N固定</button>
         <button class="icon-btn" id="fsBtn">⛶ 全画面</button>
+        <button class="icon-btn" id="shiftBtn" style="padding:3px 10px">▶ 乗務開始</button>
+        <span class="small muted" id="shiftStat"></span>
         <span class="gc-status" id="gcStatus"></span>
       </div>
       <!-- 今日のイベント（営収とは別レイヤ） -->
@@ -416,7 +442,9 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <div class="row" style="margin-top:8px">
         <button class="icon-btn" id="importBtn">取り込む</button>
         <button class="icon-btn" id="copyBtn">全データをJSONでコピー</button>
+        <button class="icon-btn" id="aiPromptBtn">AI指示文をコピー</button>
       </div>
+      <div id="aiPromptBox" style="display:none; margin-top:10px"></div>
     </div>
     <div class="card">
       <h2>🎪 今日のイベント <span class="sub" id="evCountData"></span></h2>
@@ -506,7 +534,8 @@ const SEED = [{
 
 /* ---------- 保存 ---------- */
 const LS_KEY='taxi_eigyo_v2', LS_SEASON='taxi_seasons_v2', LS_GEO='taxi_geocache_v2',
-      LS_EVENT='taxi_events_v1', LS_EVOPT='taxi_evopt_v1', LS_CAT='taxi_cats_v1';
+      LS_EVENT='taxi_events_v1', LS_EVOPT='taxi_evopt_v1', LS_CAT='taxi_cats_v1',
+      LS_TRACK='taxi_tracks_v1', LS_TRACK_ACT='taxi_track_active';
 let _fs=null, _uid=null, _pushT=null, _cloudRead=false, _lastPush=0;   // クラウド同期の状態(先に宣言してTDZ回避)
 let DB = load(LS_KEY, null);
 if(!DB){ DB = SEED; save(); }
@@ -517,6 +546,7 @@ const EVOPT_DEF={prepA:300, prepB:120, inA:90, inB:30, outA:15, outB:90};
 let EVENTS = load(LS_EVENT, []);
 let EVOPT = Object.assign({}, EVOPT_DEF, load(LS_EVOPT, {}));
 let CATS = load(LS_CAT, []);   // 客カテゴリのマスター（例: 台風客, 電車遅延客, ○○イベント終わり客）
+let TRACKS = load(LS_TRACK, {});   // GPS録跡 {出庫日: [{t,lat,lng,acc}, ...]}（端末ローカル保存）
 if(!Array.isArray(CATS)) CATS=[];
 syncCatsFromRides();           // 既存rideに付いてるcatも取り込む(自己修復)
 
@@ -602,7 +632,9 @@ function jitsuByHour(r){
 function pickupHour(r){ const m=toMin(r.on); return m==null?null:Math.floor(m/60)%24; }
 
 /* ---------- フィルタ ---------- */
-const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'', wday:'', dates:new Set(), shukkoFrom:'', shukkoTo:'', cmpA:'', cmpB:'' };
+const state={ types:new Set(['アプリ','無線','流し']), season:'', outlier:'all', weather:'', from:'', to:'', wday:'', dates:new Set(), shukkoFrom:'', shukkoTo:'' };
+let cmpList=[];   // シーズン比較の対象（無制限）。{type:'season',name} | {type:'period',start,end}
+const CMP_COLORS=['--s1','--s2','--s3','--s4','--s5','--s7','--s8','--s6','--s3','--s4'];
 /* 出庫時間の絞り込み（指定時間帯に出庫した日だけ。空欄＝指定なし） */
 function shukkoOK(d){
   const sf=state.shukkoFrom, st=state.shukkoTo;
@@ -799,19 +831,49 @@ function sumSeriesForDays(days){
   const arr=[...groups.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(e=>e[1]);
   return { labels:arr.map(g=>g.label), data:arr.map(g=>groupMetricAvg(g.days, sumMetric)) };
 }
-/* シーズン比較で使う、そのシーズンの対象日（天候・曜日・出庫の条件も反映） */
-function seasonCmpDays(name){ return DB.filter(d=> dayInSeason(d.date,name) && cmpCondDay(d)).sort((a,b)=>a.date<b.date?-1:1); }
-function cmpSeasonsReady(){ return state.cmpA && state.cmpB && SEASONS.some(s=>s.name===state.cmpA) && SEASONS.some(s=>s.name===state.cmpB); }
-/* サマリー：2シーズンの日別推移グラフを2つ並べて比較 */
+/* シーズン比較アイテム → {label, days}（天候・曜日・出庫の条件も反映）。未設定はnull */
+function cmpItemDays(it){
+  if(!it) return null;
+  if(it.type==='season'){ if(!it.name) return null;
+    return { label:it.name, days:DB.filter(d=>dayInSeason(d.date,it.name)&&cmpCondDay(d)).sort((a,b)=>a.date<b.date?-1:1) }; }
+  if(!it.start||!it.end) return null;
+  return { label:`${it.start.slice(5)}〜${it.end.slice(5)}`, days:DB.filter(d=>d.date>=it.start&&d.date<=it.end&&cmpCondDay(d)).sort((a,b)=>a.date<b.date?-1:1) };
+}
+/* 設定済みの比較アイテムを色つきで解決（cmpListの並び順＝色・表示順） */
+function cmpItemsResolved(){
+  const out=[];
+  cmpList.forEach((it,i)=>{ const r=cmpItemDays(it); if(r) out.push({label:r.label, days:r.days, color:CMP_COLORS[i%CMP_COLORS.length], idx:i}); });
+  return out;
+}
+/* 比較の個別グラフ（並び替え可）をコンテナに描く */
+function buildCmpIndividual(containerId, items, seriesFn, rateMax){
+  const box=document.getElementById(containerId); if(!box) return;
+  box.innerHTML=items.map((it,i)=>`<div class="cmp-item" data-idx="${it.idx}">
+      <div class="cmp-item-head"><span class="cmp-grip" draggable="true" title="つかんで並び替え（スマホは長押し）">⠿</span>
+        <span class="cmp-dot" style="background:${cv(it.color)}"></span>
+        <b>${esc(it.label)}</b> <span class="muted small">${it.days.length}日</span></div>
+      <div class="chart-wrap" style="height:210px"><canvas id="${containerId}_c${i}"></canvas></div>
+    </div>`).join('');
+  items.forEach((it,i)=>{ const s=seriesFn(it.days);
+    makeChart(`${containerId}_c${i}`,{ type:'bar', data:{labels:s.labels, datasets:[{label:it.label, data:s.data, backgroundColor:cv(it.color), borderRadius:4, maxBarThickness:46}]},
+      options:{scales:{y:rateMax?{max:100}:{}}, plugins:{legend:{display:false}}} }); });
+  enableReorder(box);
+}
+/* サマリー：上に重ね棒、下に各シーズンの日別推移（並び替え可） */
 function renderSumCompare(){
   const card=document.getElementById('sumCmpCard'); if(!card) return;
-  if(!cmpSeasonsReady()){ card.style.display='none'; return; }
+  const items=cmpItemsResolved();
+  if(!items.length){ card.style.display='none'; return; }
   card.style.display='';
-  document.getElementById('sumCmpSub').textContent=`${state.cmpA} ／ ${state.cmpB}（${metricLabel(sumMetric)}・1乗務平均）`;
-  const draw=(cid,name,color)=>{ const days=seasonCmpDays(name); const s=sumSeriesForDays(days);
-    makeChart(cid,{ type:'bar', data:{labels:s.labels, datasets:[{label:name, data:s.data, backgroundColor:cv(color), borderRadius:4, maxBarThickness:46}]},
-      options:{plugins:{legend:{display:false}, title:{display:true, text:`${name}（${days.length}日）`, color:cv('--ink2')}}} }); };
-  draw('sumCmpA', state.cmpA, '--s1'); draw('sumCmpB', state.cmpB, '--s2');
+  document.getElementById('sumCmpSub').textContent=`${metricLabel(sumMetric)}・1乗務平均（${items.length}件）`;
+  const top=document.getElementById('sumCmpTopWrap');
+  if(items.length>=2){ top.style.display='';
+    const mk=sumMetric==='kaisu'?'count':sumMetric;
+    makeChart('sumCmpTop',{ type:'bar',
+      data:{labels:items.map(it=>`${it.label}(${it.days.length}日)`), datasets:[{label:metricLabel(sumMetric), data:items.map(it=>metricValue(dayMetrics(it.days), it.days.length, mk, true)), backgroundColor:items.map(it=>cv(it.color)), borderRadius:4, maxBarThickness:60}]},
+      options:{plugins:{legend:{display:false}}} });
+  } else top.style.display='none';
+  buildCmpIndividual('sumCmpList', items, sumSeriesForDays, false);
 }
 function metricLabel(m){ return {uriage:'営収',kaisu:'乗車数',jitsu:'実車時間(分)',wage:'実質時給(¥/h)',fare:'売上(料金)',count:'営業回数',tanka:'客単価',rate:'実車率(%)'}[m]||m; }
 
@@ -873,16 +935,21 @@ function hrSeriesForDays(days){
     if(hrMetric==='rate') return Math.min(100, Math.round((agg.jitsu[h]||0)/(nd*60)*100));
   });
 }
+/* 時間別：上に重ね折れ線、下に各シーズンの時間帯グラフ（並び替え可） */
 function renderHrCompare(){
   const card=document.getElementById('hrCmpCard'); if(!card) return;
-  if(!cmpSeasonsReady()){ card.style.display='none'; return; }
+  const items=cmpItemsResolved();
+  if(!items.length){ card.style.display='none'; return; }
   card.style.display='';
-  document.getElementById('hrCmpSub').textContent=`${state.cmpA} ／ ${state.cmpB}（${metricLabel(hrMetric)}${hrAgg==='avg'?'・1乗務平均':''}）`;
+  document.getElementById('hrCmpSub').textContent=`${metricLabel(hrMetric)}${hrAgg==='avg'?'・1乗務平均':''}（${items.length}件）`;
   const labels=SHIFT_HOURS.map(h=>h+'時');
-  const draw=(cid,name,color)=>{ const days=seasonCmpDays(name); const data=hrSeriesForDays(days);
-    makeChart(cid,{ type:'bar', data:{labels, datasets:[{label:name, data, backgroundColor:cv(color), borderRadius:4, maxBarThickness:26}]},
-      options:{scales:{y:hrMetric==='rate'?{max:100}:{}}, plugins:{legend:{display:false}, title:{display:true, text:`${name}（${days.length}日）`, color:cv('--ink2')}}} }); };
-  draw('hrCmpA', state.cmpA, '--s1'); draw('hrCmpB', state.cmpB, '--s2');
+  const top=document.getElementById('hrCmpTopWrap');
+  if(items.length>=2){ top.style.display='';
+    makeChart('hrCmpTop',{ type:'line',
+      data:{labels, datasets:items.map(it=>({label:it.label, data:hrSeriesForDays(it.days), borderColor:cv(it.color), backgroundColor:'transparent', tension:.3, borderWidth:2, pointRadius:2}))},
+      options:{scales:{y:hrMetric==='rate'?{max:100}:{}}, plugins:{legend:{labels:{color:cv('--ink2')}}}} });
+  } else top.style.display='none';
+  buildCmpIndividual('hrCmpList', items, days=>({labels, data:hrSeriesForDays(days)}), hrMetric==='rate');
 }
 
 /* ---------- シーズン比較 ---------- */
@@ -908,6 +975,51 @@ function renderSeaList(){
   box.querySelectorAll('.sst').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].start=el.value; after(); });
   box.querySelectorAll('.sen').forEach(el=>el.onchange=()=>{ SEASONS[+el.dataset.i].end=el.value; after(); });
   box.querySelectorAll('.sdel').forEach(b=>b.onclick=()=>{ if(confirm((SEASONS[+b.dataset.i].name||'このシーズン')+' を削除?')){ SEASONS.splice(+b.dataset.i,1); after(); } });
+}
+/* 条件バーのシーズン比較アイテム（期間／シーズン・無制限）を描く */
+function renderCmpList(){
+  const box=document.getElementById('cmpList'); if(!box) return;
+  const names=[...new Set(SEASONS.map(s=>s.name))];
+  box.innerHTML=cmpList.map((it,i)=>{
+    const dot=`<i class="cmp-dot" style="background:${cv(CMP_COLORS[i%CMP_COLORS.length])}"></i>`;
+    if(it.type==='season'){
+      const opts='<option value="">シーズン選択</option>'+names.map(n=>`<option ${it.name===n?'selected':''}>${esc(n)}</option>`).join('');
+      return `<span class="cmp-chip">${dot}<select class="cmpSeasonSel" data-i="${i}">${opts}</select><button class="cmpDel" data-i="${i}">×</button></span>`;
+    }
+    return `<span class="cmp-chip">${dot}<input type="date" class="cmpPs" data-i="${i}" value="${esc(it.start||'')}"><span class="muted small">〜</span><input type="date" class="cmpPe" data-i="${i}" value="${esc(it.end||'')}"><button class="cmpDel" data-i="${i}">×</button></span>`;
+  }).join('');
+  box.querySelectorAll('.cmpSeasonSel').forEach(s=>s.onchange=()=>{ cmpList[+s.dataset.i].name=s.value; renderCurrent(); });
+  box.querySelectorAll('.cmpPs').forEach(s=>s.onchange=()=>{ cmpList[+s.dataset.i].start=s.value; renderCurrent(); });
+  box.querySelectorAll('.cmpPe').forEach(s=>s.onchange=()=>{ cmpList[+s.dataset.i].end=s.value; renderCurrent(); });
+  box.querySelectorAll('.cmpDel').forEach(b=>b.onclick=()=>{ cmpList.splice(+b.dataset.i,1); renderCmpList(); renderCurrent(); });
+}
+/* 比較グラフの並び替え（PC=ドラッグ / スマホ=長押し） */
+function getDragAfter(box,y){
+  const els=[...box.querySelectorAll('.cmp-item:not(.dragging)')];
+  let best={off:-Infinity,el:null};
+  els.forEach(el=>{ const r=el.getBoundingClientRect(); const off=y-r.top-r.height/2; if(off<0&&off>best.off) best={off,el}; });
+  return best.el;
+}
+function applyCmpOrder(box){ const order=[...box.querySelectorAll('.cmp-item')].map(el=>+el.dataset.idx);
+  cmpList=order.map(i=>cmpList[i]); renderCmpList(); renderCurrent(); }
+function enableReorder(box){
+  box.ondragover=e=>{ e.preventDefault(); const d=box.querySelector('.dragging'); if(!d) return;
+    const after=getDragAfter(box,e.clientY); if(after==null) box.appendChild(d); else box.insertBefore(d,after); };
+  box.querySelectorAll('.cmp-grip').forEach(grip=>{
+    const el=grip.closest('.cmp-item');
+    // PC：グリップをドラッグ
+    grip.addEventListener('dragstart',()=>{ el.classList.add('dragging'); });
+    grip.addEventListener('dragend',()=>{ el.classList.remove('dragging'); applyCmpOrder(box); });
+  });
+  // スマホ：グリップを長押し→ドラッグ
+  box.querySelectorAll('.cmp-grip').forEach(grip=>{
+    const el=grip.closest('.cmp-item'); let timer=null, dragging=false;
+    grip.addEventListener('touchstart',()=>{ timer=setTimeout(()=>{ dragging=true; el.classList.add('dragging'); if(navigator.vibrate)navigator.vibrate(30); },350); },{passive:true});
+    grip.addEventListener('touchmove',e=>{ if(!dragging){ clearTimeout(timer); return; } e.preventDefault();
+      const y=e.touches[0].clientY; const after=getDragAfter(box,y); if(after==null) box.appendChild(el); else box.insertBefore(el,after); },{passive:false});
+    const end=()=>{ clearTimeout(timer); if(dragging){ dragging=false; el.classList.remove('dragging'); applyCmpOrder(box); } };
+    grip.addEventListener('touchend',end); grip.addEventListener('touchcancel',end);
+  });
 }
 
 /* ---------- 地図 ---------- */
@@ -1022,6 +1134,7 @@ function renderMap(){
   }
   else if(mapMode==='tanka'){ renderMemoList('mapMemoList'); }
   renderEvents();          // イベントは営収とは別レイヤで重ねる
+  if(recOn) updateRecLine();   // 乗務記録中のルートを重ねる
 }
 
 /* ---------- 日別×イベント（その日の営収・乗降とイベントを一緒に見る） ---------- */
@@ -1678,6 +1791,61 @@ function onHeading(ev){
   if(orientFollow) setBearingSafe(h);
   updateArrow();
 }
+/* ---------- GPS 乗務録跡（乗務開始→終了まで現在地を記録） ---------- */
+let recOn=false, recTrack=[], recDate='', recWatchId=null, recLine=null, recLastSave=0;
+function saveTracks(){ try{ localStorage.setItem(LS_TRACK, JSON.stringify(TRACKS)); }catch(e){ console.warn('track保存失敗',e); } }
+function distM(a,b){ const R=6371000, toR=x=>x*Math.PI/180;
+  const dla=toR(b.lat-a.lat), dlo=toR(b.lng-a.lng);
+  const s=Math.sin(dla/2)**2 + Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dlo/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(s))); }
+function trackKm(t){ let m=0; for(let i=1;i<t.length;i++) m+=distM(t[i-1],t[i]); return m/1000; }
+function updateShiftBtn(){
+  const b=document.getElementById('shiftBtn'), s=document.getElementById('shiftStat');
+  if(!b) return;
+  if(recOn){ b.textContent='■ 乗務終了'; b.classList.add('active');
+    if(s) s.textContent=`⏺ 記録中 ${recTrack.length}点 / ${trackKm(recTrack).toFixed(1)}km`; }
+  else { b.textContent='▶ 乗務開始'; b.classList.remove('active'); if(s) s.textContent=''; }
+}
+function updateRecLine(){
+  if(!map || !window.L) return;
+  const pts=recTrack.map(p=>[p.lat,p.lng]);
+  if(!recLine){ recLine=L.polyline(pts,{color:cv('--s6'), weight:4, opacity:.85}).addTo(map); }
+  else recLine.setLatLngs(pts);
+}
+function persistActive(){ try{ localStorage.setItem(LS_TRACK_ACT, JSON.stringify({date:recDate, points:recTrack})); }catch(e){} }
+function onRecPos(p){
+  const pt={t:Date.now(), lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy||0)};
+  const last=recTrack[recTrack.length-1];
+  if(last){ const d=distM(last,pt), dt=pt.t-last.t; if(d<12 && dt<8000) return; }   // 間引き（12m or 8秒）
+  recTrack.push(pt); updateRecLine(); updateShiftBtn();
+  const st=document.getElementById('gcStatus'); if(st) st.textContent='';
+  if(Date.now()-recLastSave>5000){ persistActive(); recLastSave=Date.now(); }
+}
+function onRecErr(e){ const st=document.getElementById('gcStatus'); if(st) st.textContent='GPS: '+(e&&e.message||'取得エラー'); }
+function startShift(resume){
+  if(recOn && !resume) return;
+  if(!navigator.geolocation){ alert('この端末では位置情報が使えない'); return; }
+  recOn=true;
+  if(!resume){ recDate=todayStr(); recTrack=[]; persistActive(); }
+  try{ recWatchId=navigator.geolocation.watchPosition(onRecPos, onRecErr, {enableHighAccuracy:true, maximumAge:1000, timeout:20000}); }
+  catch(e){ onRecErr(e); }
+  updateShiftBtn(); updateRecLine();
+}
+function stopShift(){
+  if(!recOn) return;
+  if(!confirm('乗務を終了して記録を保存する？')) return;
+  if(recWatchId!=null && navigator.geolocation){ navigator.geolocation.clearWatch(recWatchId); recWatchId=null; }
+  recOn=false;
+  if(recTrack.length>=2){ TRACKS[recDate]=recTrack; saveTracks(); }
+  try{ localStorage.removeItem(LS_TRACK_ACT); }catch(e){}
+  updateShiftBtn();
+  alert(`乗務記録を保存（${recDate}・${recTrack.length}点・約${trackKm(recTrack).toFixed(1)}km）`);
+}
+function resumeActiveTrack(){
+  let a=null; try{ a=JSON.parse(localStorage.getItem(LS_TRACK_ACT)||'null'); }catch(e){}
+  if(!a||!Array.isArray(a.points)) return;
+  recDate=a.date||todayStr(); recTrack=a.points; startShift(true);   // 再読み込み後もGPS記録を再開
+}
 function placeLoc(p, recenter){
   initMap(); if(!map) return;
   const ll=[p.coords.latitude,p.coords.longitude];
@@ -1724,6 +1892,7 @@ async function toggleOrient(){
 document.getElementById('locBtn').onclick=()=>doLocate(true);
 document.getElementById('oriBtn').onclick=toggleOrient;
 document.getElementById('fsBtn').onclick=toggleFullscreen;
+document.getElementById('shiftBtn').onclick=()=> recOn? stopShift() : startShift(false);
 document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
   state.types=new Set([...document.querySelectorAll('.ftype:checked')].map(x=>x.value));
   renderCurrent();
@@ -1731,8 +1900,14 @@ document.querySelectorAll('.ftype').forEach(c=>c.onchange=()=>{
 document.getElementById('fSeason').onchange=e=>{ state.season=e.target.value; renderCurrent(); };
 document.getElementById('fWeather').onchange=e=>{ state.weather=e.target.value; renderCurrent(); };
 document.getElementById('fWday').onchange=e=>{ state.wday=e.target.value; renderCurrent(); };
-document.getElementById('fCmpA').onchange=e=>{ state.cmpA=e.target.value; renderCurrent(); };
-document.getElementById('fCmpB').onchange=e=>{ state.cmpB=e.target.value; renderCurrent(); };
+// シーズン比較：アイテム追加（期間／シーズン・無制限）
+document.getElementById('cmpAddBtn').onclick=()=>{ const p=document.getElementById('cmpAddPop');
+  p.style.display = p.style.display==='none'?'block':'none'; };
+document.getElementById('cmpAddSeason').onclick=()=>{ cmpList.push({type:'season', name:''}); document.getElementById('cmpAddPop').style.display='none'; renderCmpList(); renderCurrent(); };
+document.getElementById('cmpAddPeriod').onclick=()=>{ cmpList.push({type:'period', start:'', end:''}); document.getElementById('cmpAddPop').style.display='none'; renderCmpList(); renderCurrent(); };
+document.addEventListener('click',e=>{ const p=document.getElementById('cmpAddPop');
+  if(!p||p.style.display==='none') return;
+  if(e.target.closest('#cmpAddPop')||e.target.closest('#cmpAddBtn')) return; p.style.display='none'; });
 // 出庫時間フィルタ（0〜23時。指定なし＝全部）
 (function(){
   const opts='<option value="">指定なし</option>'+Array.from({length:24},(_,h)=>`<option value="${h}">${h}時</option>`).join('');
@@ -1814,12 +1989,9 @@ function refreshSeasonSelectors(){
   const cur=fs.value;
   fs.innerHTML='<option value="">全期間</option>'+names.map(n=>`<option>${esc(n)}</option>`).join('');
   fs.value=cur;
-  // シーズン比較(A×B)のプルダウンも更新
-  ['fCmpA','fCmpB'].forEach(id=>{ const el=document.getElementById(id); if(!el) return; const c=el.value;
-    el.innerHTML='<option value="">なし</option>'+names.map(n=>`<option>${esc(n)}</option>`).join('');
-    el.value=names.includes(c)?c:''; });
-  if(!names.includes(state.cmpA)) state.cmpA='';
-  if(!names.includes(state.cmpB)) state.cmpB='';
+  // シーズン比較：消えたシーズンを指すアイテムは空にして、チップを再描画
+  cmpList.forEach(it=>{ if(it.type==='season' && !names.includes(it.name)) it.name=''; });
+  renderCmpList();
 }
 
 /* ---------- シーズン追加・編集（条件バーの「＋シーズン」ポップアップ） ---------- */
@@ -1854,14 +2026,14 @@ function makeCal(elId, getAvail, sel, onChange){
     let cells='';
     for(let i=0;i<startDow;i++) cells+='<div class="cal-cell cal-empty"></div>';
     for(let d=1;d<=dim;d++){ const ds=`${mk}-${String(d).padStart(2,'0')}`; const w=avail.has(ds),s=sel.has(ds);
-      cells+=`<div class="cal-cell ${w?'work':'off'}${s?' sel':''}" data-d="${w?ds:''}">${d}</div>`; }
+      cells+=`<div class="cal-cell ${w?'work':'off'} pick${s?' sel':''}" data-d="${ds}">${d}</div>`; }   // データ無しの日も選択可
     el.innerHTML=`<div class="cal-head"><button class="cal-nav" data-nav="-1">‹</button><b>${y}年${m}月</b><button class="cal-nav" data-nav="1">›</button></div>
       <div class="cal-dow">${['月','火','水','木','金','土','日'].map(w=>`<span>${w}</span>`).join('')}</div>
       <div class="cal-grid">${cells}</div>
       <div class="cal-foot"><span class="small muted">${sel.size?sel.size+'日 選択中':'日をタップ（複数可）'}</span><span style="flex:1"></span>
         <button class="icon-btn calAll" style="padding:2px 8px">今月すべて</button><button class="icon-btn calNone" style="padding:2px 8px">全解除</button></div>`;
     el.querySelectorAll('.cal-nav').forEach(b=>b.onclick=()=>{ let mm=ym.m+ +b.dataset.nav, yy=ym.y; if(mm<1){mm=12;yy--;} if(mm>12){mm=1;yy++;} ym={y:yy,m:mm}; render(); });
-    el.querySelectorAll('.cal-cell.work').forEach(c=>c.onclick=()=>{ const ds=c.dataset.d; if(!ds) return; if(sel.has(ds))sel.delete(ds); else sel.add(ds); render(); onChange(); });
+    el.querySelectorAll('.cal-cell.pick').forEach(c=>c.onclick=()=>{ const ds=c.dataset.d; if(!ds) return; if(sel.has(ds))sel.delete(ds); else sel.add(ds); render(); onChange(); });
     el.querySelector('.calAll').onclick=()=>{ avail.forEach(ds=>sel.add(ds)); render(); onChange(); };
     el.querySelector('.calNone').onclick=()=>{ sel.clear(); render(); onChange(); };
   }
@@ -1876,13 +2048,19 @@ function renderDataTab(){
   dayCal.render(); evCal.render();
   renderPastDays(); renderPastEvents();
 }
-/* 過去の日報：カレンダーで選んだ日だけ編集リスト表示 */
+/* DBにその日が無ければ空の日を作って返す（データ無しの日を選んで入力するため） */
+function ensureDay(date){
+  let d=DB.find(x=>x.date===date);
+  if(!d){ d={date, rides:[]}; DB.push(d); DB.sort((a,b)=>a.date<b.date?-1:1);
+    refreshDateSelector(); if(dayCal) dayCal.render(); }
+  return d;
+}
+/* 過去の日報：カレンダーで選んだ日だけ編集リスト表示（データ無しの日は空フォーム） */
 function renderPastDays(){
   const list=document.getElementById('dataDayList'); if(!list) return;
   const dc=document.getElementById('dayCount'); if(dc) dc.textContent='登録 '+DB.length+'日';
-  if(!dataSelDays.size){ list.innerHTML='<p class="small muted">カレンダーで日を選ぶと、その日のデータが出る。</p>'; return; }
-  const days=DB.filter(d=>dataSelDays.has(d.date)).sort((a,b)=>a.date<b.date?1:-1);
-  if(!days.length){ list.innerHTML='<p class="small muted">選んだ日のデータが無い。</p>'; return; }
+  if(!dataSelDays.size){ list.innerHTML='<p class="small muted">カレンダーで日を選ぶと、その日のデータが出る（データが無い日も選べる）。</p>'; return; }
+  const days=[...dataSelDays].sort((a,b)=>a<b?1:-1).map(dt=> DB.find(d=>d.date===dt) || {date:dt, rides:[], _new:true});
   renderDayCards(list, days);
 }
 function renderDayCards(list, days){
@@ -1904,7 +2082,8 @@ function renderDayCards(list, days){
       </select></div>`;
     const dnote=`<div class="ride-edit"><span class="small" style="min-width:88px">営業メモ</span>
       <textarea class="dn" data-date="${d.date}" placeholder="この営業についての覚え書き（道路・天気・イベント・気づき など）" style="flex:1; min-width:200px; min-height:46px; resize:vertical">${esc(d.note)}</textarea></div>`;
-    const rides=wsel+dnote+(d.rides||[]).map((r,i)=>{
+    const runBlock=`<div class="ride-edit" style="align-items:flex-start"><span class="small" style="min-width:88px">稼働時間</span><div id="run_${d.date}" style="flex:1; min-width:220px"></div></div>`;
+    const rides=wsel+dnote+runBlock+(d.rides||[]).map((r,i)=>{
       const kuten=isKuten(r);
       return `<div class="ride-edit" data-date="${d.date}" data-i="${i}">
         <span class="small" style="min-width:88px">${r.on}〜${r.off}${kuten?' <span class="pill">空転</span>':''}</span>
@@ -1915,11 +2094,12 @@ function renderDayCards(list, days){
         <input type="text" class="mm" placeholder="メモ" value="${esc(r.memo)}" style="flex:2; min-width:150px">
       </div>`;
     }).join('');
-    return `<details class="day-det"><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
+    return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
   }).join('');
-  list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=DB.find(x=>x.date===sel.dataset.date); if(day){ day.weather=e.target.value; save(); renderPastDays(); renderCurrent(); } }; });
+  days.forEach(d=>renderRunEditor(d.date));
+  list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=ensureDay(sel.dataset.date); day.weather=e.target.value; save(); renderPastDays(); renderCurrent(); }; });
   // 営業メモ（その日の営業まるごとに対するメモ）
-  list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=DB.find(x=>x.date===t.dataset.date); if(day){ day.note=e.target.value.trim(); save(); renderCurrent(); } }; });
+  list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=ensureDay(t.dataset.date); day.note=e.target.value.trim(); save(); renderCurrent(); }; });
   // 削除
   list.querySelectorAll('.del').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); if(confirm(b.dataset.d+' を削除?')){ DB=DB.filter(x=>x.date!==b.dataset.d); dataSelDays.delete(b.dataset.d); save(); refreshDateSelector(); renderDataTab(); renderCurrent(); } });
   // 外れ値・メモ編集
@@ -1944,10 +2124,37 @@ function renderDayCards(list, days){
   });
   // 基本データ（出庫・営収・ハンドル・乗車数・実車・走行）の修正
   list.querySelectorAll('.numf').forEach(inp=>inp.onchange=()=>{
-    const day=DB.find(x=>x.date===inp.dataset.date); if(!day) return;
+    const day=ensureDay(inp.dataset.date);
     const k=inp.dataset.k;
     if(inp.type==='number'){ const v=inp.value.trim(); day[k]= v===''?0:(+v||0); }
     else day[k]=inp.value.trim();
+    save(); renderCurrent();
+  });
+}
+/* 稼働時間（実車/空車/迎車/回送）の区間エディタ。同日内で時間が重複しないか検証 */
+const RUN_STATES=[['jitsu','実車'],['kuusha','空車'],['gei','迎車'],['kaiso','回送']];
+function runOverlaps(run){
+  const segs=[];
+  RUN_STATES.forEach(([k])=>(run[k]||[]).forEach(iv=>{ if(iv&&iv[0]&&iv[1]){ let a=shiftMin(toMin(iv[0])), b=shiftMin(toMin(iv[1])); if(b<=a) b+=1440; segs.push([a,b]); } }));
+  segs.sort((x,y)=>x[0]-y[0]);
+  for(let i=1;i<segs.length;i++){ if(segs[i][0]<segs[i-1][1]) return true; }
+  return false;
+}
+function renderRunEditor(date){
+  const box=document.getElementById('run_'+date); if(!box) return;
+  const day=DB.find(x=>x.date===date); const run=(day&&day.run)||{};
+  box.innerHTML=RUN_STATES.map(([k,label])=>{
+    const ivs=run[k]||[];
+    const rows=ivs.map((iv,j)=>`<span class="run-iv"><input type="time" class="rin" data-k="${k}" data-j="${j}" data-f="0" value="${esc(iv[0]||'')}"><span class="muted small">〜</span><input type="time" class="rin" data-k="${k}" data-j="${j}" data-f="1" value="${esc(iv[1]||'')}"><button class="runDel" data-k="${k}" data-j="${j}">×</button></span>`).join('');
+    return `<div style="margin:4px 0"><span class="run-tag ${k}">${label}</span>${rows||'<span class="muted small">なし</span>'} <button class="runAdd icon-btn" data-k="${k}" style="padding:1px 8px">＋</button></div>`;
+  }).join('');
+  box.querySelectorAll('.runAdd').forEach(b=>b.onclick=()=>{ const d=ensureDay(date); d.run=d.run||{}; (d.run[b.dataset.k]=d.run[b.dataset.k]||[]).push(['','']); save(); renderRunEditor(date); });
+  box.querySelectorAll('.runDel').forEach(b=>b.onclick=()=>{ const d=DB.find(x=>x.date===date); if(!d||!d.run||!d.run[b.dataset.k]) return; d.run[b.dataset.k].splice(+b.dataset.j,1); save(); renderRunEditor(date); renderCurrent(); });
+  box.querySelectorAll('.rin').forEach(inp=>inp.onchange=()=>{
+    const d=ensureDay(date); d.run=d.run||{}; const k=inp.dataset.k, j=+inp.dataset.j, f=+inp.dataset.f;
+    d.run[k]=d.run[k]||[]; d.run[k][j]=d.run[k][j]||['',''];
+    const old=d.run[k][j][f]; d.run[k][j][f]=inp.value;
+    if(runOverlaps(d.run)){ alert('その時間は他の区間と重なってる。別の時間にして。'); d.run[k][j][f]=old; renderRunEditor(date); return; }
     save(); renderCurrent();
   });
 }
@@ -1966,6 +2173,36 @@ document.getElementById('importBtn').onclick=async()=>{
 };
 document.getElementById('copyBtn').onclick=()=>{
   navigator.clipboard.writeText(JSON.stringify(DB,null,2)).then(()=>alert('全データをコピーした'));
+};
+// AIに日報写真を読ませてJSONを作らせる指示文
+const AI_PROMPT=`あなたはタクシーの日報・営業履歴の写真を読み取って、下のJSONだけを出力するアシスタントです。説明やコメントは書かず、JSONのみ出力してください。
+
+1日分＝1オブジェクト（複数日あれば配列）。キー:
+- date: 出庫日 "YYYY-MM-DD"
+- shukko: 出庫時刻 "HH:MM"
+- weather: "晴れ" | "曇り" | "雨" | "雪"（分かれば）
+- uriage: 営収(数値・税込)
+- handle: ハンドル時間 "HH:MM"（総稼働時間）
+- kaisu: 乗車回数(数値)
+- jissha: 実車(数値)
+- soukou: 走行(数値)
+- rides: 乗車の配列。各要素:
+  { "type":"アプリ"|"無線"|"流し", "on":"HH:MM"(乗車時刻), "off":"HH:MM"(降車時刻),
+    "from":"乗車地の住所", "to":"降車地の住所", "pay":"支払方法", "fare":料金(数値) }
+- run: 状態ごとの走行時間帯。
+  { "jitsu":[["HH:MM","HH:MM"], ...](実車=客を乗せていた),
+    "kuusha":[...](空車=流し中),
+    "gei":[...](迎車=配車で迎えに向かっていた),
+    "kaiso":[...](回送) }
+  ルール: 各区間は [開始, 終了]。同じ日の中で、どの状態どうしも時間が重ならないようにする。
+  実車(jitsu)の区間は rides の on〜off と一致させる。分かる範囲でよい。
+
+住所はできるだけ詳しく（都道府県＋市区町村＋丁目番地）。読めない項目は省略可。JSON以外は絶対に出力しない。`;
+document.getElementById('aiPromptBtn').onclick=()=>{
+  const b=document.getElementById('aiPromptBox');
+  navigator.clipboard.writeText(AI_PROMPT).then(()=>{},()=>{});
+  b.style.display = b.style.display==='none'?'':'none';
+  if(b.style.display!=='none') b.innerHTML=`<p class="small muted">コピーしたよ。日報の写真と一緒にAIに貼って使ってね。</p><textarea readonly style="min-height:260px">${esc(AI_PROMPT)}</textarea>`;
 };
 // データタブ：今日のイベントを入れる（日付はJSONのdate優先・無ければ今日）
 document.getElementById('evImportData').onclick=async()=>{
@@ -2097,6 +2334,8 @@ refreshDateSelector();
 refreshCatFilter();
 evWire();
 renderCurrent();
+updateShiftBtn();
+resumeActiveTrack();     // 再読み込み前に乗務記録中なら再開
 geocodeAll(false);
 geocodeEvents(false);
 initCloud();
