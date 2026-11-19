@@ -1895,7 +1895,8 @@ function anDayVal(k,m){const ids=new Set([...dayItems(k),...Object.keys(logs[k]|
   ids.forEach(id=>{if(!itemById(id))return;const ds=doneSets(k,id);if(!ds.length)return;exc++;ds.forEach(s=>{sets++;const r=parseInt(s.r)||0,w=toNum(s.w)||0;reps+=r;vol+=w*r})});
   return m==="exc"?exc:m==="sets"?sets:m==="reps"?reps:vol}
 // baseId単位のその日の最大1RM（繰り返し種目 id#2 もまとめる）
-function anDayRM(k,b){let mx=0;new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{if(baseId(id)===b){const v=dayMaxRM(k,id);if(v>mx)mx=v}});return mx}
+// 重量×回数が入っていれば1RMを出す（単位の設定に関係なく）
+function anDayRM(k,b){let mx=0;new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{if(baseId(id)!==b)return;doneSets(k,id).forEach(s=>{const e=e1rm(s.w,s.r,id,k);if(e&&e>mx)mx=e})});return mx}
 function anRMExs(days){const seen=new Map();days.forEach(k=>{new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{const b=baseId(id),r=itemById(id);if(r&&!seen.has(b)&&anDayRM(k,b))seen.set(b,r.item.name)})});return [...seen].map(([id,name])=>({id,name}))}
 function anChart(data,o){o=o||{};const type=o.type||"bar",W=340,H=170,PL=40,PR=10,PT=12,PB=26;
   const n=data.length,mx=Math.max(1,...data.map(d=>d.y||0)),nm=anNiceMax(mx);
