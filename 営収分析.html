@@ -219,7 +219,6 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
 
 <nav class="tabs" id="tabs">
   <button data-tab="summary" class="active">サマリー</button>
-  <button data-tab="hourly">時間別</button>
   <button data-tab="map">地図</button>
   <button data-tab="data">データ</button>
 </nav>
@@ -304,6 +303,7 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
           <button data-g="all" class="active">全期間</button>
           <button data-g="month">月度</button>
           <button data-g="week">週</button>
+          <button data-g="hour">時間帯</button>
         </div>
         <div class="seg" id="sumMetric">
           <button data-m="uriage" class="active">営収</button>
@@ -325,36 +325,6 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     </div>
   </section>
 
-  <!-- HOURLY -->
-  <section class="view" id="view-hourly">
-    <div class="kpis" id="hrKpis"></div>
-    <div class="card">
-      <h2>時間帯別 <span class="sub">出庫からの一勤務を時刻順(13時→翌12時)で表示</span></h2>
-      <div class="filters">
-        <div class="seg" id="hrMetric">
-          <button data-m="fare" class="active">売上(料金)</button>
-          <button data-m="count">営業回数</button>
-          <button data-m="jitsu">実車時間(分)</button>
-          <button data-m="rate">実車率(%)</button>
-        </div>
-        <div class="seg" id="hrAgg">
-          <button data-a="total" class="active">合計</button>
-          <button data-a="avg">1乗務平均</button>
-        </div>
-        <div class="seg" id="hrView">
-          <button data-v="chart" class="active">グラフ</button>
-          <button data-v="table">表</button>
-        </div>
-      </div>
-      <div id="hrChartWrap" class="chart-wrap"><canvas id="hrChart"></canvas></div>
-      <div id="hrTableWrap" style="display:none"></div>
-    </div>
-    <div class="card" id="hrCmpCard" style="display:none">
-      <h2>シーズン比較 <span class="sub" id="hrCmpSub"></span></h2>
-      <div class="chart-wrap" id="hrCmpTopWrap"><canvas id="hrCmpTop"></canvas></div>
-      <div id="hrCmpList" style="margin-top:14px"></div>
-    </div>
-  </section>
 
 
   <!-- MAP -->
@@ -386,6 +356,8 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <button class="icon-btn" id="fsBtn">⛶ 全画面</button>
         <span style="position:relative; display:inline-flex; gap:6px; align-items:center; flex-wrap:wrap">
           <button class="icon-btn" id="shiftBtn" style="padding:3px 10px">▶ 乗務開始</button>
+          <button class="icon-btn" id="gpxBtn" style="padding:3px 8px" title="バックグラウンドGPSロガーのGPXを取り込む">GPX取込</button>
+          <input type="file" id="gpxInput" accept=".gpx,.xml,application/gpx+xml,application/octet-stream,text/xml,*/*" style="display:none">
           <span class="small muted" id="shiftStat"></span>
           <span id="shiftList" style="display:inline-flex; gap:4px; flex-wrap:wrap; align-items:center"></span>
           <div id="shiftPop" class="cal-pop" style="display:none; width:260px"></div>
@@ -846,8 +818,19 @@ function renderSummary(){
   renderSumCompare();                 // シーズン比較（2つ選択時のみ）
   state.outlier=_om;
 }
-/* 日別の推移の系列（全期間＝日ごと／月度／週、1乗務平均）を指定日配列から作る */
+/* 日別の推移の系列（全期間＝日ごと／月度／週／時間帯、1乗務平均）を指定日配列から作る */
 function sumSeriesForDays(days){
+  if(sumGroup==='hour'){            // 時間帯別（1乗務あたり平均）
+    const agg=hourlyAggDays(days); const nd=days.length||1;
+    const data=SHIFT_HOURS.map(h=>{
+      if(sumMetric==='uriage') return Math.round((agg.fare[h]||0)/nd);
+      if(sumMetric==='kaisu')  return +((agg.count[h]||0)/nd).toFixed(1);
+      if(sumMetric==='jitsu')  return Math.round((agg.jitsu[h]||0)/nd);
+      if(sumMetric==='wage')   return Math.round((agg.fare[h]||0)*0.9*0.52/nd);   // その時間帯の実質収入
+      return 0;
+    });
+    return { labels:SHIFT_HOURS.map(h=>h+'時'), data };
+  }
   if(sumGroup==='all'){
     return { labels:days.map(d=>d.date.slice(5)+'('+wdayOf(d.date)+')'), data:days.map(d=>groupMetricAvg([d], sumMetric)) };
   }
@@ -1815,9 +1798,8 @@ document.getElementById('tabs').addEventListener('click',e=>{
 function renderCurrent(){
   document.getElementById('fOutlier').style.display = (curTab==='summary')?'none':'';
   // シーズン比較(A×B・＋シーズン)はサマリー・時間別だけに出す
-  const gc=document.getElementById('grpCmp'); if(gc) gc.style.display=(curTab==='summary'||curTab==='hourly')?'':'none';
+  const gc=document.getElementById('grpCmp'); if(gc) gc.style.display=(curTab==='summary')?'':'none';
   if(curTab==='summary') renderSummary();
-  else if(curTab==='hourly') renderHourly();
   else if(curTab==='map') renderMap();
   else if(curTab==='data') renderDataTab();
   document.getElementById('scopeInfo').textContent=`${scopedDays().length}日 / ${scopedRides().length}乗車`;
@@ -1831,9 +1813,6 @@ function segWire(id, key, cb){
 }
 segWire('sumMetric','m',v=>{sumMetric=v; renderSummary();});
 segWire('sumGroup','g',v=>{sumGroup=v; renderSummary();});
-segWire('hrMetric','m',v=>{hrMetric=v; renderHourly();});
-segWire('hrAgg','a',v=>{hrAgg=v; renderHourly();});
-segWire('hrView','v',v=>{hrView=v; renderHourly();});
 segWire('mapMode','m',v=>{ mapMode=v; renderMap(); });
 document.getElementById('odClear').onclick=()=>{ closeAllOD(); };
 // 客カテゴリ絞り込み
@@ -1927,7 +1906,7 @@ function shiftDateNow(){ const d=new Date(); if(d.getHours()<13) d.setDate(d.get
 function startShift(resume){
   if(recOn && !resume) return;
   if(!navigator.geolocation){ alert('この端末では位置情報が使えない'); return; }
-  recOn=true;
+  recOn=true; acquireWake();
   if(!resume){ recDate=shiftDateNow(); recTrack=[]; persistActive(); }
   try{ recWatchId=navigator.geolocation.watchPosition(onRecPos, onRecErr, {enableHighAccuracy:true, maximumAge:0, timeout:20000}); }
   catch(e){ onRecErr(e); }
@@ -1937,7 +1916,7 @@ function stopShift(){
   if(!recOn) return;
   if(!confirm('乗務を終了して記録を保存する？')) return;
   if(recWatchId!=null && navigator.geolocation){ navigator.geolocation.clearWatch(recWatchId); recWatchId=null; }
-  recOn=false;
+  recOn=false; releaseWake();
   if(recTrack.length>=2){ TRACKS[recDate]={points:recTrack, startT:recTrack[0].t, endT:recTrack[recTrack.length-1].t}; saveTracks(); }
   try{ localStorage.removeItem(LS_TRACK_ACT); }catch(e){}
   if(recLine && map){ try{ map.removeLayer(recLine); }catch(e){} recLine=null; }
@@ -1990,6 +1969,39 @@ function resumeActiveTrack(){
   if(!a||!Array.isArray(a.points)) return;
   recDate=a.date||todayStr(); recTrack=a.points; startShift(true);   // 再読み込み後もGPS記録を再開
 }
+/* 画面スリープ防止（乗務中は画面を消さない）。前面にいる間の記録を途切れにくくする */
+let wakeLock=null;
+async function acquireWake(){ try{ if('wakeLock' in navigator){ wakeLock=await navigator.wakeLock.request('screen'); } }catch(e){} }
+function releaseWake(){ try{ wakeLock&&wakeLock.release(); }catch(e){} wakeLock=null; }
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && recOn){
+    acquireWake();                                   // 画面復帰でロック取り直し
+    if(recWatchId==null && navigator.geolocation){   // 止まっていたら記録を再開
+      try{ recWatchId=navigator.geolocation.watchPosition(onRecPos, onRecErr, {enableHighAccuracy:true, maximumAge:0, timeout:20000}); }catch(e){}
+    }
+  }
+});
+/* GPX取り込み：バックグラウンドGPSロガーの軌跡を読み込んで乗務記録にする */
+function gpxShiftDate(ms){ const d=new Date(ms); if(d.getHours()<13) d.setDate(d.getDate()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function importGpxText(txt){
+  let xml; try{ xml=new DOMParser().parseFromString(txt,'application/xml'); }catch(e){ alert('GPXが読めない'); return; }
+  if(xml.querySelector('parsererror')){ alert('GPXの形式が正しくない'); return; }
+  let nodes=[...xml.getElementsByTagName('trkpt')];
+  if(!nodes.length) nodes=[...xml.getElementsByTagName('rtept')];
+  if(!nodes.length) nodes=[...xml.getElementsByTagName('wpt')];
+  const pts=nodes.map(p=>{ const lat=+p.getAttribute('lat'), lng=+p.getAttribute('lon');
+    const te=p.getElementsByTagName('time')[0]; const t=te? Date.parse(te.textContent) : null;
+    return (isFinite(lat)&&isFinite(lng)&&t)? {t, lat, lng} : null; }).filter(Boolean);
+  if(pts.length<2){ alert('時刻つきの軌跡が足りない（GPSロガーで「時刻を記録」をONにしてGPX書き出しして）'); return; }
+  pts.sort((a,b)=>a.t-b.t);
+  const date=gpxShiftDate(pts[0].t);
+  if(TRACKS[date] && !confirm(date+' には既に乗務記録がある。置き換える？')) return;
+  TRACKS[date]={points:pts, startT:pts[0].t, endT:pts[pts.length-1].t};
+  saveTracks(); renderShiftList();
+  if(curTab==='data') renderDataTab();
+  alert(`GPXを取り込んだ：${date}・${pts.length}点・約${trackKm(pts).toFixed(1)}km`);
+}
 function placeLoc(p, recenter){
   initMap(); if(!map) return;
   const ll=[p.coords.latitude,p.coords.longitude];
@@ -2039,6 +2051,9 @@ document.getElementById('fsBtn').onclick=toggleFullscreen;
 document.getElementById('shiftBtn').onclick=()=> recOn? stopShift() : startShift(false);
 document.getElementById('pickOk').onclick=pickConfirm;
 document.getElementById('pickClose').onclick=closePick;
+document.getElementById('gpxBtn').onclick=()=>document.getElementById('gpxInput').click();
+document.getElementById('gpxInput').onchange=e=>{ const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{ importGpxText(String(r.result)); e.target.value=''; }; r.readAsText(f); };
 document.addEventListener('click',e=>{ const p=document.getElementById('shiftPop');
   if(!p||p.style.display==='none') return;
   if(e.target.closest('#shiftPop')||e.target.closest('.shiftChip')) return; p.style.display='none'; });
@@ -2474,9 +2489,12 @@ document.getElementById('copyBtn').onclick=()=>{
 // AIに日報写真を読ませてJSONを作らせる指示文
 const AI_PROMPT=`あなたはタクシーの日報・営業履歴の写真を読み取って、下のJSONだけを出力するアシスタントです。説明やコメントは書かず、JSONのみ出力してください。
 
+写真は複数枚送られることがあります（例：「営業履歴」＝乗降地・時刻・料金 → rides用、「電子日報」＝空車/実車/迎車/回送の時間 → run用）。同じ乗務（同じ出庫日）の写真なら、まとめて1つのオブジェクトにしてください。
+
 1日分＝1オブジェクト（複数日あれば配列）。キー:
 - date: 出庫日 "YYYY-MM-DD"
-- shukko: 出庫時刻 "HH:MM"
+- shukko: 出庫時刻 "HH:MM"（営業所を出た時刻）
+- kiko: 帰庫時刻 "HH:MM"（営業所に戻った時刻。日跨ぎなら翌日の時刻でOK。例 "01:20"）
 - weather: "晴れ" | "曇り" | "雨" | "雪"（分かれば）
 - uriage: 営収(数値・税込)
 - handle: ハンドル時間 "HH:MM"（総稼働時間）
@@ -2486,13 +2504,17 @@ const AI_PROMPT=`あなたはタクシーの日報・営業履歴の写真を読
 - rides: 乗車の配列。各要素:
   { "type":"アプリ"|"無線"|"流し", "on":"HH:MM"(乗車時刻), "off":"HH:MM"(降車時刻),
     "from":"乗車地の住所", "to":"降車地の住所", "pay":"支払方法", "fare":料金(数値) }
-- run: 状態ごとの走行時間帯。
-  { "jitsu":[["HH:MM","HH:MM"], ...](実車=客を乗せていた),
-    "kuusha":[...](空車=流し中),
-    "gei":[...](迎車=配車で迎えに向かっていた),
-    "kaiso":[...](回送) }
-  ルール: 各区間は [開始, 終了]。同じ日の中で、どの状態どうしも時間が重ならないようにする。
-  実車(jitsu)の区間は rides の on〜off と一致させる。分かる範囲でよい。
+- run: 状態ごとに走っていた時間帯（タクシーの空車灯・メーターの状態）。
+  { "jitsu":[["HH:MM","HH:MM"], ...]  // 実車＝客を乗せてメーターを入れて走っていた時間
+    "kuusha":[...]                    // 空車＝客がいない状態で流して拾おうとしていた時間
+    "gei":[...]                       // 迎車＝アプリ/無線の配車で、客の所へ迎えに向かっていた時間
+    "kaiso":[...] }                   // 回送＝営業対象外で走っていた時間（休憩・食事・給油・車庫や営業所へ戻る移動・乗務終了に向けた移動など、客を乗せる気が無い走行）
+  ルール:
+  ・各区間は [開始時刻, 終了時刻]。
+  ・同じ日の中で、どの状態どうしも時間が重ならないようにする（ある瞬間は必ず1つの状態）。
+  ・実車(jitsu)の区間は rides の on〜off と一致させる。
+  ・出庫〜帰庫の間を、できるだけ jitsu/kuusha/gei/kaiso のどれかで埋める（分かる範囲でよい）。
+  ・電子日報に「〇時〜〇時」の時間帯が書いてあればそれを run に入れる。もし合計時間（例「空車 2時間30分」）しか書いていなくて、いつ走ったか特定できない状態は、無理に区間を作らず run は空（{}）のままにする。
 
 住所はできるだけ詳しく（都道府県＋市区町村＋丁目番地）。読めない項目は省略可。JSON以外は絶対に出力しない。`;
 document.getElementById('aiPromptBtn').onclick=()=>{
