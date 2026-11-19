@@ -1044,7 +1044,7 @@ function renderInner(){
   renderPerEdit();
 
   // selected day
-  const sd=parse(sel),ids=p?dayItems(sel):[];
+  const sd=parse(sel),ids=dayItems(sel);
   $("dayhead").replaceChildren(el("span",{class:"yr"},sd.getFullYear()+"年"),el("span",{class:"big"},md(sd)),el("span",{class:"dw"+(sd.getDay()===0?" sun":"")+(sd.getDay()===6?" sat":"")},"("+DOW[sd.getDay()]+")"),...dayTagList(sel).map(t=>el("span",{class:"dht",style:"color:"+t.color},t.name)),
     ...(tab==="menu"?[el("button",{class:"mini editbtn",onclick:()=>{tab="log";catOpen=false;render();window.scrollTo({top:0})}},"編集")]:[]),
     el("button",{class:"sharebtn","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(sel)},SHARE_SVG()));
@@ -1052,7 +1052,7 @@ function renderInner(){
   renderTplBar(p);
   renderDsum(p,ids);$("dayStick").hidden=false;
   if(!skipLog)renderLog(p,ids);
-  const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
+  const dn=$("dayNote");dn.disabled=false;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
 
   renderCats();renderTemplates();renderCatTpl();
 
@@ -1488,7 +1488,7 @@ function fill1rm(box,s,id,k){
 function dsumCells(k,ids){let ns=0,nr=0,vol=0;ids.forEach(id=>{const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg");doneSets(k,id).forEach(s=>{ns++;const r=parseInt(s.r)||0,w=toNum(s.w);nr+=r;if(kg&&w>0)vol+=w*r})});
   return [["種目数",ids.length,""],["セット数",ns,""],["レップ",nr,""],["総負荷量",Math.round(vol).toLocaleString(),"kg"]].map(([a,b,u])=>el("div",null,el("small",null,a),el("b",null,String(b),u?el("i",null,u):null)))}
 function renderDsum(p,ids){
-  $("dsum").hidden=!p||!ids.length;
+  $("dsum").hidden=!ids.length;
   $("dsum").replaceChildren(...dsumCells(sel,ids));
 }
 const exNote=(k,id)=>(exNotes[k]&&exNotes[k][id])||"";
@@ -1497,8 +1497,7 @@ function setExNote(k,id,v){if(v.trim()){exNotes[k]=exNotes[k]||{};exNotes[k][id]
 function renderLog(p,ids){
   foldReset();
   const box=$("wlog");box.replaceChildren();
-  if(!p){box.append(el("div",{class:"empty"},"期間を作ると、日付ごとに種目と記録を入れられます。"));return}
-  if(!ids.length)return;
+  if(!ids.length){if(!p)box.append(el("div",{class:"empty"},"右下の＋から種目を追加できます。"));return}
   LOGKEYS=Object.keys(logs).sort();
   ids.forEach(id=>{
     const r=itemById(id);let sets=setsOf(sel,id);
