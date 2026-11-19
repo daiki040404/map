@@ -274,6 +274,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .sortrow .sortbtns button{color:var(--fg)}
 /* トレーニング記録 */
 .tplbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:12px}
+.cattplbar{margin:2px 0 10px}
 .tplbar>.tagrow{width:100%}.panel.inpanel{border:0;padding:0;background:none;box-shadow:none}.inpanel .btnrow{margin-top:0!important}.tplbar>.tpanel{flex-basis:100%;width:100%}
 .tplbar .tlabel{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-right:2px}
 .tplbtn{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px}
@@ -731,6 +732,7 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
 
   <section class="panel" id="catSec">
     <div class="catback"><button class="ghost" id="catBack">‹ 戻る</button><span class="cbt">種目を追加</span></div>
+    <div class="tplbar cattplbar" id="catTplBar"></div>
     <div class="palhead">
       <div class="label">種目リスト</div>
       <button class="edittoggle" id="editBtn">編集</button>
@@ -844,6 +846,7 @@ const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",n
 let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
 let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),catMenuId=null,catRmMode=null,recFold={},exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
+let catTplOpen=false,catTplSel=new Set();
 let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
@@ -1051,7 +1054,7 @@ function renderInner(){
   if(!skipLog)renderLog(p,ids);
   const dn=$("dayNote");dn.disabled=!p;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
 
-  renderCats();renderTemplates();
+  renderCats();renderTemplates();renderCatTpl();
 
   const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";if($("weekMemoV"))linkSync(wm,$("weekMemoV"));
 
@@ -2002,6 +2005,23 @@ function renderTplBar(p){
   const t=templates.find(x=>x.id===tplConfirm);cf.hidden=!t;cf.replaceChildren();
   if(t)cf.append(el("div",null,"この日にはもう種目が入っています。「"+t.name+"」をどう入れますか？"),
     el("div",{class:"btnrow"},el("button",{class:"primary",onclick:()=>applyTpl(t,"replace")},"入れ替える"),el("button",{class:"ghost",onclick:()=>applyTpl(t,"add")},"後ろに追加"),el("button",{class:"ghost",onclick:()=>{tplConfirm=null;render()}},"やめる")));
+}
+// 種目追加画面での「テンプレートから追加」（種目を個別に足すのとは別に、テンプレをまとめて追加）
+function renderCatTpl(){
+  const bar=$("catTplBar");if(!bar)return;bar.replaceChildren();
+  if(!(tab==="log"&&catOpen)){bar.hidden=true;catTplOpen=false;return}
+  bar.hidden=false;
+  const tps=templates.filter(t=>(t.items||[]).length);
+  [...catTplSel].forEach(x=>{if(!tps.some(t=>t.id===x))catTplSel.delete(x)});
+  const row=el("div",{class:"tagrow"});
+  row.append(el("button",{class:"tpick"+(catTplOpen?" on":""),"aria-expanded":String(catTplOpen),onclick:()=>{catTplOpen=!catTplOpen;if(!catTplOpen)catTplSel.clear();render()}},"テンプレートから追加",el("span",{class:"tv"},catTplOpen?"▲":"▼")));
+  bar.append(row);
+  if(!catTplOpen)return;
+  const pan=el("div",{class:"tpanel"}),list=el("div",{class:"tplist"});
+  if(!tps.length)list.append(el("span",{class:"note",style:"padding:6px"},"テンプレートがまだありません"));
+  tps.forEach(t=>{const on=catTplSel.has(t.id);list.append(el("button",{class:"topt"+(on?" on":""),style:"--tc:"+tplColor(t),"aria-pressed":String(on),onclick:()=>{if(on)catTplSel.delete(t.id);else catTplSel.add(t.id);render()}},el("span",{class:"tbx"},on?"✓":""),t.name))});
+  pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"primary",style:"margin-left:auto"+(catTplSel.size?"":";opacity:.45"),onclick:()=>{const ts=tps.filter(t=>catTplSel.has(t.id));if(!ts.length)return;catTplOpen=false;catTplSel.clear();catOpen=false;applyTpls(ts);window.scrollTo({top:0})}},catTplSel.size?catTplSel.size+"件を追加":"追加")));
+  bar.append(pan);
 }
 function applyTpls(ts){
   const k=sel,snap=clone({p:plan[k]||null,l:logs[k]||null});let ids=dayItems(k).slice();
