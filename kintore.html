@@ -1147,7 +1147,7 @@ function pickDay(dk){const c=cur();
   if(c&&inP(c,dk)){sel=dk;render();return}
   const q=sorted().filter(x=>inP(x,dk));
   if(q.length){curId=q[q.length-1].id;userNavigated=true;sel=dk;render();return}
-  toast("この日はどの期間にも入っていません。期間を作るとメニューを入れられます");openEditor("new");$("pStart").value=dk;$("pEnd").value=addK(dk,6);pNote()}
+  sel=dk;render()}
 function monthGrid(days,y,m,outFn,nav,onlyWeeksIn){
   const first=new Date(y,m-1,1),n=new Date(y,m,0).getDate();
   if(onlyWeeksIn){ // 期間にかかる週だけ表示
@@ -1173,8 +1173,6 @@ function renderMonth(days){
   if(!calMonth)calMonth=sel.slice(0,7);
   const [y,m]=calMonth.split("-").map(Number),n=new Date(y,m,0).getDate();
   monthGrid(days,y,m,k=>!periods.some(q=>inP(q,k)),true);
-  const cnt=Array.from({length:n},(_,i)=>key(new Date(y,m-1,i+1))).filter(k=>dayItems(k).length).length;
-  days.append(el("div",{class:"monfoot note"},"この月のトレーニング "+cnt+"日　（薄い日はどの期間にも入っていない日）"));
 }
 // 期間を選んでいるとき：期間がかかる月を並べて表示（期間外の日は薄く）
 function renderPeriodMonths(days,p){
@@ -2221,7 +2219,7 @@ function toggle(id){
     tt.items.push({id,sets:3});touch();const wasOpen=catOpen;catOpen=false;render();
     if(wasOpen){const c=document.querySelector('.tpli[data-id="'+id+'"]');if(c)c.scrollIntoView({block:"center"})}
     toast("「"+nm+"」をテンプレートに追加しました");return}
-  if(!cur())return;const a=(plan[sel]||[]).filter(x=>itemById(x));let key=id,n=2;while(a.includes(key)||(logs[sel]&&logs[sel][key]&&logs[sel][key].some(hasAny)))key=id+"#"+(n++);
+  if(!sel)return;const a=(plan[sel]||[]).filter(x=>itemById(x));let key=id,n=2;while(a.includes(key)||(logs[sel]&&logs[sel][key]&&logs[sel][key].some(hasAny)))key=id+"#"+(n++);
   a.push(key);plan[sel]=a;setSrc(sel,key,defSrc(sel));openEx.add(key);foldReset();openedEx.add(key);
   // 押した種目の行が指の下から動かないように（ブラウザ任せの自動補正は切ってある）
   const q='#cats .trow[data-id="'+id+'"]',an=document.querySelector(q),t0=an?an.getBoundingClientRect().top:null;
@@ -2269,7 +2267,7 @@ $("pSel").addEventListener("change",()=>goPeriod($("pSel").value));
 $("prevP").onclick=()=>{const s=sorted(),order=[null,...s.map(x=>x.id)],i=allMode?0:order.indexOf(curId);if(i>0)goPeriod(order[i-1])};
 $("nextP").onclick=()=>{const s=sorted(),order=[null,...s.map(x=>x.id)],i=allMode?0:order.indexOf(curId);if(i>=0&&i<order.length-1)goPeriod(order[i+1])};
 $("todayP").onclick=()=>{const t=periodFor(todayK);if(t){curId=t.id;sel=todayK;calMonth=todayK.slice(0,7);perMode=null;render();$("dayGroup").scrollIntoView({behavior:"smooth",block:"start"})}else{toast("今日を含む期間がありません。新しく作れます");openEditor("new");$("pStart").value=todayK;$("pEnd").value=addK(todayK,6);pNote()}};
-sortable($("wlog"),".dcard",ids=>{if(!cur())return;plan[sel]=ids;savePlan();render()},{handle:".grip"});
+sortable($("wlog"),".dcard",ids=>{if(!sel)return;plan[sel]=ids;savePlan();render()},{handle:".grip"});
 sortable($("tpls"),".tpl",ids=>{const by={};templates.forEach(t=>by[t.id]=t);templates=ids.map(i=>by[i]).filter(Boolean);touch();render()},{handle:".tplh"});
 $("tplNewBtn").onclick=()=>{const t={id:"tp_"+uid(),name:"",items:[]};templates.push(t);tplEditing=t.id;touch();render()};
 $("tplFromDayBtn").onclick=()=>{const ids=dayItems(sel);if(!ids.length)return;const t={id:"tp_"+uid(),name:mdk(sel)+"のメニュー",items:ids.map(id=>({id,sets:setsOf(sel,id).length||3}))};templates.push(t);tplEditing=t.id;touch();render();};
