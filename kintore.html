@@ -83,6 +83,16 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);fon
 .rday.rtoday{outline:2px solid var(--accent);outline-offset:1px}
 .recmore{display:flex;justify-content:center;margin:8px 0}
 .recmore .ghost{font-size:13px}
+.anh{font-weight:700;font-size:14px;margin:6px 0 2px}
+.anrow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.anexrow{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.anexrow::-webkit-scrollbar{display:none}
+.anchip{font-size:12px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--fg);white-space:nowrap}
+.anchip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.anchip.sm{padding:4px 11px}
+.anchartwrap{margin:4px 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 6px}
+.anchart{width:100%;height:auto;display:block}
+.ancap{font-size:11px;margin-top:2px}
 .rph .rt{font-weight:700;font-size:13px;color:var(--muted);letter-spacing:.04em}
 .rph .rm{font-size:13px;white-space:pre-wrap;background:var(--panel2);border-radius:8px;padding:6px 8px}
 .rday{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px;display:flex;flex-direction:column;gap:6px}
@@ -811,7 +821,7 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
       <div class="recmk" id="recMk"></div>
       <div class="recbar"><span class="note" id="recCount"></span><span class="recio"><button class="ghost" id="recCopy">コピー</button><button class="ghost" id="recImport">追加</button><input type="file" id="recFile" accept=".json,.txt,application/json,text/plain" hidden></span><button class="ghost" id="recSort"></button></div>
     </div>
-    <div class="viewsw recview" id="recView" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="cal">カレンダー</button></div>
+    <div class="viewsw recview" id="recView" role="group" aria-label="表示"><button data-v="list">リスト</button><button data-v="cal">カレンダー</button><button data-v="analysis">分析</button></div>
     <div class="recs" id="recs"></div>
   </section>
   </div>
@@ -867,7 +877,7 @@ let tags=defaultTags(),dayTags={},tagEditing=false;
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
 let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),catMenuId=null,catRmMode=null,recFold={},exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
 let catTplOpen=false,catTplSel=new Set();
-let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recAllBack=45,recAllFwd=14,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
+let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recAllBack=45,recAllFwd=14,anMetric="vol",anType="bar",anEx=null,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
 const liveTags=g=>tags.filter(t=>!t.deleted&&(!g||(t.group||"plan")===g));
@@ -1877,6 +1887,52 @@ function setMemos(k,a){a=a.filter(x=>String(x).trim());if(a.length)dayMemo[k]=a;
 function keepY(fn){const y=window.scrollY;fn();window.scrollTo(0,y);requestAnimationFrame(()=>window.scrollTo(0,y))}
 function recordDays(){const ks=new Set([...Object.keys(plan),...Object.keys(logs),...Object.keys(notes),...Object.keys(exNotes),...Object.keys(dayTags)]);
   return [...ks].filter(k=>(dayItems(k).length||Object.keys(logs[k]||{}).some(id=>itemById(id)&&doneSets(k,id).length)||notes[k]||exNotes[k]||(dayTags[k]||[]).length)).sort()}
+// ---------- 分析（グラフ） ----------
+function anNiceMax(m){if(m<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(m)));const r=m/p,n=r<=1?1:r<=2?2:r<=5?5:10;return n*p}
+function anFmt(v){v=Math.round(v);if(v>=10000)return Math.round(v/1000)+"k";if(v>=1000)return (v/1000).toFixed(1)+"k";return String(v)}
+// その日の集計：種目数・セット数・レップ・総負荷量
+function anDayVal(k,m){const ids=new Set([...dayItems(k),...Object.keys(logs[k]||{})]);let exc=0,sets=0,reps=0,vol=0;
+  ids.forEach(id=>{if(!itemById(id))return;const ds=doneSets(k,id);if(!ds.length)return;exc++;ds.forEach(s=>{sets++;const r=parseInt(s.r)||0,w=toNum(s.w)||0;reps+=r;vol+=w*r})});
+  return m==="exc"?exc:m==="sets"?sets:m==="reps"?reps:vol}
+// baseId単位のその日の最大1RM（繰り返し種目 id#2 もまとめる）
+function anDayRM(k,b){let mx=0;new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{if(baseId(id)===b){const v=dayMaxRM(k,id);if(v>mx)mx=v}});return mx}
+function anRMExs(days){const seen=new Map();days.forEach(k=>{new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{const b=baseId(id),r=itemById(id);if(r&&!seen.has(b)&&anDayRM(k,b))seen.set(b,r.item.name)})});return [...seen].map(([id,name])=>({id,name}))}
+function anChart(data,o){o=o||{};const type=o.type||"bar",W=340,H=170,PL=40,PR=10,PT=12,PB=26;
+  const n=data.length,mx=Math.max(1,...data.map(d=>d.y||0)),nm=anNiceMax(mx);
+  const pw=W-PL-PR,ph=H-PT-PB,x0=PL,y1=H-PB;
+  const X=i=>n<=1?x0+pw/2:x0+i*pw/(n-1),Xb=i=>x0+(i+0.5)*pw/Math.max(1,n),Y=v=>y1-(v/nm)*ph;
+  let s=`<svg viewBox="0 0 ${W} ${H}" class="anchart" xmlns="http://www.w3.org/2000/svg">`;
+  [0,0.5,1].forEach(t=>{const yy=y1-t*ph;s+=`<line x1="${x0}" y1="${yy}" x2="${W-PR}" y2="${yy}" style="stroke:var(--line)" stroke-width="1"/><text x="${x0-5}" y="${yy+3}" text-anchor="end" style="fill:var(--muted)" font-size="9">${anFmt(nm*t)}</text>`});
+  if(type==="bar"){const bw=Math.max(2,Math.min(22,pw/Math.max(1,n)*0.62));data.forEach((d,i)=>{const yy=Y(d.y||0);s+=`<rect x="${(Xb(i)-bw/2).toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,y1-yy).toFixed(1)}" rx="2" style="fill:var(--accent)"/>`})}
+  else{const pts=data.map((d,i)=>`${X(i).toFixed(1)},${Y(d.y||0).toFixed(1)}`).join(" ");s+=`<polyline points="${pts}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;data.forEach((d,i)=>{s+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.y||0).toFixed(1)}" r="2.6" style="fill:var(--accent)"/>`})}
+  const xi=type==="bar"?Xb:X,idxs=[...new Set(n<=1?[0]:[0,Math.floor((n-1)/2),n-1])];
+  idxs.forEach(i=>{const d=data[i];if(!d)return;const dt=parse(d.k);s+=`<text x="${xi(i).toFixed(1)}" y="${H-8}" text-anchor="middle" style="fill:var(--muted)" font-size="9">${dt.getMonth()+1}/${dt.getDate()}</text>`});
+  s+=`</svg>`;const w=el("div",{class:"anchartwrap"});w.innerHTML=s;return w}
+function renderAnalysis(box,days){
+  if(!days.length){box.append(el("div",{class:"empty"},"この条件の記録がありません。"));return}
+  const metrics=[["vol","総負荷量","kg"],["sets","セット数","set"],["reps","レップ","回"],["exc","種目数","種目"]];
+  const met=metrics.find(m=>m[0]===anMetric)||metrics[0];
+  box.append(el("div",{class:"anh"},"日ごとの記録"));
+  const mrow=el("div",{class:"anrow"});
+  metrics.forEach(([v,lb])=>mrow.append(el("button",{class:"anchip"+(anMetric===v?" on":""),onclick:()=>{anMetric=v;keepY(render)}},lb)));
+  const trow=el("div",{class:"anrow"});
+  [["bar","棒グラフ"],["line","折れ線"]].forEach(([v,lb])=>trow.append(el("button",{class:"anchip sm"+(anType===v?" on":""),onclick:()=>{anType=v;keepY(render)}},lb)));
+  box.append(mrow,trow);
+  box.append(anChart(days.map(k=>({k,y:anDayVal(k,anMetric)})),{type:anType}));
+  box.append(el("div",{class:"ancap note"},met[1]+"（単位："+met[2]+"）"));
+  box.append(el("div",{class:"anh",style:"margin-top:18px"},"種目ごとの1RM推移"));
+  const exs=anRMExs(days);
+  if(!exs.length){box.append(el("div",{class:"empty"},"1RMを計算できる記録がありません。"));return}
+  if(!anEx||!exs.some(e=>e.id===anEx))anEx=exs[0].id;
+  const erow=el("div",{class:"anrow anexrow"});
+  exs.forEach(e=>erow.append(el("button",{class:"anchip"+(anEx===e.id?" on":""),onclick:()=>{anEx=e.id;keepY(render)}},e.name)));
+  box.append(erow);
+  const rdata=days.map(k=>({k,y:anDayRM(k,anEx)})).filter(p=>p.y>0).map(p=>({k:p.k,y:Math.round(p.y*10)/10}));
+  if(!rdata.length){box.append(el("div",{class:"empty"},"この種目の1RM記録がありません。"));return}
+  box.append(anChart(rdata,{type:"line"}));
+  const best=Math.max(...rdata.map(p=>p.y)),latest=rdata[rdata.length-1].y;
+  box.append(el("div",{class:"ancap note"},"最新 "+latest+"kg ／ 最高 "+best+"kg"));
+}
 function renderRecords(){
   const box=$("recs");if(tab!=="rec"){return}box.replaceChildren();
   const all=recordDays(),years=[...new Set(all.map(k=>k.slice(0,4)))].sort().reverse();
@@ -1941,6 +1997,7 @@ function renderRecords(){
   $("recSort").textContent=recAsc?"古い順 ⇅":"新しい順 ⇅";
   $("recCount").textContent=(contAll?all.filter(k=>k>=aLo&&k<=aHi).length:list.length)+"日分";recList=list.filter(k=>allSet.has(k));
   document.querySelectorAll("#recView button").forEach(b=>b.classList.toggle("on",b.dataset.v===recView));
+  if(recView==="analysis"){renderAnalysis(box,recList.slice().sort());return}
   if(recView==="cal"){recCalendar(box,list);return}
   if(!list.length){box.append(el("div",{class:"empty"},"この条件の記録はありません。"));return}
   if(contAll)box.append(el("div",{class:"recmore"},el("button",{class:"ghost",onclick:()=>{recAllFwd+=14;keepY(render)}},"＋ 先の日付を見る")));
