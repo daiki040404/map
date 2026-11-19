@@ -902,9 +902,9 @@ function chipsFor(dk){const ids=visIds(dk),cs=allMode?covering(dk):[];
   const box=el("div",{class:"lgroups"});
   cs.forEach(q=>{const mine=ids.filter(id=>srcOf(dk,id)===q);box.append(el("div",{class:"lgrp"},el("span",{class:"lgl"},q.name||pLabel(q)),mine.length?el("div",{class:"lchips"},...mine.map(chip)):el("span",{class:"lnone"},"なし")))});
   return box}
-function pickInitial(){const t=periodFor(todayK);if(t){curId=t.id;sel=todayK;return}
-  const s=sorted();if(!s.length){curId=null;return}
-  const next=s.find(p=>p.start>todayK),prev=s.filter(p=>p.end<todayK).pop(),p=next||prev;curId=p.id;sel=p.start}
+function pickInitial(){sel=todayK;calMonth=todayK.slice(0,7);const t=periodFor(todayK);if(t){curId=t.id;allMode=false;return}
+  // 今日がどの期間にも入っていないときは一覧表示で今日の月を出す
+  curId=null;allMode=true}
 function fixSel(){const p=cur();if(!p){curId=null;return}if(!inP(p,sel))sel=inP(p,todayK)?todayK:p.start}
 
 // ---------- lookups ----------
@@ -2433,7 +2433,7 @@ $("authBtn").addEventListener("click",()=>{
 
 lsLoad();ensureMarks();rebuildIdx();if(purgeTrash()){rebuildIdx();lsSave()}histReset();pickInitial();
 // 再読み込みしても、開いていた画面（メニュー・記録・履歴）と日付をそのままにする
-try{const u=JSON.parse(localStorage.getItem("kintore-ui")||"null");if(u){if(["menu","log","rec"].includes(u.tab))tab=u.tab;if(u.day===todayK&&u.sel&&/^\d{4}-\d{2}-\d{2}$/.test(u.sel)){sel=u.sel;const q=periodFor(sel);if(q)curId=q.id;userNavigated=true}if(u.fc)freqCondId=u.fc;}}catch(e){}
+try{const u=JSON.parse(localStorage.getItem("kintore-ui")||"null");if(u){if(["menu","log","rec"].includes(u.tab))tab=u.tab;if(u.fc)freqCondId=u.fc;}}catch(e){}
 render();initFirebase();
 // 日付が変わった状態で戻ってきたら「今日」を更新して、今日の期間を開き直す
 function refreshToday(){const t=new Date();t.setHours(0,0,0,0);const k=key(t);if(k===todayK)return;today=t;todayK=k;userNavigated=false;pickInitial();render()}
