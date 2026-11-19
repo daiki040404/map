@@ -449,6 +449,14 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <h2>過去の日報データ <span class="sub" id="dayCount"></span></h2>
       <p class="small muted">カレンダーで日を選ぶと、その日のデータだけ下に出る。各項目をタップで修正できる。</p>
       <div id="dataDayCal" class="cal-inline"></div>
+      <div class="row" style="gap:8px; margin:10px 0 4px; flex-wrap:wrap; align-items:center">
+        <button class="icon-btn" id="copySel">選択中をコピー</button>
+        <span class="small muted" style="margin-left:6px">期間</span>
+        <input type="date" id="copyFrom"><span class="muted small">〜</span><input type="date" id="copyTo">
+        <button class="icon-btn" id="copyRange">期間をコピー</button>
+        <button class="icon-btn" id="copyAll">全部コピー</button>
+      </div>
+      <p class="small muted" style="margin:0 0 4px">コピー時に「営業だけ / イベントも」を選べる。各日の「コピー」で1日ぶんだけコピーも可。</p>
       <div id="dataDayList" style="margin-top:12px"></div>
     </div>
     <div class="card">
@@ -466,6 +474,18 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
     <div class="pick-head"><b id="pickTitle">地図で場所を選ぶ</b><span style="flex:1"></span><button class="icon-btn" id="pickClose">✕</button></div>
     <div id="pickMap"></div>
     <div class="pick-foot"><span class="small muted" id="pickAddr">地図をタップしてピンを置く（ドラッグで微調整）</span><span style="flex:1"></span><button class="icon-btn" id="pickOk">この場所にする</button></div>
+  </div>
+</div>
+
+<!-- コピー内容の選択 -->
+<div id="copyModal" class="pick-modal">
+  <div class="pick-box" style="width:min(90vw,340px)">
+    <div class="pick-head"><b>コピーする内容</b><span style="flex:1"></span><button class="icon-btn" id="copyCancel">✕</button></div>
+    <div class="small muted" id="copyModalInfo" style="margin-bottom:12px"></div>
+    <div class="row" style="gap:8px">
+      <button class="icon-btn" id="copyBiz" style="flex:1; padding:12px">営業</button>
+      <button class="icon-btn" id="copyBizEv" style="flex:1; padding:12px; border-color:var(--accent)">営業＋イベント</button>
+    </div>
   </div>
 </div>
 
@@ -1179,11 +1199,12 @@ function renderDayMode(){
   const day=DB.find(x=>x.date===date), rides=dayRides(date);
   const track=shiftObj(date);
   const hasTrack = track && track.points && track.points.length>=2;
+  let routeDrawn=false;
   if(hasTrack){
     const ref=track.startT;
     const winS = (day&&day.shukko)? hmToEpochForShift(day.shukko, ref) : track.startT;   // 出庫
     const winE = (day&&day.kiko)  ? hmToEpochForShift(day.kiko, ref)   : track.endT;     // 帰庫
-    drawStateRoute(track, buildStateIntervals(day, ref), winS, winE);   // 出庫〜帰庫のルートを状態で色分け
+    routeDrawn = drawStateRoute(track, buildStateIntervals(day, ref), winS, winE) > 0;   // 出庫〜帰庫のルートを状態で色分け
   }
   rides.forEach((r,i)=>{
     if(r.fromLat==null) return;
@@ -1193,7 +1214,7 @@ function renderDayMode(){
       .bindPopup(`<b>${i+1}. ${r.on}〜${r.off} ${r.type||''}${r.outlier?' ⚠':''}</b><br>${esc(r.from)}<br>→ ${esc(r.to)}<br>${fmtYen(r.fare)}${r.cat?'<br>🏷 '+esc(r.cat):''}${r.memo?'<br><i>'+esc(r.memo)+'</i>':''}`)
       .addTo(layerGroup);
     if(r.toLat!=null){
-      if(!hasTrack) L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.55}).addTo(layerGroup);  // 録跡が無い日は従来の直線
+      if(!routeDrawn) L.polyline([[r.fromLat,r.fromLng],[r.toLat,r.toLng]],{color:cv('--s2'),weight:2,opacity:.55}).addTo(layerGroup);  // 録跡が描けない/無い日は従来の直線
       L.circleMarker([r.toLat,r.toLng],{radius:5,color:cv('--s2'),fillColor:cv('--s2'),fillOpacity:.8,weight:1})
         .bindPopup(`${i+1}. 降車 ${r.off||''}<br>${esc(r.to)}<br>${fmtYen(r.fare)}`).addTo(layerGroup);
     }
@@ -1211,10 +1232,10 @@ function renderDayMode(){
       ['客単価', fmtYen(m.tanka)]
     ].map(([l,v])=>`<div class="kpi"><div class="lab">${l}</div><div class="val" style="font-size:18px">${v}</div></div>`).join('');
   }
-  if(hasTrack){
+  if(routeDrawn){
     legend.innerHTML='<b>営業ルート</b>'+multiNote+'<br><span class="muted small">GPS録跡を状態で色分け（番号＝乗せた順 / 橙点＝降車）。</span>'+routeLegendHTML();
   } else {
-    legend.innerHTML='<b>営業ルート</b>'+multiNote+'<br><span class="muted small">選んだ日の営業を時刻順に番号付きで表示（青＝乗車 / 橙＝降車、⚠は外れ値）。録跡があれば走行ルートを色分け表示。</span>';
+    legend.innerHTML='<b>営業ルート</b>'+multiNote+'<br><span class="muted small">乗車地→降車地を直線でつないで表示（青＝乗車 / 橙＝降車、⚠は外れ値）。乗務記録(GPS)があれば走行ルートを色分け表示。</span>';
   }
   renderDayTimeline(date, rides);
 }
@@ -1265,16 +1286,20 @@ function renderNoPick(){
 }
 /* GPS録跡を状態ごとに色を変えて線で描く（出庫〜帰庫の窓で絞る） */
 function drawStateRoute(track, iv, winS, winE){
-  const pts=track.points; const s0=(winS!=null?winS:track.startT), e0=(winE!=null?winE:track.endT);
-  let cur=null;
-  const addSeg=seg=>{ if(seg.latlngs.length>=2) L.polyline(seg.latlngs,{color:cv(STATE_COL[seg.state]||'--s5'), weight:5, opacity:.85}).addTo(layerGroup); };
+  const pts=track.points;
+  let s0=(winS!=null?winS:track.startT), e0=(winE!=null?winE:track.endT);
+  // 窓に点がほぼ無ければ録跡全体で描く（出庫/帰庫のズレで線が消えないように）
+  if(pts.filter(p=>p.t>=s0-1000 && p.t<=e0+1000).length<2){ s0=track.startT; e0=track.endT; }
+  let cur=null, count=0;
+  const addSeg=seg=>{ if(seg.latlngs.length>=2){ L.polyline(seg.latlngs,{color:cv(STATE_COL[seg.state]||'--s5'), weight:5, opacity:.85}).addTo(layerGroup); count++; } };
   for(let i=0;i<pts.length;i++){
-    if(pts[i].t<s0-1000 || pts[i].t>e0+1000) continue;   // 乗務開始/終了で絞った範囲だけ
+    if(pts[i].t<s0-1000 || pts[i].t>e0+1000) continue;
     const st=stateAt(pts[i].t, iv);
     if(!cur || cur.state!==st){ if(cur) addSeg(cur); cur={state:st, latlngs: cur? [cur.latlngs[cur.latlngs.length-1]] : []}; }
     cur.latlngs.push([pts[i].lat, pts[i].lng]);
   }
   if(cur) addSeg(cur);
+  return count;   // 描いた線の本数（0なら直線フォールバックに使う）
 }
 /* 出庫(13時)をまたぐ時間帯は勤務の頭に寄せて並べる */
 function evSortT(w){ const a=shiftMin(w.from), b=shiftMin(w.to); return b<a? 780 : a; }
@@ -2051,6 +2076,9 @@ document.getElementById('fsBtn').onclick=toggleFullscreen;
 document.getElementById('shiftBtn').onclick=()=> recOn? stopShift() : startShift(false);
 document.getElementById('pickOk').onclick=pickConfirm;
 document.getElementById('pickClose').onclick=closePick;
+document.getElementById('copyBiz').onclick=()=>{ if(copyPending) copyDaysData(copyPending,false); document.getElementById('copyModal').style.display='none'; };
+document.getElementById('copyBizEv').onclick=()=>{ if(copyPending) copyDaysData(copyPending,true); document.getElementById('copyModal').style.display='none'; };
+document.getElementById('copyCancel').onclick=()=>{ document.getElementById('copyModal').style.display='none'; };
 document.getElementById('gpxBtn').onclick=()=>document.getElementById('gpxInput').click();
 document.getElementById('gpxInput').onchange=e=>{ const f=e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>{ importGpxText(String(r.result)); e.target.value=''; }; r.readAsText(f); };
@@ -2227,6 +2255,24 @@ function renderPastDays(){
   const days=[...dataSelDays].sort((a,b)=>a<b?1:-1).map(dt=> DB.find(d=>d.date===dt) || {date:dt, rides:[], _new:true});
   renderDayCards(list, days);
 }
+/* 指定日のデータをコピー（営業だけ / イベントも を選ぶ） */
+function copyDaysData(dates, withEvents){
+  const days=DB.filter(d=>dates.includes(d.date)).map(d=>{ const c=Object.assign({},d); delete c._new; return c; });
+  const payload = withEvents ? {days, events:EVENTS.filter(e=>dates.includes(e.date))} : days;
+  const txt=JSON.stringify(payload,null,2);
+  const n=days.length, en=withEvents?payload.events.length:0;
+  navigator.clipboard.writeText(txt).then(
+    ()=>alert(`コピーした：${n}日分${withEvents?'＋イベント'+en+'件':'（営業だけ）'}`),
+    ()=>{ prompt('コピーできなかったので、ここを長押しでコピー', txt); });
+}
+let copyPending=null;
+function askAndCopy(dates, label){
+  dates=[...new Set(dates)].filter(dt=>DB.some(d=>d.date===dt));
+  if(!dates.length){ alert('コピーする営業データが無い'); return; }
+  copyPending=dates;
+  document.getElementById('copyModalInfo').textContent=`${label}（${dates.length}日分）`;
+  document.getElementById('copyModal').style.display='flex';
+}
 function renderDayCards(list, days){
   list.innerHTML=days.map(d=>{
     const nf=(k,ph,val,num)=>`<input class="numf" data-date="${d.date}" data-k="${k}" ${num?'type="number"':'type="text"'} placeholder="${ph}" value="${esc(val==null?'':val)}" style="width:${num?90:76}px">`;
@@ -2263,12 +2309,14 @@ function renderDayCards(list, days){
         <input type="text" class="mm" placeholder="メモ" value="${esc(r.memo)}" style="flex:2; min-width:150px">
       </div>`;
     }).join('');
-    return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="unsel" data-d="${d.date}">選択解除</button> <button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
+    return `<details class="day-det"${d._new?'':' '}><summary>${d.date}(${wdayOf(d.date)})${d.weather?' ・'+d.weather:''}${d._new?' <span class="muted small">(データ無し)</span>':''}${d.note?' 📝':''} — 営収${fmtYen(+d.uriage||0)} / ${(d.rides||[]).length}乗車 &nbsp;<button class="daycopy" data-d="${d.date}">コピー</button> <button class="unsel" data-d="${d.date}">選択解除</button> <button class="del" data-d="${d.date}">削除</button></summary>${rides}</details>`;
   }).join('');
   days.forEach(d=>{ renderRunEditor(d.date); renderEigyoAdd(d.date); renderTrackEditor(d.date); });
   list.querySelectorAll('.wsel').forEach(sel=>{ sel.onchange=e=>{ const day=ensureDay(sel.dataset.date); day.weather=e.target.value; save(); renderPastDays(); renderCurrent(); }; });
   // 営業メモ（その日の営業まるごとに対するメモ）
   list.querySelectorAll('.dn').forEach(t=>{ t.onchange=e=>{ const day=ensureDay(t.dataset.date); day.note=e.target.value.trim(); save(); renderCurrent(); }; });
+  // 1日ぶんコピー
+  list.querySelectorAll('.daycopy').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); askAndCopy([b.dataset.d], b.dataset.d); });
   // 選択解除（データは消さずにリストから外す）
   list.querySelectorAll('.unsel').forEach(b=>b.onclick=(e)=>{ e.preventDefault(); e.stopPropagation(); dataSelDays.delete(b.dataset.d); renderDataTab(); });
   // 削除
@@ -2473,18 +2521,33 @@ function closePick(){ document.getElementById('pickModal').style.display='none';
 document.getElementById('importBtn').onclick=async()=>{
   let txt=document.getElementById('pasteBox').value.trim(); if(!txt) return;
   let obj; try{ obj=JSON.parse(txt); }catch(e){ alert('JSONが読めない: '+e.message); return; }
-  const arr=Array.isArray(obj)?obj:[obj]; let n=0, lastDate='';
+  let arr, evArr=null;
+  if(Array.isArray(obj)) arr=obj;
+  else if(obj && Array.isArray(obj.days)){ arr=obj.days; if(Array.isArray(obj.events)) evArr=obj.events; }  // {days,events}形式（コピー機能のイベント込み）
+  else arr=[obj];
+  let n=0, lastDate='';
   arr.forEach(d=>{ if(!d.date) return; d.rides=d.rides||[];
     DB=DB.filter(x=>x.date!==d.date); DB.push(d); dataSelDays.add(d.date); lastDate=d.date; n++; });
+  let en=0;
+  if(evArr){ evArr.forEach(o=>{ const ev=normEvent(o, o.date); if(ev){ EVENTS=EVENTS.filter(x=>x.id!==ev.id); EVENTS.push(ev); en++; } }); if(en){ saveEvents(); } }
   DB.sort((a,b)=>a.date<b.date?-1:1); save();
   document.getElementById('pasteBox').value='';
-  alert(n+'日 取り込んだ。座標を取得します。');
+  alert(n+'日'+(en?'＋イベント'+en+'件':'')+' 取り込んだ。座標を取得します。');
   syncCatsFromRides(); saveCats(); refreshCatFilter();
   if(dayCal && lastDate) dayCal.show(lastDate.slice(0,7));       // 入れた日を自動で選択表示
   refreshDateSelector(); renderDataTab(); await geocodeAll(false); renderCurrent();
 };
 document.getElementById('copyBtn').onclick=()=>{
   navigator.clipboard.writeText(JSON.stringify(DB,null,2)).then(()=>alert('全データをコピーした'));
+};
+// 過去の日報データ：選択中／期間／全部をコピー
+document.getElementById('copySel').onclick=()=>askAndCopy([...dataSelDays], '選択中');
+document.getElementById('copyAll').onclick=()=>askAndCopy(DB.map(d=>d.date), '全期間');
+document.getElementById('copyRange').onclick=()=>{
+  const f=document.getElementById('copyFrom').value, t=document.getElementById('copyTo').value;
+  if(!f||!t){ alert('期間の開始と終了を入れて'); return; }
+  const lo=f<t?f:t, hi=f<t?t:f;
+  askAndCopy(DB.filter(d=>d.date>=lo&&d.date<=hi).map(d=>d.date), `${lo}〜${hi}`);
 };
 // AIに日報写真を読ませてJSONを作らせる指示文
 const AI_PROMPT=`あなたはタクシーの日報・営業履歴の写真を読み取って、下のJSONだけを出力するアシスタントです。説明やコメントは書かず、JSONのみ出力してください。
