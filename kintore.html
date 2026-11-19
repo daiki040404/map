@@ -439,7 +439,8 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 /* 回数の集計 */
 .stats{display:flex;flex-direction:column;gap:12px}.sthead{position:sticky;top:var(--abh,64px);z-index:5;background:var(--panel);display:flex;flex-direction:column;gap:12px;padding:6px 0;margin:-6px 0;box-shadow:0 6px 8px -8px rgba(0,0,0,.35)}
 .srow{display:grid;grid-template-columns:minmax(6.5em,9em) 2.6em minmax(0,1fr);gap:8px;align-items:center}@media (max-width:340px){.srow{grid-template-columns:minmax(4.5em,6.5em) 2.4em minmax(0,1fr);gap:6px}}
-.srow .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.srow .nm{min-width:0;overflow-x:auto;overflow-y:hidden;white-space:nowrap;font-size:13px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.srow .nm::-webkit-scrollbar{display:none}
 .srow.cat .nm{font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
 .srow .ct{font-family:var(--f-num);font-size:18px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums;line-height:1}
 .srow .ct small{font-size:11px;font-weight:500;color:var(--muted);margin-left:1px}
@@ -454,6 +455,7 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .strip.head .cell{background:none;opacity:1;height:auto;font-size:9.5px;color:var(--muted);text-align:center;font-family:var(--f-num);line-height:1.2}
 .strip.ym .cell{background:none;opacity:1;height:auto;font-size:9.5px;color:var(--muted);white-space:nowrap;overflow:visible;font-weight:700;line-height:1.2}
 .strip.ym{margin-bottom:-6px}
+.ymfix{font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap}
 .strip.head .cell.sun{color:var(--bad)} .strip.head .cell.sat{color:#3c74c8} .strip.head.wk .cell{white-space:nowrap;overflow:hidden;text-overflow:clip}
 .sgroup{display:flex;flex-direction:column;gap:5px;padding-top:10px;border-top:1px solid var(--line)}
 .sgroup:first-of-type{border-top:0;padding-top:0}
@@ -1347,7 +1349,10 @@ function renderStats(p,showZero,filterIds){
   const ym=el("div",{class:"strip ym"+(sc?" fixw":""),style:"--n:"+N});let py=null,pm=null;
   cols.forEach(ix=>{const dt=parse(days[ix[0]].k),y=dt.getFullYear(),m=dt.getMonth()+1;let t="";
     if(y!==py&&!wk){t=y+"年 "+m+"月"}else if(m!==pm){t=m+"月"}py=y;pm=m;ym.append(el("span",{class:"cell"},t))});
-  box.append(el("div",{class:"sthead"},el("div",{class:"srow"},el("span"),el("span"),wrapS(ym)),el("div",{class:"srow"},el("span",{class:"nm note"}),el("span"),wrapS(head))));
+  const monFix=el("span",{class:"ymfix"});
+  box.append(el("div",{class:"sthead"},el("div",{class:"srow"},el("span",{class:"ymfixcell"},monFix),el("span"),wrapS(ym)),el("div",{class:"srow"},el("span",{class:"nm note"}),el("span"),wrapS(head))));
+  const setMonFix=xx=>{const i=Math.max(0,Math.min(cols.length-1,Math.round((xx||0)/18))),dt=parse(days[cols[i][0]].k);monFix.textContent=(dt.getMonth()+1)+"月";monFix.title=dt.getFullYear()+"年"+(dt.getMonth()+1)+"月"};
+  if(!sc)setMonFix(0);
   let any=false;
   cats.forEach(c=>{const fr=IDX.folders[c.id],all=fr?fr.all:[];
     const itemRows=all.map(id=>{const x=IDX.items[id];const on=days.map(d=>d.ids.some(z=>baseId(z)===id));return {id,i:x.item,dead:x.deleted,on,n:on.filter(Boolean).length}}).filter(x=>(!filterIds||filterIds.has(x.id))&&(x.n>0||(showZero&&!x.dead)));
@@ -1362,7 +1367,7 @@ function renderStats(p,showZero,filterIds){
   // 横の動きは全部の行でそろえる。スクロールではなく位置をずらすだけなので軽い。最初は今日のあたりを表示
   if(sc){const key=p.id||p.start,W=N*16+(N-1)*2;let x=statsX[key],raf=0,vel=0,ani=0;
     const strips=()=>box.querySelectorAll(".sscroll>.strip"),maxX=()=>{const f=box.querySelector(".sscroll");return Math.max(0,W-(f?f.clientWidth:0))};
-    const paint=()=>{raf=0;const t="translate3d("+(-x)+"px,0,0)";strips().forEach(e=>e.style.transform=t)};
+    const paint=()=>{raf=0;const t="translate3d("+(-x)+"px,0,0)";strips().forEach(e=>e.style.transform=t);setMonFix(x)};
     const setX=v=>{x=Math.min(maxX(),Math.max(0,v));statsX[key]=x;if(!raf)raf=requestAnimationFrame(paint)};
     box.addEventListener("pointerdown",e=>{if(!(e.target.closest&&e.target.closest(".sscroll"))||e.button>0)return;cancelAnimationFrame(ani);
       const x0=e.clientX,y0=e.clientY,s0=x;let mode=null,lx=x0,lt=performance.now();vel=0;
@@ -1406,7 +1411,8 @@ function renderFreqCond(){const box=$("freqCondPanel");if(!box)return;box.replac
     const tl=el("div",{class:"extree"});
     const row=(n,dep,isFolder)=>{const on=freqCondSel.has(n.id);
       const r=el("div",{class:"exrow"+(on?" on":"")+(isFolder?" fo":""),style:"padding-left:"+(6+dep*16)+"px"});
-      r.append(el("button",{class:"exn",onclick:()=>{if(on)freqCondSel.delete(n.id);else freqCondSel.add(n.id);keepY(render)}},(dep?"ー":"")+n.name),el("span",{class:"exck"},on?"✓":""));
+      const ck=el("span",{class:"exck"},on?"✓":"");
+      r.append(el("button",{class:"exn",onclick:()=>{const nowOn=!freqCondSel.has(n.id);if(nowOn)freqCondSel.add(n.id);else freqCondSel.delete(n.id);r.classList.toggle("on",nowOn);ck.textContent=nowOn?"✓":""}},(dep?"ー":"")+n.name),ck);
       tl.append(r)};
     const walk=(arr,dep)=>arr.forEach(n=>{if(n.deleted)return;const fo=dep===0||isF(n);row(n,dep,fo);if(fo)walk(n.items||[],dep+1)});
     walk(cats,0);pan.append(tl);
