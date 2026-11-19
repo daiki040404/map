@@ -1175,7 +1175,7 @@ function listMonth(days){
 function renderMonth(days){
   if(!calMonth)calMonth=sel.slice(0,7);
   const [y,m]=calMonth.split("-").map(Number),n=new Date(y,m,0).getDate();
-  monthGrid(days,y,m,k=>!periods.some(q=>inP(q,k)),true);
+  monthGrid(days,y,m,k=>false,true);
 }
 // 期間を選んでいるとき：期間がかかる月を並べて表示（期間外の日は薄く）
 function renderPeriodMonths(days,p){
