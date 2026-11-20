@@ -92,7 +92,10 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);fon
 .anchip.sm{padding:4px 11px}
 .anchartwrap{margin:4px 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 6px}
 .anchart{width:100%;height:auto;display:block}
+.antip{position:absolute;top:2px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--fg);font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;pointer-events:none;z-index:2}
 .ancap{font-size:11px;margin-top:2px}
+.ancaprow{display:flex;align-items:center;gap:8px;margin-top:2px}
+.anshare{margin-left:auto;width:34px;height:34px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--panel2);color:var(--fg);display:inline-flex;align-items:center;justify-content:center;padding:0}
 .stchip{font-size:11px;font-weight:700;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:1px 7px;white-space:nowrap}
 .storow{display:flex;align-items:center;gap:6px;padding:3px 2px}
 .storow .stoin{flex:1;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px}
@@ -1955,28 +1958,70 @@ function anDayVal(k,m){const ids=new Set([...dayItems(k),...Object.keys(logs[k]|
 // 重量×回数が入っていれば1RMを出す（単位の設定に関係なく）
 function anDayRM(k,b){let mx=0;new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{if(baseId(id)!==b)return;doneSets(k,id).forEach(s=>{const e=e1rm(s.w,s.r,id,k);if(e&&e>mx)mx=e})});return mx}
 function anRMExs(days){const seen=new Map();days.forEach(k=>{new Set([...dayItems(k),...Object.keys(logs[k]||{})]).forEach(id=>{const b=baseId(id),r=itemById(id);if(r&&!seen.has(b)&&anDayRM(k,b))seen.set(b,r.item.name)})});return [...seen].map(([id,name])=>({id,name}))}
-function anChart(data,o){o=o||{};const type=o.type||"bar",W=340,H=170,PL=40,PR=10,PT=12,PB=26;
+function anChartMarkup(data,o){o=o||{};const type=o.type||"bar",W=340,H=170,PL=40,PR=10,PT=12,PB=26;
   const n=data.length,mx=Math.max(1,...data.map(d=>d.y||0)),nm=anNiceMax(mx);
   const pw=W-PL-PR,ph=H-PT-PB,x0=PL,y1=H-PB;
-  const X=i=>n<=1?x0+pw/2:x0+i*pw/(n-1),Xb=i=>x0+(i+0.5)*pw/Math.max(1,n),Y=v=>y1-(v/nm)*ph;
+  const X=i=>n<=1?x0+pw/2:x0+i*pw/(n-1),Xb=i=>x0+(i+0.5)*pw/Math.max(1,n),Y=v=>y1-(v/nm)*ph,cxOf=i=>type==="bar"?Xb(i):X(i);
   let s=`<svg viewBox="0 0 ${W} ${H}" class="anchart" xmlns="http://www.w3.org/2000/svg">`;
   [0,0.5,1].forEach(t=>{const yy=y1-t*ph;s+=`<line x1="${x0}" y1="${yy}" x2="${W-PR}" y2="${yy}" style="stroke:var(--line)" stroke-width="1"/><text x="${x0-5}" y="${yy+3}" text-anchor="end" style="fill:var(--muted)" font-size="9">${anFmt(nm*t)}</text>`});
+  s+=`<line class="anguide" x1="0" y1="${PT}" x2="0" y2="${y1}" style="stroke:var(--accent);opacity:.45" stroke-width="1" visibility="hidden"/>`;
   if(type==="bar"){const bw=Math.max(2,Math.min(22,pw/Math.max(1,n)*0.62));data.forEach((d,i)=>{const yy=Y(d.y||0);s+=`<rect x="${(Xb(i)-bw/2).toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,y1-yy).toFixed(1)}" rx="2" style="fill:var(--accent)"/>`})}
   else{const pts=data.map((d,i)=>`${X(i).toFixed(1)},${Y(d.y||0).toFixed(1)}`).join(" ");s+=`<polyline points="${pts}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;data.forEach((d,i)=>{s+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.y||0).toFixed(1)}" r="2.6" style="fill:var(--accent)"/>`})}
-  const xi=type==="bar"?Xb:X,idxs=[...new Set(n<=1?[0]:[0,Math.floor((n-1)/2),n-1])];
-  idxs.forEach(i=>{const d=data[i];if(!d)return;const dt=parse(d.k);s+=`<text x="${xi(i).toFixed(1)}" y="${H-8}" text-anchor="middle" style="fill:var(--muted)" font-size="9">${dt.getMonth()+1}/${dt.getDate()}</text>`});
-  s+=`</svg>`;const w=el("div",{class:"anchartwrap"});w.innerHTML=s;return w}
+  s+=`<circle class="anmark" r="4.5" style="fill:var(--accent);stroke:#fff;stroke-width:1.5" visibility="hidden"/>`;
+  const idxs=[...new Set(n<=1?[0]:[0,Math.floor((n-1)/2),n-1])];
+  idxs.forEach(i=>{const d=data[i];if(!d)return;const dt=parse(d.k);s+=`<text x="${cxOf(i).toFixed(1)}" y="${H-8}" text-anchor="middle" style="fill:var(--muted)" font-size="9">${dt.getMonth()+1}/${dt.getDate()}</text>`});
+  return s+`</svg>`}
+// グラフを画像にして共有（グラフ＋見出し・種目名・数値もまとめて）
+async function shareChart(opts,data,o){
+  try{await document.fonts.ready}catch(e){}
+  const cs=getComputedStyle(document.body),V=n=>cs.getPropertyValue(n).trim();
+  const BG=V("--panel")||"#1a2128",FG=V("--fg")||"#e7ecf0",MU=V("--muted")||"#94a3b0",AC=V("--accent")||"#d4561c",LN=V("--line")||"#2e3943";
+  const JP='"Zen Kaku Gothic New","Hiragino Sans",system-ui,sans-serif';
+  let svg=anChartMarkup(data,o).replace(/var\((--[\w-]+)\)/g,(m,v)=>V(v)||m);
+  const CW=340,CH=170;svg=svg.replace("<svg ",`<svg width="${CW}" height="${CH}" `);
+  const img=new Image();try{await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg)})}catch(e){toast("画像を作れませんでした");return}
+  const S=3,W=380,P=18,cv=document.createElement("canvas"),c=cv.getContext("2d");
+  const chW=W-P*2,chH=Math.round(chW/CW*CH);
+  let h=P+22+(opts.head?24:0)+(opts.sub?22:0)+8+chH+(opts.cap?22:0)+6+18+P;
+  cv.width=W*S;cv.height=Math.ceil(h*S);c.scale(S,S);c.textBaseline="alphabetic";
+  c.fillStyle=BG;c.fillRect(0,0,W,h);
+  let y=P+18;c.fillStyle=MU;c.font="700 12px "+JP;c.fillText("筋トレログ",P,y);y+=16;
+  if(opts.head){c.fillStyle=FG;c.font="700 18px "+JP;c.fillText(opts.head,P,y+2);y+=24}
+  if(opts.sub){c.fillStyle=AC;c.font="700 14px "+JP;c.fillText(opts.sub,P,y);y+=22}
+  y+=4;c.drawImage(img,P,y,chW,chH);y+=chH+6;
+  if(opts.cap){c.fillStyle=MU;c.font="700 13px "+JP;c.fillText(opts.cap,P,y+12);y+=20}
+  const blob=await new Promise(r=>cv.toBlob(r,"image/png"));if(!blob){toast("画像を作れませんでした");return}
+  const file=new File([blob],"kintore-graph.png",{type:"image/png"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file]});return}catch(e){if(e&&e.name==="AbortError")return}}
+  const url=URL.createObjectURL(blob);const card=el("div",{class:"popcard imgpop"},el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"),el("img",{src:url,alt:"graph"}));
+  card.addEventListener("click",e=>e.stopPropagation());document.body.append(el("div",{class:"popov",id:"dayPop",onclick:closeDayPop},card))}
+function anChart(data,o){o=o||{};const type=o.type||"bar",unit=o.unit||"",W=340,H=170,PL=40,PR=10,PT=12,PB=26;
+  const n=data.length,mx=Math.max(1,...data.map(d=>d.y||0)),nm=anNiceMax(mx);
+  const pw=W-PL-PR,ph=H-PT-PB,x0=PL,y1=H-PB;
+  const X=i=>n<=1?x0+pw/2:x0+i*pw/(n-1),Xb=i=>x0+(i+0.5)*pw/Math.max(1,n),Y=v=>y1-(v/nm)*ph,cxOf=i=>type==="bar"?Xb(i):X(i);
+  const w=el("div",{class:"anchartwrap"});w.innerHTML=anChartMarkup(data,o);
+  const tip=el("div",{class:"antip",hidden:true});w.append(tip);
+  const svg=w.querySelector("svg"),guide=svg.querySelector(".anguide"),mark=svg.querySelector(".anmark");
+  const fmtV=v=>{v=Math.round(v*10)/10;return Math.abs(v)>=1000?v.toLocaleString():String(v)};
+  function pick(clientX){const r=svg.getBoundingClientRect();if(!r.width||!data.length)return;const rx=(clientX-r.left)/r.width*W;let bi=0,bd=1e9;data.forEach((d,i)=>{const dd=Math.abs(cxOf(i)-rx);if(dd<bd){bd=dd;bi=i}});const d=data[bi];if(!d)return;const dt=parse(d.k),cx=cxOf(bi),cy=Y(d.y||0);
+    guide.setAttribute("x1",cx);guide.setAttribute("x2",cx);guide.setAttribute("visibility","visible");
+    mark.setAttribute("cx",cx);mark.setAttribute("cy",cy);mark.setAttribute("visibility","visible");
+    tip.textContent=(dt.getMonth()+1)+"/"+dt.getDate()+"  "+fmtV(d.y)+unit;tip.hidden=false;tip.style.left=Math.max(12,Math.min(88,cx/W*100))+"%"}
+  w.addEventListener("pointerdown",ev=>pick(ev.clientX));
+  return w}
 function renderAnalysis(box,days){
   if(!days.length){box.append(el("div",{class:"empty"},"この条件の記録がありません。"));return}
-  const metrics=[["vol","総負荷量","kg"],["sets","セット数","set"],["reps","レップ","回"],["exc","種目数","種目"]];
+  const metrics=[["vol","総負荷量","kg"],["sets","セット数","セット"],["reps","レップ","回"],["exc","種目数","種目"]];
   const met=metrics.find(m=>m[0]===anMetric)||metrics[0];
   box.append(el("div",{class:"anh"},"日ごとの記録"));
   const mrow=el("div",{class:"anrow"});
   metrics.forEach(([v,lb])=>mrow.append(el("button",{class:"anchip"+(anMetric===v?" on":""),onclick:()=>{anMetric=v;keepY(render)}},lb)));
   const trow=el("div",{class:"anrow"});
   [["bar","棒グラフ"],["line","折れ線"]].forEach(([v,lb])=>trow.append(el("button",{class:"anchip sm"+(anType===v?" on":""),onclick:()=>{anType=v;keepY(render)}},lb)));
+  const dData=days.map(k=>({k,y:anDayVal(k,anMetric)}));
+  trow.append(el("button",{class:"sharebtn anshare","aria-label":"グラフを共有",title:"共有",onclick:()=>shareChart({head:"日ごとの記録",sub:met[1],cap:"単位："+met[2]},dData,{type:anType,unit:met[2]})},SHARE_SVG()));
   box.append(mrow,trow);
-  box.append(anChart(days.map(k=>({k,y:anDayVal(k,anMetric)})),{type:anType}));
+  box.append(anChart(dData,{type:anType,unit:met[2]}));
   box.append(el("div",{class:"ancap note"},met[1]+"（単位："+met[2]+"）"));
   box.append(el("div",{class:"anh",style:"margin-top:18px"},"種目ごとの1RM推移"));
   const exs=anRMExs(days);
@@ -1987,9 +2032,9 @@ function renderAnalysis(box,days){
   box.append(erow);
   const rdata=days.map(k=>({k,y:anDayRM(k,anEx)})).filter(p=>p.y>0).map(p=>({k:p.k,y:Math.round(p.y*10)/10}));
   if(!rdata.length){box.append(el("div",{class:"empty"},"この種目の1RM記録がありません。"));return}
-  box.append(anChart(rdata,{type:"line"}));
-  const best=Math.max(...rdata.map(p=>p.y)),latest=rdata[rdata.length-1].y;
-  box.append(el("div",{class:"ancap note"},"最新 "+latest+"kg ／ 最高 "+best+"kg"));
+  box.append(anChart(rdata,{type:"line",unit:"kg"}));
+  const best=Math.max(...rdata.map(p=>p.y)),latest=rdata[rdata.length-1].y,exName=(exs.find(e=>e.id===anEx)||{}).name||"",cap="最新 "+latest+"kg ／ 最高 "+best+"kg";
+  box.append(el("div",{class:"ancaprow"},el("span",{class:"ancap note"},cap),el("button",{class:"sharebtn anshare","aria-label":"グラフを共有",title:"共有",onclick:()=>shareChart({head:"種目ごとの1RM推移",sub:exName,cap:cap},rdata,{type:"line",unit:"kg"})},SHARE_SVG())));
 }
 function renderRecords(){
   const box=$("recs");if(tab!=="rec"){return}box.replaceChildren();
