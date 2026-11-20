@@ -884,7 +884,7 @@ let tags=defaultTags(),dayTags={},tagEditing=false,stores=[],dayStore={};
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
 let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),catMenuId=null,catRmMode=null,recFold={},exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
 let catTplOpen=false,catTplSel=new Set();
-let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recAllBack=45,recAllFwd=14,anMetric="vol",anType="bar",anEx=null,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null,popStore=false,storeEdit=false,recStore=null,prevAll=false;
+let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recAllBack=45,recAllFwd=14,anMetric="vol",anType="bar",anEx=null,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null,popStore=false,recStore=null,prevAll=false,popTag=false,popEditMode=null;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
 const liveTags=g=>tags.filter(t=>!t.deleted&&(!g||(t.group||"plan")===g));
@@ -1863,28 +1863,43 @@ function memoEdit(k){const w=el("div",{class:"mmemo"});
 // カレンダーの日付を押したとき：小さい画面でその日の内容を見せる（✕か外側で閉じる）
 let popPlan=false;
 function storePanel(k){const pan=el("div",{class:"tpanel"}),list=el("div",{class:"tplist"}),cur=dayStore[k]||null;
-  if(storeEdit){
+  if(popEditMode==="store"){
     stores.forEach(s=>{const row=el("div",{class:"storow","data-id":s.id});
       row.append(el("span",{class:"grip","aria-hidden":"true"},"⠿"),el("input",{class:"stoin",value:s.name,placeholder:"店舗名（例：fit24 武蔵境）",oninput:e=>{s.name=e.target.value;touch()}}),el("button",{class:"mini del",onclick:()=>{delStore(s.id);openDayPop(k,true)}},"削除"));
       list.append(row)});
-    if(!stores.length)list.append(el("span",{class:"note",style:"padding:6px"},"「＋ 店舗を追加」で作成"));
-    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",onclick:()=>{addStore("");openDayPop(k,true)}},"＋ 店舗を追加"),el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{storeEdit=false;openDayPop(k,true)}},"完了")));
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",onclick:()=>{addStore("");openDayPop(k,true)}},"＋ 店舗を追加"),el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{popEditMode=null;openDayPop(k,true)}},"完了")));
     requestAnimationFrame(()=>sortable(list,".storow",ids=>{stores.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));touch();openDayPop(k,true)},{handle:".grip"}));
   }else{
-    if(!stores.length)list.append(el("span",{class:"note",style:"padding:6px"},"店舗がまだありません。"));
     stores.forEach(s=>{const on=cur===s.id;list.append(el("button",{class:"topt"+(on?" on":""),onclick:()=>{setDayStore(k,on?null:s.id);openDayPop(k,true)}},el("span",{class:"tbx"},on?"✓":""),s.name||"(名称未設定)"))});
-    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",style:"margin-left:auto",onclick:()=>{storeEdit=true;openDayPop(k,true)}},"店舗を編集／追加")));
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",style:"margin-left:auto",onclick:()=>{if(!stores.length)addStore("");popEditMode="store";openDayPop(k,true)}},stores.length?"編集／追加":"＋ 店舗を追加")));
   }
   return pan}
-function openDayPop(k,keep){closeDayPop();if(!keep){popPlan=false;popStore=false;storeEdit=false}const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
+// タグ（mark）・予定（plan）の選択＋編集（追加・名前・色・削除・並び替え）
+function tagGroupPanel(k,g){const pan=el("div",{class:"tpanel"}),list=el("div",{class:"tplist"}),on=dayTags[k]||[],its=liveTags(g),addLbl=g==="mark"?"＋ タグを追加":"＋ 予定を追加";
+  if(popEditMode===g){
+    its.forEach(t=>{const row=el("div",{class:"storow","data-id":t.id});
+      row.append(el("span",{class:"grip","aria-hidden":"true"},"⠿"),
+        el("button",{class:"swatch","aria-label":"色を変える",style:"background:"+t.color,onclick:()=>{t.color=TAG_COLORS[(TAG_COLORS.indexOf(t.color)+1)%TAG_COLORS.length];touch();openDayPop(k,true)}}),
+        el("input",{class:"stoin",value:t.name,placeholder:"名前",oninput:e=>{t.name=e.target.value;touch()}}),
+        el("button",{class:"mini del",onclick:()=>{t.deleted=true;trashAdd("tag",g==="mark"?"タグ":"予定",t.name,{id:t.id});touch();openDayPop(k,true)}},"削除"));
+      list.append(row)});
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",onclick:()=>{tags.push({id:(g==="mark"?"m_":"t_")+uid(),name:"",color:TAG_COLORS[its.length%TAG_COLORS.length],group:g});touch();openDayPop(k,true)}},addLbl),el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{popEditMode=null;openDayPop(k,true)}},"完了")));
+    requestAnimationFrame(()=>sortable(list,".storow",ids=>{const rest=tags.filter(t=>(t.group||"plan")!==g),mine=tags.filter(t=>(t.group||"plan")===g);mine.sort((a,b)=>{const ia=ids.indexOf(a.id),ib=ids.indexOf(b.id);return (ia<0?999:ia)-(ib<0?999:ib)});tags=rest.concat(mine);touch();openDayPop(k,true)},{handle:".grip"}));
+  }else{
+    its.forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(k,t.id);openDayPop(k,true)}},el("span",{class:"tbx"},isOn?"✓":""),t.name||"(名称未設定)"))});
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",style:"margin-left:auto",onclick:()=>{if(!its.length)tags.push({id:(g==="mark"?"m_":"t_")+uid(),name:"",color:TAG_COLORS[0],group:g});popEditMode=g;openDayPop(k,true)}},its.length?"編集／追加":addLbl)));
+  }
+  return pan}
+function openDayPop(k,keep){closeDayPop();if(!keep){popPlan=false;popStore=false;popTag=false;popEditMode=null}const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
   if(dayItems(k).length){const sm=el("div",{class:"dsum popsum"},...dsumCells(k,dayItems(k)));const t=body.querySelector(".dvtags");if(t)t.after(sm);else body.prepend(sm)}
   {const sb=el("button",{class:"sharebtn popshare","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(k)},SHARE_SVG());const t=body.querySelector(".dvtags");if(t)t.append(sb);else body.prepend(el("div",{class:"dvtags"},sb))}
   {const pn=dayPlanName(k);if(pn)body.prepend(el("div",{class:"dvplan"},pn))}
   const ids=dayItems(k);
   const card=el("div",{class:"popcard",role:"dialog","aria-label":"この日の内容"},
-    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popstore"+(popStore?" on":""),role:"button","aria-label":"店舗を選ぶ",onclick:()=>{popStore=!popStore;popPlan=false;openDayPop(k,true)}},storeOf(k)?storeOf(k).name:"店舗",el("span",{class:"tv"},popStore?"▲":"▼")),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;popStore=false;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
+    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popstore"+(popStore?" on":""),role:"button","aria-label":"店舗を選ぶ",onclick:()=>{popStore=!popStore;popPlan=false;popTag=false;popEditMode=null;openDayPop(k,true)}},storeOf(k)?storeOf(k).name:"店舗",el("span",{class:"tv"},popStore?"▲":"▼")),el("span",{class:"lplan poptag"+(popTag?" on":""),role:"button","aria-label":"タグを選ぶ",onclick:()=>{popTag=!popTag;popPlan=false;popStore=false;popEditMode=null;openDayPop(k,true)}},"タグ",el("span",{class:"tv"},popTag?"▲":"▼")),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;popStore=false;popTag=false;popEditMode=null;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
     popStore?storePanel(k):null,
-    popPlan?(()=>{const on=dayTags[k]||[],list=el("div",{class:"tplist"});liveTags("plan").forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(k,t.id);openDayPop(k,true)}},el("span",{class:"tbx"},isOn?"✓":""),t.name))});return el("div",{class:"tpanel"},list)})():null,
+    popTag?tagGroupPanel(k,"mark"):null,
+    popPlan?tagGroupPanel(k,"plan"):null,
     body.childNodes.length?body:el("div",{class:"note"},"—"));
   card.addEventListener("click",e=>e.stopPropagation());
   const ov=el("div",{class:"popov",id:"dayPop",onclick:closeDayPop},card);document.body.append(ov)}
