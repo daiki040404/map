@@ -93,6 +93,11 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);fon
 .anchartwrap{margin:4px 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 6px}
 .anchart{width:100%;height:auto;display:block}
 .ancap{font-size:11px;margin-top:2px}
+.stchip{font-size:11px;font-weight:700;color:var(--accent);border:1px solid var(--accent);border-radius:6px;padding:1px 7px;white-space:nowrap}
+.storow{display:flex;align-items:center;gap:6px;padding:3px 2px}
+.storow .stoin{flex:1;min-width:0;font:inherit;font-size:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:8px;padding:5px 8px}
+.storow .grip{cursor:grab;color:var(--muted);font-size:16px;padding:0 2px;touch-action:none}
+.prevline .stall{margin-left:6px}
 .rph .rt{font-weight:700;font-size:13px;color:var(--muted);letter-spacing:.04em}
 .rph .rm{font-size:13px;white-space:pre-wrap;background:var(--panel2);border-radius:8px;padding:6px 8px}
 .rday{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:10px;display:flex;flex-direction:column;gap:6px}
@@ -875,11 +880,11 @@ const d0=defaults();
 let cats=d0.cats,plan={},notes={},periods=d0.periods,archPeriods=[];
 const TAG_COLORS=["#5b6773","#a87410","#2f6fd0","#c23a6b","#2f8a57","#8a4fc4","#d4561c","#0f8b8d"];
 const defaultTags=()=>[{id:"t_work",name:"仕事",color:"#5b6773"},{id:"t_ake",name:"明け",color:"#a87410"},{id:"t_off",name:"公休",color:"#2f6fd0"},{id:"t_gou",name:"合トレ",color:"#c23a6b"}];
-let tags=defaultTags(),dayTags={},tagEditing=false;
+let tags=defaultTags(),dayTags={},tagEditing=false,stores=[],dayStore={};
 // logs: 日付 → 種目id → [{w:重量,r:回数,m:メモ}] / templates: [{id,name,items:[{id:種目id,sets:セット数}]}]
 let logs={},templates=[],tplEditing=null,tplConfirm=null,tplMng=false,tplOpen=false,tplSaveDay=false,tplSel=new Set(),exNotes={},dayMemo={},planSrc={},openEx=new Set(),openedEx=new Set(),catMenuId=null,catRmMode=null,recFold={},exMenuId=null,exDelAsk=false,exRmMode=null,foldSel=null,skipLog=false;
 let catTplOpen=false,catTplSel=new Set();
-let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recAllBack=45,recAllFwd=14,anMetric="vol",anType="bar",anEx=null,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null;
+let customUnits=[],delAsk=false,trash=[],prevTab="menu",newOpen=new Set(),allMode=false,calMonth=null,recMarks=new Set(),tab="menu",recMode="all",recYear=null,recMonth=null,recView="list",recCalM=null,recList=[],recFrom="",recTo="",recDay="",recAsc=false,recAllBack=45,recAllFwd=14,anMetric="vol",anType="bar",anEx=null,recMkOpen=null,memoOpen=false,catOpen=false,renOpen=false,pOpen=false,renId=null,pMenuId=null,pDelId=null,catPage=false,catY=0,recExs=new Set(),recExOpen=false,recExTop=0,recDelAsk=null,popStore=false,storeEdit=false,recStore=null,prevAll=false;
 let collapsed=(()=>{try{return new Set(JSON.parse(localStorage.getItem("kintore-collapsed")||"[]"))}catch(e){return new Set()}})();
 const saveCollapsed=()=>{try{localStorage.setItem("kintore-collapsed",JSON.stringify([...collapsed]))}catch(e){}};
 const liveTags=g=>tags.filter(t=>!t.deleted&&(!g||(t.group||"plan")===g));
@@ -887,6 +892,13 @@ const defaultMarks=()=>[{id:"m_good",name:"調子が良い",color:"#2f8a57",grou
 function ensureMarks(){if(!tags.some(t=>t.group==="mark")){const have=new Set(tags.filter(t=>!t.deleted).map(t=>t.name));tags=tags.concat(defaultMarks().filter(m=>!have.has(m.name)))}}
 const tagById=id=>tags.find(t=>t.id===id);
 const dayTagList=k=>(dayTags[k]||[]).map(tagById).filter(Boolean);
+// 店舗（ジム）：日付ごとに1つ設定、並び替え・追加・削除できる
+const storeById=id=>stores.find(s=>s.id===id);
+const storeOf=k=>dayStore[k]?storeById(dayStore[k]):null;
+function setDayStore(k,id){if(id)dayStore[k]=id;else delete dayStore[k];touch()}
+const storeChip=k=>{const s=storeOf(k);return s?el("span",{class:"stchip"},s.name):null};
+function addStore(name){const s={id:uid(),name:name||""};stores.push(s);touch();return s}
+function delStore(id){stores=stores.filter(s=>s.id!==id);Object.keys(dayStore).forEach(k=>{if(dayStore[k]===id)delete dayStore[k]});touch()}
 let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list"||v==="cal")return v}catch(e){}return window.innerWidth<700?"list":"cal"})();
 let statsZero=false,editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
 let freqConds=[],freqCondId=null,freqCondOpen=false,freqCondEdit=null,freqCondName="",freqCondSel=new Set(),freqView="strip",freqCalM=null;
@@ -1516,7 +1528,9 @@ function ensureSets(k,id){logs[k]=logs[k]||{};return logs[k][id]=logs[k][id]||[]
 function cleanLog(k){if(!logs[k])return;for(const id of Object.keys(logs[k]))if(!logs[k][id].length)delete logs[k][id];if(!Object.keys(logs[k]).length)delete logs[k]}
 const instKeys=(d,id)=>{const b=baseId(id);return Object.keys(logs[d]||{}).filter(x=>baseId(x)===b)};
 const setsAll=(d,id)=>instKeys(d,id).flatMap(x=>setsOf(d,x));
-function prevSession(id,k){for(let i=LOGKEYS.length-1;i>=0;i--){const d=LOGKEYS[i];if(d>=k)continue;const s=setsAll(d,id).filter(isDone);if(s.length)return {k:d,sets:s}}return null}
+function prevSession(id,k,storeId){
+  if(storeId){for(let i=LOGKEYS.length-1;i>=0;i--){const d=LOGKEYS[i];if(d>=k||dayStore[d]!==storeId)continue;const s=setsAll(d,id).filter(isDone);if(s.length)return {k:d,sets:s,store:storeId}}}
+  for(let i=LOGKEYS.length-1;i>=0;i--){const d=LOGKEYS[i];if(d>=k)continue;const s=setsAll(d,id).filter(isDone);if(s.length)return {k:d,sets:s,store:dayStore[d]||null}}return null}
 function bestBefore(id,k){if(!hasRM(getFields(id)))return 0;let b=0;for(const d of LOGKEYS){if(d>=k)break;for(const s of setsAll(d,id)){const e=e1rm(s.w,s.r,id,d);if(e&&e>b)b=e}}return b}
 function bestAll(id){if(!hasRM(getFields(id)))return 0;let b=0;for(const d of LOGKEYS)for(const s of setsAll(d,id)){const e=e1rm(s.w,s.r,id,d);if(e&&e>b)b=e}return b}
 function setTxt(s,id){const fs=getFields(id);
@@ -1571,11 +1585,12 @@ function renderLog(p,ids){
 }
 let tEditF=null,unitPick=null,sw=null,swInt=null;
 function renderEditor(id){
-  const k=sel,sets=setsOf(k,id),prev=prevSession(id,k),fs=getFields(id),rm=hasRM(fs),ba=rm?bestAll(id):0;
+  const k=sel,sets=setsOf(k,id),st=storeOf(k),prev=prevSession(id,k,(st&&!prevAll)?st.id:null),fs=getFields(id),rm=hasRM(fs),ba=rm?bestAll(id):0;
   const ed=el("div",{class:"dedit"});
   const pl=el("div",{class:"prevline"});
-  if(prev){pl.append(el("span",null,"前回 "+mdk(prev.k)+"：",el("b",null,prev.sets.map(x=>setTxt(x,id)).join("、"))));if(!sets.some(hasAny))pl.append(el("button",{class:"mini",onclick:()=>copyPrev(id,prev)},"前回をコピー"))}
-  else pl.append(el("span",null,"前回の記録なし"));
+  if(prev){const lbl=st?(prev.store===st.id?"前回（"+st.name+"）":prev.store?"前回（"+((storeById(prev.store)||{}).name||"他店舗")+"）":"前回（全体）"):"前回 ";pl.append(el("span",null,lbl+mdk(prev.k)+"：",el("b",null,prev.sets.map(x=>setTxt(x,id)).join("、"))));if(!sets.some(hasAny))pl.append(el("button",{class:"mini",onclick:()=>copyPrev(id,prev)},"前回をコピー"))}
+  else pl.append(el("span",null,st&&!prevAll?"前回の記録なし（"+st.name+"）":"前回の記録なし"));
+  if(st)pl.append(el("button",{class:"mini stall",onclick:()=>{prevAll=!prevAll;keepY(render)}},prevAll?"この店舗だけ":"全店舗で見る"));
   if(ba)pl.append(el("span",null,"自己ベスト1RM ",el("b",null,f1(ba)),((getFields(id).find(f=>f.id==="w")||{}).unit||"kg")));
   ed.append(pl);
   if(unitPick&&unitPick.id===id)ed.append(renderUnitPick(id));
@@ -1847,13 +1862,28 @@ function memoEdit(k){const w=el("div",{class:"mmemo"});
   w.append(el("div",{class:"memoline dmadd"},mi,el("button",{class:"primary mini",onclick:e=>{e.stopPropagation();add()}},"追加")));return w}
 // カレンダーの日付を押したとき：小さい画面でその日の内容を見せる（✕か外側で閉じる）
 let popPlan=false;
-function openDayPop(k,keep){closeDayPop();if(!keep)popPlan=false;const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
+function storePanel(k){const pan=el("div",{class:"tpanel"}),list=el("div",{class:"tplist"}),cur=dayStore[k]||null;
+  if(storeEdit){
+    stores.forEach(s=>{const row=el("div",{class:"storow","data-id":s.id});
+      row.append(el("span",{class:"grip","aria-hidden":"true"},"⠿"),el("input",{class:"stoin",value:s.name,placeholder:"店舗名（例：fit24 武蔵境）",oninput:e=>{s.name=e.target.value;touch()}}),el("button",{class:"mini del",onclick:()=>{delStore(s.id);openDayPop(k,true)}},"削除"));
+      list.append(row)});
+    if(!stores.length)list.append(el("span",{class:"note",style:"padding:6px"},"「＋ 店舗を追加」で作成"));
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",onclick:()=>{addStore("");openDayPop(k,true)}},"＋ 店舗を追加"),el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{storeEdit=false;openDayPop(k,true)}},"完了")));
+    requestAnimationFrame(()=>sortable(list,".storow",ids=>{stores.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id));touch();openDayPop(k,true)},{handle:".grip"}));
+  }else{
+    if(!stores.length)list.append(el("span",{class:"note",style:"padding:6px"},"店舗がまだありません。"));
+    stores.forEach(s=>{const on=cur===s.id;list.append(el("button",{class:"topt"+(on?" on":""),onclick:()=>{setDayStore(k,on?null:s.id);openDayPop(k,true)}},el("span",{class:"tbx"},on?"✓":""),s.name||"(名称未設定)"))});
+    pan.append(list,el("div",{class:"tpfoot"},el("button",{class:"mini",style:"margin-left:auto",onclick:()=>{storeEdit=true;openDayPop(k,true)}},"店舗を編集／追加")));
+  }
+  return pan}
+function openDayPop(k,keep){closeDayPop();if(!keep){popPlan=false;popStore=false;storeEdit=false}const d=parse(k),w=d.getDay(),body=el("div",{class:"dview"});dayViewInto(body,k);
   if(dayItems(k).length){const sm=el("div",{class:"dsum popsum"},...dsumCells(k,dayItems(k)));const t=body.querySelector(".dvtags");if(t)t.after(sm);else body.prepend(sm)}
   {const sb=el("button",{class:"sharebtn popshare","aria-label":"この日のトレーニングを共有",title:"共有",onclick:()=>shareDay(k)},SHARE_SVG());const t=body.querySelector(".dvtags");if(t)t.append(sb);else body.prepend(el("div",{class:"dvtags"},sb))}
   {const pn=dayPlanName(k);if(pn)body.prepend(el("div",{class:"dvplan"},pn))}
   const ids=dayItems(k);
   const card=el("div",{class:"popcard",role:"dialog","aria-label":"この日の内容"},
-    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
+    el("div",{class:"poph"},el("span",{class:"popd"},d.getFullYear()+"年 "+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"ldow"+(w===0?" sun":"")+(w===6?" sat":"")},"("+DOW[w]+")"),el("span",{class:"popbtns"},el("button",{class:"mini poprec",onclick:()=>{closeDayPop();const q=periodFor(k);if(q){curId=q.id;userNavigated=true}sel=k;tab="log";catOpen=false;render();window.scrollTo({top:0})}},"記録"),el("span",{class:"lplan popstore"+(popStore?" on":""),role:"button","aria-label":"店舗を選ぶ",onclick:()=>{popStore=!popStore;popPlan=false;openDayPop(k,true)}},storeOf(k)?storeOf(k).name:"店舗",el("span",{class:"tv"},popStore?"▲":"▼")),el("span",{class:"lplan popplan"+(popPlan?" on":""),role:"button","aria-label":"予定を選ぶ",onclick:()=>{popPlan=!popPlan;popStore=false;openDayPop(k,true)}},"予定",el("span",{class:"tv"},popPlan?"▲":"▼")),el("button",{class:"mini tclose popx","aria-label":"閉じる",onclick:closeDayPop},"✕"))),
+    popStore?storePanel(k):null,
     popPlan?(()=>{const on=dayTags[k]||[],list=el("div",{class:"tplist"});liveTags("plan").forEach(t=>{const isOn=on.includes(t.id);list.append(el("button",{class:"topt"+(isOn?" on":""),style:"--tc:"+t.color,"aria-pressed":String(isOn),onclick:()=>{toggleTagAt(k,t.id);openDayPop(k,true)}},el("span",{class:"tbx"},isOn?"✓":""),t.name))});return el("div",{class:"tpanel"},list)})():null,
     body.childNodes.length?body:el("div",{class:"note"},"—"));
   card.addEventListener("click",e=>e.stopPropagation());
@@ -1953,7 +1983,7 @@ function renderRecords(){
   sel2.hidden=recMode==="all";
   const allSet=new Set(all);
   // 「全て」＋リスト表示＋絞り込みなし → 今日を起点に前後の日付を連続表示（記録のない日も出す）
-  const contAll=recMode==="all"&&recView==="list"&&!recExs.size&&!recMarks.size;
+  const contAll=recMode==="all"&&recView==="list"&&!recExs.size&&!recMarks.size&&!recStore;
   const aLo=addK(todayK,-recAllBack),aHi=addK(todayK,recAllFwd);
   let list;
   if(contAll){list=[];for(let k=aLo;k<=aHi;k=addK(k,1))list.push(k)}
@@ -1975,6 +2005,15 @@ function renderRecords(){
       pan.append(tl,el("div",{class:"tpfoot"},chosen.length?el("button",{class:"mini",onclick:()=>{its.forEach(t=>recMarks.delete(t.id));keepY(render)}},"すべて解除"):el("span"),el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{recMkOpen=null;keepY(render)}},"完了")));
       wrap.append(pan)}
     mk.append(wrap)});
+  // 店舗で絞り込み（全店舗／特定の店舗）
+  if(stores.length){const open=recMkOpen==="store",curS=recStore?storeById(recStore):null;
+    const pick=el("button",{class:"tpick"+(open?" on":""),onclick:e=>{e.stopPropagation();recMkOpen=open?null:"store";keepY(render)}},el("span",{class:"tpv"},curS?curS.name:"すべて"),el("span",{class:"tv"},open?"▲":"▼"));
+    const wrap=el("div",{class:"recex mkpick"},el("div",{class:"mkrow"},el("span",{class:"note mkl"},"店舗："),pick));
+    if(open){const pan=el("div",{class:"tpanel expanel"}),tl=el("div",{class:"extree"});pan.addEventListener("click",e=>e.stopPropagation());
+      const ar=el("div",{class:"exrow"+(!recStore?" on":"")});ar.append(el("button",{class:"exn",onclick:()=>{recStore=null;keepY(render)}},"すべての店舗"));if(!recStore)ar.append(el("span",{class:"exshow"},"✓"));tl.append(ar);
+      stores.forEach(s=>{const on=recStore===s.id,n=all.filter(k=>dayStore[k]===s.id).length;const r=el("div",{class:"exrow"+(on?" on":"")});r.append(el("button",{class:"exn",onclick:()=>{recStore=s.id;keepY(render)}},s.name||"(名称未設定)",el("small",{class:"note"},"　"+n+"日")));if(on)r.append(el("span",{class:"exshow"},"✓"));tl.append(r)});
+      pan.append(tl,el("div",{class:"tpfoot"},el("button",{class:"primary",style:"margin-left:auto",onclick:()=>{recMkOpen=null;keepY(render)}},"完了")));wrap.append(pan)}
+    mk.append(wrap)}
   // 種目で絞り込み
   const hasEx=(k,id)=>(plan[k]||[]).some(x=>baseId(x)===id)||Object.keys(logs[k]||{}).some(x=>baseId(x)===id);
   [...recExs].forEach(x=>{if(!(IDX.items[x]&&!IDX.items[x].deleted)&&!(IDX.folders[x]&&!IDX.folders[x].deleted))recExs.delete(x)});
@@ -1997,11 +2036,12 @@ function renderRecords(){
   }
   if(eff.size)list=list.filter(k=>[...eff].some(id=>hasEx(k,id)));
   if(recMarks.size)list=list.filter(k=>(dayTags[k]||[]).some(id=>recMarks.has(id)));
+  if(recStore)list=list.filter(k=>dayStore[k]===recStore);
   if(!recAsc)list=list.slice().reverse();
   $("recSort").textContent=recAsc?"古い順 ⇅":"新しい順 ⇅";
   $("recCount").textContent=(contAll?all.filter(k=>k>=aLo&&k<=aHi).length:list.length)+"日分";recList=list.filter(k=>allSet.has(k));
   document.querySelectorAll("#recView button").forEach(b=>b.classList.toggle("on",b.dataset.v===recView));
-  if(recView==="analysis"){const ad=all.filter(k=>recMode==="all"||(recMode==="year"&&k.startsWith(recYear))||(recMode==="month"&&k.startsWith(recYear+"-"+recMonth))||(recMode==="range"&&(!recFrom||k>=recFrom)&&(!recTo||k<=recTo))||(recMode==="day"&&k===recDay));renderAnalysis(box,ad.sort());return}
+  if(recView==="analysis"){const ad=all.filter(k=>(recMode==="all"||(recMode==="year"&&k.startsWith(recYear))||(recMode==="month"&&k.startsWith(recYear+"-"+recMonth))||(recMode==="range"&&(!recFrom||k>=recFrom)&&(!recTo||k<=recTo))||(recMode==="day"&&k===recDay))&&(!recStore||dayStore[k]===recStore));renderAnalysis(box,ad.sort());return}
   if(recView==="cal"){recCalendar(box,list);return}
   if(!list.length){box.append(el("div",{class:"empty"},"この条件の記録はありません。"));return}
   if(contAll)box.append(el("div",{class:"recmore"},el("button",{class:"ghost",onclick:()=>{recAllFwd+=14;keepY(render)}},"＋ 先の日付を見る")));
@@ -2012,7 +2052,7 @@ function renderRecords(){
     const d=parse(k),w=d.getDay(),ids=dayItems(k);
     const expandable=ids.length||Object.keys(logs[k]||{}).some(id=>itemById(id))||notes[k];
     const card=el("div",{class:"rday"+(allSet.has(k)?"":" rempty")+(k===todayK?" rtoday":"")}),rOpen=expandable&&(recFold[k]!==undefined?recFold[k]:k===sel);
-    card.append(el("div",{class:"rh"},el("span",{class:"rd"},d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"rw"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),...dayTagList(k).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
+    card.append(el("div",{class:"rh"},el("span",{class:"rd"},d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"rw"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),storeChip(k),...dayTagList(k).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
       expandable?el("button",{class:"mini rfold","aria-label":rOpen?"閉じる":"開く","aria-expanded":String(rOpen),onclick:()=>{recFold[k]=!rOpen;keepY(render)}},rOpen?"▲":"▼"):null,
       el("button",{class:"mini",onclick:()=>openDayPop(k)},"記録")));
     if(!rOpen){box.append(card);return}
@@ -2423,8 +2463,8 @@ const FB_COLLECTION="kintoreMenu";
 const LS="kintore-menu-v3";
 const SEED={"cats": [{"color": "#d4561c", "id": "7synawt", "items": [{"id": "c8b941y", "name": "ベンチ9割"}, {"id": "6pb4x0y", "name": "ベンチ7割"}, {"id": "daiyvo3", "name": "ダンベルプレス"}], "name": "胸"}, {"color": "#2f6fd0", "id": "i1us2f2", "items": [{"id": "45uah5d", "name": "デッドリフト"}, {"id": "l5rbud5", "name": "懸垂"}, {"id": "81mflf5", "name": "ローイング"}], "name": "背中"}, {"color": "#2f8a57", "id": "e9b6h5u", "items": [{"id": "117e0pf", "name": "スクワット"}, {"id": "wu4kol4", "name": "レッグプレス"}], "name": "脚"}, {"color": "#8a4fc4", "id": "xotib05", "items": [{"id": "h5hk2c7", "name": "ショルダープレス"}, {"id": "4fq1afl", "name": "サイドレイズ"}], "name": "肩"}, {"color": "#c23a6b", "id": "bk3mpcs", "items": [{"id": "7uez3o6", "name": "カール"}, {"id": "ih9sd1l", "name": "トライセプス"}], "name": "腕"}], "plan": {"2026-10-02": ["6pb4x0y"]}, "notes": {}, "periods": [{"end": "2026-10-04", "id": "p0928", "rules": [], "start": "2026-09-28"}], "updatedAt": 0};
 let updatedAt=0,fbUser=null,fbDb=null,unsub=null,pushT=null;
-const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,archPeriods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF,freqConds,updatedAt});
-function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);archPeriods=clone(s.archPeriods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rmF=clone(s.rmF||{custom:[],sel:{}});freqConds=clone(s.freqConds||[]);rebuildIdx();updatedAt=s.updatedAt||0}
+const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,archPeriods,tags,dayTags,stores,dayStore,logs,templates,exNotes,trash,customUnits,rmF,freqConds,updatedAt});
+function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);archPeriods=clone(s.archPeriods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});stores=clone(s.stores||[]);dayStore=clone(s.dayStore||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rmF=clone(s.rmF||{custom:[],sel:{}});freqConds=clone(s.freqConds||[]);rebuildIdx();updatedAt=s.updatedAt||0}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(storeObj()))}catch(e){}}
 function lsLoad(){try{const s=JSON.parse(localStorage.getItem(LS)||"null");if(s&&s.cats){applyStore(s);return}}catch(e){}applyStore(SEED)}
 function setSync(msg,state){$("sync").replaceChildren(el("span",{class:"sync-dot"+(state?" "+state:"")}),document.createTextNode(msg))}
@@ -2432,14 +2472,14 @@ const stamp=t=>{if(!t)return"";const d=new Date(t);return (d.getMonth()+1)+"/"+d
 function touch(){updatedAt=Date.now();lsSave();push();if(!histApplying)histNote()}
 // ===== 戻す／進む（操作の履歴） =====
 let hist=[],hpos=-1,histT=null,histApplying=false;
-const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","archPeriods","tags","dayTags","logs","templates","exNotes","trash","rmF","freqConds"];
-function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,archPeriods,tags,dayTags,logs,templates,exNotes,trash,customUnits,rmF,freqConds})}
+const histKeys=["cats","plan","planSrc","dayMemo","notes","periods","archPeriods","tags","dayTags","stores","dayStore","logs","templates","exNotes","trash","rmF","freqConds"];
+function snapState(){return JSON.stringify({cats,plan,planSrc,dayMemo,notes,periods,archPeriods,tags,dayTags,stores,dayStore,logs,templates,exNotes,trash,customUnits,rmF,freqConds})}
 function histCommit(){clearTimeout(histT);histT=null;const st=snapState();if(hist[hpos]===st)return;hist=hist.slice(0,hpos+1);hist.push(st);if(hist.length>60)hist.shift();hpos=hist.length-1;paintHist()}
 // 文字入力中はまとめて1回分、ボタン操作などはその都度1回分として記録
 function histNote(){const a=document.activeElement;if(a&&a.matches&&a.matches("input[type=text],input:not([type]),textarea")&&!a.closest("#appbar")){clearTimeout(histT);histT=setTimeout(histCommit,900);paintHist(true)}else histCommit()}
 function histReset(){hist=[snapState()];hpos=0;paintHist()}
 function histGo(d){if(histT)histCommit();const to=hpos+d;if(to<0||to>=hist.length)return;hpos=to;const o=JSON.parse(hist[hpos]);
-  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;archPeriods=o.archPeriods||[];tags=o.tags;dayTags=o.dayTags;logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];rmF=o.rmF||{custom:[],sel:{}};freqConds=o.freqConds||[];
+  cats=o.cats;plan=o.plan;planSrc=o.planSrc||{};dayMemo=o.dayMemo||{};notes=o.notes;periods=o.periods;archPeriods=o.archPeriods||[];tags=o.tags;dayTags=o.dayTags;stores=o.stores||[];dayStore=o.dayStore||{};logs=o.logs;templates=o.templates;exNotes=o.exNotes;trash=o.trash||[];customUnits=o.customUnits||[];rmF=o.rmF||{custom:[],sel:{}};freqConds=o.freqConds||[];
   rebuildIdx();if(curId&&!P(curId))pickInitial();histApplying=true;try{touch()}finally{histApplying=false}render();toast(d<0?"ひとつ前に戻しました":"やり直しました")}
 function paintHist(pending){const u=$("hUndo"),r=$("hRedo");if(!u)return;const pend=!!(pending||histT);u.disabled=!(hpos>0||pend);r.disabled=pend||!(hpos<hist.length-1);const n=$("hTrashN");if(n){n.hidden=!trash.length;n.textContent=String(trash.length)}}
 $("hBrand").onclick=()=>{tab="menu";perMode=null;render();window.scrollTo({top:0,behavior:"smooth"})};
