@@ -461,7 +461,9 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .rule.editing-now{outline:2px solid var(--accent);outline-offset:2px}
 .rbtns{display:flex;flex-direction:column;gap:6px;align-self:center}
 /* 回数の集計 */
-.stats{display:flex;flex-direction:column;gap:12px}.sthead{position:sticky;top:var(--abh,64px);z-index:5;background:var(--panel);display:flex;flex-direction:column;gap:12px;padding:6px 0;margin:-6px 0;box-shadow:0 6px 8px -8px rgba(0,0,0,.35)}
+.stats{display:flex;flex-direction:column;gap:12px}
+.stats.sdrag{touch-action:none}
+.stats.sdrag .srow .nm{touch-action:pan-x}.sthead{position:sticky;top:var(--abh,64px);z-index:5;background:var(--panel);display:flex;flex-direction:column;gap:12px;padding:6px 0;margin:-6px 0;box-shadow:0 6px 8px -8px rgba(0,0,0,.35)}
 .srow{display:grid;grid-template-columns:minmax(6.5em,9em) 2.6em minmax(0,1fr);gap:8px;align-items:center}@media (max-width:340px){.srow{grid-template-columns:minmax(4.5em,6.5em) 2.4em minmax(0,1fr);gap:6px}}
 .srow .nm{min-width:0;overflow-x:auto;overflow-y:hidden;white-space:nowrap;font-size:13px;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .srow .nm::-webkit-scrollbar{display:none}
@@ -471,7 +473,7 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 .srow.item .nm{padding-left:18px;color:var(--fg)}
 .srow.item .ct{font-size:15px}
 .srow.zero .nm,.srow.zero .ct{color:var(--muted);opacity:.7}
-.strip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}.sscroll{overflow:hidden;min-width:0;touch-action:pan-y;cursor:grab}.sscroll>.strip{will-change:transform}.sscroll::-webkit-scrollbar{display:none}.sscroll .strip.ym{margin-bottom:0;padding-top:2px}.strip.fixw{grid-template-columns:repeat(var(--n),16px);width:max-content}
+.strip{display:grid;grid-template-columns:repeat(var(--n),minmax(0,1fr));gap:2px}.sscroll{overflow:hidden;min-width:0;touch-action:none;cursor:grab}.sscroll>.strip{will-change:transform}.sscroll::-webkit-scrollbar{display:none}.sscroll .strip.ym{margin-bottom:0;padding-top:2px}.strip.fixw{grid-template-columns:repeat(var(--n),16px);width:max-content}
 .strip .cell{height:14px;border-radius:3px;background:var(--line);opacity:.55}
 .srow.cat .strip .cell{height:18px}
 .strip .cell.on{opacity:1}
@@ -1408,17 +1410,18 @@ function renderStats(p,showZero,filterIds){
     itemRows.forEach(x=>g.append(el("div",{class:"srow item"+(x.n?"":" zero")},el("span",{class:"nm",title:x.i.name},x.i.name),el("span",{class:"ct"},String(x.n),el("small",null,"回")),strip(x.on,c.color))));
     box.append(g)});
   // 横の動きは全部の行でそろえる。スクロールではなく位置をずらすだけなので軽い。最初は今日のあたりを表示
-  if(sc){const key=p.id||p.start,W=N*16+(N-1)*2;let x=statsX[key],raf=0,vel=0,ani=0;
+  if(sc){box.classList.add("sdrag");const key=p.id||p.start,W=N*16+(N-1)*2;let x=statsX[key],raf=0,vel=0,ani=0;
     const strips=()=>box.querySelectorAll(".sscroll>.strip"),maxX=()=>{const f=box.querySelector(".sscroll");return Math.max(0,W-(f?f.clientWidth:0))};
     const paint=()=>{raf=0;const t="translate3d("+(-x)+"px,0,0)";strips().forEach(e=>e.style.transform=t);setMonFix(x)};
     const setX=v=>{x=Math.min(maxX(),Math.max(0,v));statsX[key]=x;if(!raf)raf=requestAnimationFrame(paint)};
-    box.addEventListener("pointerdown",e=>{if(!(e.target.closest&&e.target.closest(".sscroll"))||e.button>0)return;cancelAnimationFrame(ani);
-      const x0=e.clientX,y0=e.clientY,s0=x;let mode=null,lx=x0,lt=performance.now();vel=0;
-      const mv=ev=>{if(ev.pointerId!==e.pointerId)return;const dx=ev.clientX-x0,dy=ev.clientY-y0;
-        if(!mode){if(Math.abs(dx)>3&&Math.abs(dx)>=Math.abs(dy))mode="x";else if(Math.abs(dy)>8)mode="y"}
-        if(mode==="x"){if(ev.cancelable)ev.preventDefault();const now=performance.now(),dt=Math.max(1,now-lt);vel=0.7*vel+0.3*((lx-ev.clientX)/dt);lx=ev.clientX;lt=now;setX(s0-dx)}};
+    box.addEventListener("pointerdown",e=>{if(e.button>0)return;const tt=e.target;if(tt.closest&&(tt.closest("button")||tt.closest("a")||tt.closest(".nm")))return;cancelAnimationFrame(ani);
+      const x0=e.clientX,s0=x;let started=false,lx=x0,lt=performance.now();vel=0;
+      // この帯は横スクロール専用（縦に動かしてもページは動かさない）＝横の感度を最優先
+      const mv=ev=>{if(ev.pointerId!==e.pointerId)return;const dx=ev.clientX-x0;
+        if(!started){if(Math.abs(dx)<2&&Math.abs(ev.clientY-e.clientY)<2)return;started=true}
+        if(ev.cancelable)ev.preventDefault();const now=performance.now(),dt=Math.max(1,now-lt);vel=0.7*vel+0.3*((lx-ev.clientX)/dt);lx=ev.clientX;lt=now;setX(s0-dx)};
       const up=ev=>{if(ev.pointerId!==e.pointerId)return;window.removeEventListener("pointermove",mv);window.removeEventListener("pointerup",up);window.removeEventListener("pointercancel",up);
-        if(mode==="x"&&Math.abs(vel)>0.05){let v=vel*16;const step=()=>{v*=0.94;if(Math.abs(v)<0.3)return;const b=x;setX(x+v);if(x===b)return;ani=requestAnimationFrame(step)};ani=requestAnimationFrame(step)}};
+        if(started&&Math.abs(vel)>0.05){let v=vel*16;const step=()=>{v*=0.94;if(Math.abs(v)<0.3)return;const b=x;setX(x+v);if(x===b)return;ani=requestAnimationFrame(step)};ani=requestAnimationFrame(step)}};
       window.addEventListener("pointermove",mv,{passive:false});window.addEventListener("pointerup",up);window.addEventListener("pointercancel",up)});
     box.addEventListener("wheel",e=>{if(!(e.target.closest&&e.target.closest(".sscroll")))return;const d=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:(e.shiftKey?e.deltaY:0);if(d){e.preventDefault();setX(x+d)}},{passive:false});
     requestAnimationFrame(()=>{if(x==null){const ti=days.findIndex(d=>d.k===todayK),f=box.querySelector(".sscroll");x=ti>=0&&f?ti*18-f.clientWidth/2:0}setX(x)})}
@@ -1998,7 +2001,7 @@ function renderRecords(){
   $("recSort").textContent=recAsc?"古い順 ⇅":"新しい順 ⇅";
   $("recCount").textContent=(contAll?all.filter(k=>k>=aLo&&k<=aHi).length:list.length)+"日分";recList=list.filter(k=>allSet.has(k));
   document.querySelectorAll("#recView button").forEach(b=>b.classList.toggle("on",b.dataset.v===recView));
-  if(recView==="analysis"){renderAnalysis(box,recList.slice().sort());return}
+  if(recView==="analysis"){const ad=all.filter(k=>recMode==="all"||(recMode==="year"&&k.startsWith(recYear))||(recMode==="month"&&k.startsWith(recYear+"-"+recMonth))||(recMode==="range"&&(!recFrom||k>=recFrom)&&(!recTo||k<=recTo))||(recMode==="day"&&k===recDay));renderAnalysis(box,ad.sort());return}
   if(recView==="cal"){recCalendar(box,list);return}
   if(!list.length){box.append(el("div",{class:"empty"},"この条件の記録はありません。"));return}
   if(contAll)box.append(el("div",{class:"recmore"},el("button",{class:"ghost",onclick:()=>{recAllFwd+=14;keepY(render)}},"＋ 先の日付を見る")));
