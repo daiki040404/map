@@ -533,6 +533,7 @@ body.dragging-now{user-select:none;-webkit-user-select:none;cursor:grabbing}
 
 /* メモ・保存・アーカイブ */
 textarea{font:inherit;font-size:14px;width:100%;min-height:72px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:10px;padding:8px 10px;resize:vertical;line-height:1.6}
+textarea.amemo{min-height:40px;resize:none;overflow:hidden}
 .memoblock{margin-top:12px;display:flex;flex-direction:column;gap:6px}
 .day .dts{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;padding:0 2px;min-height:15px}
 .day .dt{font-size:9px;line-height:1.2;border:1px solid currentColor;border-radius:4px;padding:0 3px;font-weight:700;white-space:nowrap;background:var(--panel)}
@@ -657,7 +658,7 @@ body.catpage #catSec{margin-top:0!important;border-top:0;border-radius:0 0 14px 
 body.catpage .catback{display:flex}
 .catback .cbt{font-weight:700;font-size:16px}
 body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:790;height:56px;min-width:96px;padding:0 22px;border-radius:28px;font-size:17px;font-weight:700;background:var(--panel);color:var(--fg);border:2px solid var(--accent);box-shadow:0 6px 18px rgba(0,0,0,.35)}body.catopen #editBtn.on{background:var(--accent);color:#fff}
-.fab{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:790;width:52px;height:52px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:28px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.4);padding:0}
+.fab{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:790;width:46px;height:46px;border-radius:50%;border:0;background:var(--accent);color:#fff;font-size:25px;font-weight:400;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.4);padding:0}
 .fab[hidden]{display:none}
 .pselrow{display:flex;align-items:center;justify-content:center;gap:2px;min-width:0}
 .kebab{flex:none;width:30px;height:30px;border:0;background:transparent;color:var(--muted);font-size:20px;font-weight:700;padding:0;border-radius:8px;line-height:1}
@@ -772,7 +773,7 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
     <div class="wlog" id="wlog"></div>
     <div class="memoblock">
       <label class="label" for="dayNote">この日のトレーニングのメモ</label>
-      <span class="lnkwrap"><textarea id="dayNote"></textarea><span class="lnkview big" id="dayNoteV" role="button" tabindex="0" hidden></span></span>
+      <span class="lnkwrap"><textarea id="dayNote" class="amemo"></textarea><span class="lnkview big" id="dayNoteV" role="button" tabindex="0" hidden></span></span>
     </div>
   </section>
 
@@ -800,7 +801,7 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
   <section class="panel" id="reflPanel">
     <div class="label">この期間の振り返り <span class="hint" id="reflSub"></span></div>
     <div class="memoblock">
-      <span class="lnkwrap"><textarea id="weekMemo" aria-label="この期間の振り返り"></textarea><span class="lnkview big" id="weekMemoV" role="button" tabindex="0" hidden></span></span>
+      <span class="lnkwrap"><textarea id="weekMemo" class="amemo" aria-label="この期間の振り返り"></textarea><span class="lnkview big" id="weekMemoV" role="button" tabindex="0" hidden></span></span>
     </div>
   </section>
   </div>
@@ -1108,11 +1109,11 @@ function renderInner(){
   renderTplBar(p);
   renderDsum(p,ids);$("dayStick").hidden=false;
   if(!skipLog)renderLog(p,ids);
-  const dn=$("dayNote");dn.disabled=false;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));
+  const dn=$("dayNote");dn.disabled=false;if(document.activeElement!==dn)dn.value=notes[sel]||"";if(!$("dayNoteV").querySelector(".lnform"))linkSync(dn,$("dayNoteV"));requestAnimationFrame(()=>fitMemo(dn));
 
   renderCats();renderTemplates();renderCatTpl();
 
-  const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";if($("weekMemoV"))linkSync(wm,$("weekMemoV"));
+  const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";if($("weekMemoV"))linkSync(wm,$("weekMemoV"));requestAnimationFrame(()=>fitMemo(wm));
 
   if(allMode&&!calMonth)calMonth=sel.slice(0,7);
   // トレーニング頻度：今日を起点に全期間を横スクロール。条件で種目を絞れる
@@ -1575,7 +1576,7 @@ function setExNote(k,id,v){if(v.trim()){exNotes[k]=exNotes[k]||{};exNotes[k][id]
 function renderLog(p,ids){
   foldReset();
   const box=$("wlog");box.replaceChildren();
-  if(!ids.length){if(!p)box.append(el("div",{class:"empty"},"右下の＋から種目を追加できます。"));return}
+  if(!ids.length)return;
   LOGKEYS=Object.keys(logs).sort();
   ids.forEach(id=>{
     const r=itemById(id);let sets=setsOf(sel,id);
@@ -2518,11 +2519,12 @@ $("vList").onclick=()=>setView("list");$("vCal").onclick=()=>{calMonth=sel.slice
 $("editBtn").onclick=()=>{editing=!editing;render()};
 const addCat=()=>{const v=$("newCat").value.trim();if(!v)return;cats.push({id:uid(),kind:"f",name:v,color:COLORS[cats.filter(c=>!c.deleted).length%COLORS.length],items:[]});$("newCat").value="";saveCfg();render()};
 $("addCatBtn").onclick=addCat;$("newCat").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();addCat()}});
-$("dayNote").addEventListener("input",e=>{const v=e.target.value;if(v.trim())notes[sel]=v;else delete notes[sel];savePlan()});
+function fitMemo(ta){if(!ta||ta.offsetParent===null)return;ta.style.height="0px";ta.style.height=Math.max(40,ta.scrollHeight)+"px"}
+$("dayNote").addEventListener("input",e=>{const v=e.target.value;if(v.trim())notes[sel]=v;else delete notes[sel];savePlan();fitMemo(e.target)});
 $("dayNote").addEventListener("blur",()=>render());
-[["dayNote","dayNoteV"],["weekMemo","weekMemoV"]].forEach(([a,b])=>{const v=$(b);if(!v)return;v.addEventListener("click",()=>{if(v.querySelector(".lnform"))return;v.hidden=true;$(a).style.display="";$(a).focus()})});
+[["dayNote","dayNoteV"],["weekMemo","weekMemoV"]].forEach(([a,b])=>{const v=$(b);if(!v)return;v.addEventListener("click",()=>{if(v.querySelector(".lnform"))return;v.hidden=true;$(a).style.display="";$(a).focus();fitMemo($(a))})});
 $("weekMemo").addEventListener("blur",()=>setTimeout(()=>linkSync($("weekMemo"),$("weekMemoV")),0));
-$("weekMemo").addEventListener("input",e=>{const p=cur();if(!p)return;p.memo=e.target.value;savePeriods()});
+$("weekMemo").addEventListener("input",e=>{const p=cur();if(!p)return;p.memo=e.target.value;savePeriods();fitMemo(e.target)});
 $("weekMemo").addEventListener("blur",()=>render());
 
 
