@@ -382,13 +382,14 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
         <span class="muted small" id="evNowLab"></span>
       </div>
       <div class="kpis" id="mapDayKpi" style="display:none"></div>
+      <div id="evLegend" class="small" style="margin:4px 0"></div>
       <div id="map"></div>
       <div class="row" style="margin-top:10px; align-items:flex-start">
         <div class="map-legend" id="mapLegend"></div>
         <div class="note" style="flex:1; min-width:200px" id="mapHint">
           「乗降地と単価」では乗せた場所を料金で色分け（薄青＜3千≦濃青＜6千≦薄赤＜9千≦濃赤＜12千≦黒）。点をタップすると降車先(橙の点・線)・日付・単価が出て、もう一度タップでメモ・カテゴリ編集、さらにタップで消える。金のふちは外れ値。<br>
           🏷「客カテゴリ」を選ぶと、その客だけを地図に表示（例: 台風客・電車遅延客・○○イベント終わり客）。カテゴリはデータタブの各乗車、または「＋」で新規作成。データタブの各乗車で客を分類できる。<br>
-          🎪イベントは営収とは別レイヤ。ピンの色＝いま該当している時間帯（<span style="color:var(--s4)">■</span>準備・設営 / <span style="color:var(--s3)">■</span>来場 / <span style="color:var(--s2)">■</span>終演・退場 / <span style="color:var(--s7)">■</span>時間外）。
+          🎪イベントは営収とは別レイヤ。ピンの色＝規模（人数、上の凡例）。少人数でもタクシー客が多そうなイベントは紫。今の時間帯に需要があるイベントは白い太枠で強調。
         </div>
       </div>
       <div id="mapMemoList" style="margin-top:10px"></div>
@@ -442,8 +443,10 @@ code.k{background:var(--surface2); padding:1px 5px; border-radius:4px; font-size
       <textarea id="evBoxData" placeholder='{"date":"2026-09-07","events":[{"name":"…","venue":"東京ドーム","address":"東京都文京区後楽1-3-61","open":"16:00","start":"18:00","end":"20:30"}]}'></textarea>
       <div class="row" style="margin-top:8px">
         <button class="icon-btn" id="evImportData">取り込む</button>
+        <button class="icon-btn" id="evAiCopyData">イベント収集の指示文をコピー</button>
       </div>
-      <p class="small muted" style="margin-top:6px">今日の日付で登録（JSONに <code class="k">date</code> があればそれを優先）。座標は住所から自動取得。</p>
+      <p class="small muted" style="margin-top:6px">今日の日付で登録（JSONに <code class="k">date</code> があればそれを優先）。座標は住所から自動取得。別チャットのAIに上の指示文を貼って、その日のイベントを集めてもらう。</p>
+      <div id="evAiBoxData" style="display:none; margin-top:8px"></div>
     </div>
     <div class="card">
       <h2>過去の日報データ <span class="sub" id="dayCount"></span></h2>
@@ -1490,7 +1493,9 @@ function normEvent(o, fallbackDate){
     start:  hm(g('start','begin','開始','開演','開始時間')),
     end:    hm(g('end','finish','終了','終演','終了時間')),
     note:   g('note','memo','備考','メモ','説明') || '',
-    cap:    +(g('capacity','cap','来場者','人数','動員')||0) || 0
+    cap:    +(g('capacity','cap','来場者','人数','動員')||0) || 0,
+    taxiHot: !!(g('taxiHot','taxi','タクシー','タクシー多','タク多')===true
+      || /^(true|1|yes|多|高|○|◯)$/.test(String(g('taxiHot','taxi','タクシー','タクシー多','タク多')||'').trim()))
   };
   const lat=g('lat','latitude','緯度'), lng=g('lng','lon','longitude','経度');
   if(lat!=null && lng!=null){ ev.lat=+lat; ev.lng=+lng; }
@@ -1609,6 +1614,21 @@ function shownEvents(){
 }
 const EV_COLOR={prep:'--s4', in:'--s3', out:'--s2'};
 function evColor(ev){ const a=evActive(ev); return cv(a.length? (EV_COLOR[a[0].kind]||'--s5') : '--s7'); }
+/* イベントの規模（人数）で色分け。少人数でもタクシー客多そう＝taxiHotは別色 */
+const EV_SCALE=[
+  {max:1000,     col:'#8a8f98', label:'〜1千'},
+  {max:3000,     col:'#39b3c6', label:'1千〜3千'},
+  {max:6000,     col:'#f2c744', label:'3千〜6千'},
+  {max:10000,    col:'#ef8a3a', label:'6千〜1万'},
+  {max:Infinity, col:'#e23b3b', label:'1万〜'}
+];
+const EV_TAXI_COL='#c026d3';   // 少人数でもタクシー客多そう
+function evScaleColor(ev){ if(ev.taxiHot) return EV_TAXI_COL; const c=+ev.cap||0; for(const b of EV_SCALE){ if(c<b.max) return b.col; } return '#e23b3b'; }
+function evScaleLegendHTML(){
+  return '<b class="small">イベント規模（人数）</b><div style="display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:4px">'+
+    EV_SCALE.map(b=>`<span class="small" style="display:inline-flex;align-items:center;gap:4px"><i style="width:11px;height:11px;border-radius:50%;background:${b.col};display:inline-block"></i>${b.label}</span>`).join('')+
+    `<span class="small" style="display:inline-flex;align-items:center;gap:4px"><i style="width:11px;height:11px;border-radius:50%;background:${EV_TAXI_COL};display:inline-block"></i>タクシー客多め</span></div>`;
+}
 
 /* --- 地図に描く --- */
 function renderEvents(){
@@ -1618,23 +1638,27 @@ function renderEvents(){
   if(evLayer){ map.removeLayer(evLayer); evLayer=null; }
   if(!document.getElementById('evOn').checked) return;
   evLayer=L.layerGroup().addTo(map);
+  let any=false;
   shownEvents().forEach(ev=>{
     if(ev.lat==null||ev.lng==null) return;
-    const act=evActive(ev), col=evColor(ev);
+    any=true;
+    const act=evActive(ev);
+    const fill=evScaleColor(ev);                 // 規模（人数）＝塗り色
     const r = 9 + Math.min(ev.cap||0, 50000)/50000*7;
     const wins=evWindows(ev).map(w=>{
       const hit=act.some(a=>a.label===w.label);
       return `${hit?'<b>▶ ':''}${esc(w.label)} ${m2hm(w.from)}〜${m2hm(w.to)}${hit?'</b>':''}`;
     }).join('<br>');
-    L.circleMarker([ev.lat,ev.lng],{radius:r, color:col, fillColor:col, fillOpacity:.55, weight:3})
+    L.circleMarker([ev.lat,ev.lng],{radius:r, color: act.length?'#ffffff':'#00000055', fillColor:fill, fillOpacity:.8, weight: act.length?3:1})  // 今の時間帯に該当＝白い太枠
       .bindTooltip(ev.name, {permanent:true, direction:'top', className:'ev-tip', offset:[0,-6]})
       .bindPopup(`<b>🎪 ${esc(ev.name)}</b><br>${esc(ev.venue||ev.address)}`+
         `<br>${ev.open?'開場 '+ev.open+' / ':''}${ev.start?'開始 '+ev.start:''}${ev.end?' / 終了 '+ev.end:''}`+
-        (ev.cap?`<br>動員 ${ev.cap.toLocaleString('ja-JP')}人`:'')+
+        (ev.cap?`<br>動員 ${ev.cap.toLocaleString('ja-JP')}人`:'')+(ev.taxiHot?'<br>🚕 タクシー客多めの想定':'')+
         `<hr style="border:none;border-top:1px solid #8884;margin:5px 0">${wins}`+
         (ev.note?`<br><i>${esc(ev.note)}</i>`:''))
       .addTo(evLayer);
   });
+  const el=document.getElementById('evLegend'); if(el) el.innerHTML = any? evScaleLegendHTML() : '';
 }
 function updateEvLabel(){
   const lab=document.getElementById('evNowLab'); if(!lab) return;
@@ -1755,17 +1779,23 @@ function evWire(){
       events:[
         {name:"◯◯ LIVE TOUR", venue:"東京ドーム", address:"東京都文京区後楽1丁目3-61",
          open:"16:00", start:"18:00", end:"20:30", capacity:45000, note:"アリーナ公演"},
-        {name:"◯◯展", venue:"東京ビッグサイト", address:"東京都江東区有明3丁目11-1",
-         start:"10:00", end:"17:00",
-         windows:[{label:"搬入・設営", from:"05:00", to:"08:00"},
-                  {label:"来場", from:"09:00", to:"11:00"},
-                  {label:"帰り", from:"16:30", to:"18:30"}]},
-        {name:"ナイター", venue:"明治神宮野球場", lat:35.6759, lng:139.7170, start:"18:00", end:"21:00"}
+        {name:"高級レストラン周年パーティー", venue:"◯◯ホテル", address:"東京都港区…",
+         start:"19:00", end:"22:00", capacity:200, taxiHot:true, note:"富裕層・終電後に帰宅でタクシー需要大"},
+        {name:"ナイター", venue:"明治神宮野球場", lat:35.6759, lng:139.7170, start:"18:00", end:"21:00", capacity:30000}
       ]
     },null,2))}</textarea>
     <p class="small muted"><code class="k">address</code>があれば座標は自動取得（<code class="k">lat</code>/<code class="k">lng</code>直接指定も可）。<br>
-    <code class="k">open</code>開場 / <code class="k">start</code>開始 / <code class="k">end</code>終了 を入れると、準備・来場・退場の時間帯を自動で作る。<br>
-    <code class="k">windows</code> を書けばその時間帯をそのまま使う。日本語キー（名前・会場・住所・開場・開始・終了）でもOK。</p>`;
+    <code class="k">capacity</code>＝動員人数（規模の色分けに使う）。<br>
+    <code class="k">taxiHot:true</code>＝人数は少なくてもタクシー利用客が多そうなイベント（別色・紫で表示）。<br>
+    <code class="k">open</code>開場 / <code class="k">start</code>開始 / <code class="k">end</code>終了 で準備・来場・退場の時間帯を自動生成。日本語キーもOK。</p>
+    <div class="row" style="margin-top:8px"><button class="icon-btn" id="evAiCopy">イベント収集の指示文をコピー</button></div>
+    <div id="evAiBox" style="display:none; margin-top:8px"></div>`;
+    document.getElementById('evAiCopy').onclick=()=>{
+      const bx=document.getElementById('evAiBox');
+      navigator.clipboard.writeText(EV_AI_PROMPT).then(()=>{},()=>{});
+      bx.style.display = bx.style.display==='none'?'':'none';
+      if(bx.style.display!=='none') bx.innerHTML=`<p class="small muted">コピーした。別チャットのAIに貼って、その日のイベントを集めてもらってね。</p><textarea readonly style="min-height:300px">${esc(EV_AI_PROMPT)}</textarea>`;
+    };
   };
   // 「現在時刻」で見ているときは毎分更新
   if(evTimer) clearInterval(evTimer);
@@ -2550,6 +2580,39 @@ document.getElementById('copyRange').onclick=()=>{
   askAndCopy(DB.filter(d=>d.date>=lo&&d.date<=hi).map(d=>d.date), `${lo}〜${hi}`);
 };
 // AIに日報写真を読ませてJSONを作らせる指示文
+// 別チャットのAIに、その日のイベントを集めてもらってJSONにする指示文
+const EV_AI_PROMPT=`あなたはタクシー運転手のために、指定した日・エリアのイベントを調べて、下のJSONだけを出力するアシスタントです。説明やコメントは書かず、JSONのみ出力してください。
+
+【やること】
+指定された日付とエリア（例：「2026-09-07 東京23区」）について、その日に開催されるイベント（ライブ・コンサート、スポーツ、花火、祭り、展示会・見本市、学会・大規模会議、周年パーティーや宴会、ホテルの大型宴会 など）をできるだけ集めて、JSONにする。タクシー需要（終演後・終電後の帰宅、会場への移動）に関係しそうなものを優先。
+
+【出力JSON】
+{
+  "date":"YYYY-MM-DD",
+  "events":[
+    { "name":"イベント名",
+      "venue":"会場名",
+      "address":"会場の住所（都道府県＋市区町村＋丁目番地、できるだけ詳しく）",
+      "open":"HH:MM",   // 開場（分かれば）
+      "start":"HH:MM",  // 開始・開演
+      "end":"HH:MM",    // 終了・終演（タクシー需要の山になる）
+      "capacity":数値,  // 動員・収容人数（規模。分かる範囲での概算でよい）
+      "taxiHot":true,   // 下の条件に当てはまるときだけ true（当てはまらなければ省略 or false）
+      "note":"補足（任意）" }
+  ]
+}
+
+【capacity（規模）の目安】おおよそで良い： 〜1000 / 1000〜3000 / 3000〜6000 / 6000〜1万 / 1万以上。
+
+【taxiHot（人数は少なくてもタクシー客が多そう）を true にする例】
+- 富裕層・VIPが集まる（高級ホテルの宴会・パーティー、周年・祝賀会、会員制イベント、高級店の集まり）
+- 終演・解散が終電後〜深夜になる（深夜公演、ディナーショー、長時間の宴会）
+- 公共交通が不便な会場、または雨天・悪天候で歩きたくない状況
+- 空港・新幹線発着に絡む集まり、接待・会食が多い業種のイベント
+- 高齢者・正装の参加者が多い（歩きたがらない）
+→ 人数が少なくても単価や台数が見込めるものは taxiHot:true。
+
+住所はできるだけ詳しく。確実でない推定は note に書く。JSON以外は絶対に出力しない。`;
 const AI_PROMPT=`あなたはタクシーの日報・営業履歴の写真を読み取って、下のJSONだけを出力するアシスタントです。説明やコメントは書かず、JSONのみ出力してください。
 
 写真は複数枚送られることがあります（例：「営業履歴」＝乗降地・時刻・料金 → rides用、「電子日報」＝空車/実車/迎車/回送の時間 → run用）。同じ乗務（同じ出庫日）の写真なら、まとめて1つのオブジェクトにしてください。
@@ -2594,6 +2657,12 @@ document.getElementById('evImportData').onclick=async()=>{
   if(n>=0){ document.getElementById('evBoxData').value='';
     evSelDays.add(fb); if(evCal) evCal.show(fb.slice(0,7));     // 入れた日を自動で選択表示
     renderDataTab(); }
+};
+document.getElementById('evAiCopyData').onclick=()=>{
+  const bx=document.getElementById('evAiBoxData');
+  navigator.clipboard.writeText(EV_AI_PROMPT).then(()=>{},()=>{});
+  bx.style.display = bx.style.display==='none'?'':'none';
+  if(bx.style.display!=='none') bx.innerHTML=`<p class="small muted">コピーした。別チャットのAIに貼って、その日のイベントを集めてもらってね（下のテキストを選んで手動コピーでもOK）。</p><textarea readonly style="min-height:300px">${esc(EV_AI_PROMPT)}</textarea>`;
 };
 
 /* ---------- 数値表示トグル ---------- */
