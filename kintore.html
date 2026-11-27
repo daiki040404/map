@@ -91,7 +91,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);fon
 .anchip{font-size:12px;padding:5px 12px;border:1px solid var(--line);border-radius:999px;background:var(--panel2);color:var(--fg);white-space:nowrap}
 .anchip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 .anchip.sm{padding:4px 11px}
-.anchartwrap{margin:4px 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 6px}
+.anchartwrap{position:relative;margin:4px 0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:8px 6px}
 .anchart{width:100%;height:auto;display:block}
 .antip{position:absolute;top:2px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--accent);color:var(--fg);font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;pointer-events:none;z-index:2}
 .ancap{font-size:11px;margin-top:2px}
@@ -2108,6 +2108,8 @@ function renderRecords(){
   if(eff.size)list=list.filter(k=>[...eff].some(id=>hasEx(k,id)));
   if(recMarks.size)list=list.filter(k=>(dayTags[k]||[]).some(id=>recMarks.has(id)));
   if(recStore)list=list.filter(k=>dayStore[k]===recStore);
+  // 種目の登録がある日だけ表示（記録のない日は出さない）
+  list=list.filter(k=>dayItems(k).length||Object.keys(logs[k]||{}).some(id=>itemById(id)));
   if(!recAsc)list=list.slice().reverse();
   $("recSort").textContent=recAsc?"古い順 ⇅":"新しい順 ⇅";
   $("recCount").textContent=(contAll?all.filter(k=>k>=aLo&&k<=aHi).length:list.length)+"日分";recList=list.filter(k=>allSet.has(k));
