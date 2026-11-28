@@ -182,6 +182,10 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .days .monhead{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .days .monhead .mt{font-family:var(--f-num);font-size:20px;font-weight:700}
 .days .monhead .mtbtn{border:0;background:none;color:inherit;cursor:pointer;padding:2px 8px;border-radius:8px;font-size:18px}
+.viewrow{display:flex;align-items:center;gap:8px;margin:4px 0 8px}
+.viewrow .viewsw{flex:1;margin:0}
+.viewrow #freqCondBtn{flex:none;white-space:nowrap}
+.viewrow #freqCondBtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 .days .monfoot{grid-column:1/-1;margin-top:6px}
 .day.out{opacity:.45}
 .viewsw{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
@@ -784,13 +788,9 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
         <button class="ghost" id="pCancel">やめる</button>
       </div>
     </div>
-    <div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">予定</button><button id="vCal">カレンダー</button><button id="vFreq">頻度</button></div>
+    <div class="viewrow"><div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">リスト</button><button id="vCal">カレンダー</button></div><button class="ghost" id="freqCondBtn">条件</button></div>
+    <div id="freqCondPanel"></div>
     <div class="days" id="days"></div>
-    <div id="freqWrap" hidden>
-      <div class="palhead"><div class="label">トレーニング頻度 <span class="hint" id="statsSub"></span></div><button class="ghost" id="freqCondBtn">条件</button></div>
-      <div id="freqCondPanel"></div>
-      <div id="stats"></div>
-    </div>
   </section>
 
   <div class="daygroup" id="dayGroup">
@@ -935,7 +935,7 @@ function setDayStore(k,id){if(id)dayStore[k]=id;else delete dayStore[k];touch()}
 const storeChip=k=>{const s=storeOf(k);return s?el("span",{class:"stchip"},s.name):null};
 function addStore(name){const s={id:uid(),name:name||""};stores.push(s);touch();return s}
 function delStore(id){stores=stores.filter(s=>s.id!==id);Object.keys(dayStore).forEach(k=>{if(dayStore[k]===id)delete dayStore[k]});touch()}
-let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list"||v==="cal"||v==="freq")return v}catch(e){}return "cal"})();
+let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list"||v==="cal")return v}catch(e){}return "cal"})();
 let statsZero=false,editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
 let freqConds=[],freqCondId=null,freqCondOpen=false,freqCondEdit=null,freqCondName="",freqCondSel=new Set(),freqView="strip",freqCalM=null;
 let curId=null,sel=todayK;
@@ -1106,22 +1106,21 @@ function renderInner(){
   ps.value=allMode?"__all__":(p?p.id:"");ps.classList.toggle("allm",allMode);
   // 表示
   const days=$("days");days.replaceChildren();cpShown=false;
-  const freqMode=(tab==="menu"&&viewMode==="freq");
-  $("vList").classList.toggle("on",viewMode==="list");$("vCal").classList.toggle("on",viewMode==="cal");$("vFreq").classList.toggle("on",viewMode==="freq");
+  $("vList").classList.toggle("on",viewMode==="list");$("vCal").classList.toggle("on",viewMode==="cal");
   days.classList.toggle("list",viewMode==="list");
-  $("days").hidden=freqMode;$("freqWrap").hidden=!freqMode;$("dayGroup").hidden=freqMode;
-  if(freqMode){}
-  else if(allMode){
+  const condSet=condFilter(freqConds.find(c=>c.id===freqCondId));
+  $("freqCondBtn").classList.toggle("active",!!condSet);
+  if(allMode){
     const keys=allPeriodDays();
     $("plen").textContent="";
-    if(viewMode==="list")listWeek(days)
-    else{renderMonth(days);if(isCompact())calPreview(days)}
+    if(viewMode==="list")listWeek(days,condSet)
+    else{renderMonth(days,condSet);if(isCompact())calPreview(days)}
   } else if(!p){$("plen").textContent="";days.append(el("div",{class:"noper"},"まず期間（開始日〜終了日）を決めてください。"))}
   else{
     $("plen").replaceChildren(document.createTextNode((p.name?pLabel(p,true)+"・":"")+plen(p)+"日間"));$("plen").classList.toggle("named",!!p.name);
-    const keys=[];for(let i=0;i<plen(p);i++)keys.push(addK(p.start,i));
-    if(viewMode==="list")listRows(days,keys,false);
-    else{renderPeriodMonths(days,p);if(isCompact())calPreview(days)}
+    let keys=[];for(let i=0;i<plen(p);i++)keys.push(addK(p.start,i));
+    if(viewMode==="list")listRows(days,condSet?keys.filter(k=>condDayMatch(k,condSet)):keys,false);
+    else{renderPeriodMonths(days,p,condSet);if(isCompact())calPreview(days)}
   }
   renderPerEdit();
   renderPerEdit();
@@ -1145,10 +1144,6 @@ function renderInner(){
   const wm=$("weekMemo");wm.disabled=!p;if(document.activeElement!==wm)wm.value=(p&&p.memo)||"";if($("weekMemoV"))linkSync(wm,$("weekMemoV"));requestAnimationFrame(()=>fitMemo(wm));
 
   if(allMode&&!calMonth)calMonth=sel.slice(0,7);
-  // トレーニング頻度：今日を起点に全期間を横スクロール。条件で種目を絞れる
-  const fr=freqRange(),fcond=freqConds.find(c=>c.id===freqCondId);
-  $("statsSub").textContent=fcond?fcond.name:"";
-  $("stats").replaceChildren(renderStats(fr,true,condFilter(fcond)));
   renderFreqCond();
   $("reflPanel").hidden=allMode||!p;$("reflSub").textContent=p&&!allMode?pLabel(p):"";
   renderRecords();
@@ -1258,9 +1253,11 @@ function listMonth(days){
   const mv=d=>{const t=new Date(y,m-1+d,1);calMonth=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0");render()};
   days.append(el("div",{class:"monhead"},el("button",{class:"navbtn","aria-label":"前の月",onclick:()=>mv(-1)},"‹"),el("span",{class:"mt"},y+"年 "+m+"月"),el("button",{class:"navbtn","aria-label":"次の月",onclick:()=>mv(1)},"›")));
   listRows(days,Array.from({length:n},(_,i)=>key(new Date(y,m-1,i+1))),false)}
-// 予定：今日を含む週を7日だけ表示。‹ › で先週・翌週
+// 条件（種目）に合う日かどうか
+function condDayMatch(k,sset){if(!sset)return true;const ids=new Set([...dayItems(k),...Object.keys(logs[k]||{})]);for(const id of ids)if(sset.has(id))return true;return false}
+// リスト：今日を含む週を7日だけ表示。‹ › で先週・翌週。条件で種目を絞れる
 let weekRef=null;
-function listWeek(days){
+function listWeek(days,condSet){
   if(!weekRef)weekRef=todayK;
   const d=parse(weekRef),mo=(d.getDay()+6)%7,mon=new Date(d.getFullYear(),d.getMonth(),d.getDate()-mo);
   const keys=[];for(let i=0;i<7;i++)keys.push(key(new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i)));
@@ -1269,16 +1266,18 @@ function listWeek(days){
   days.append(el("div",{class:"monhead"},el("button",{class:"navbtn","aria-label":"前の週",onclick:()=>shift(-1)},"‹"),
     el("button",{class:"mt mtbtn","aria-label":"今週に戻る",onclick:()=>{weekRef=todayK;render()}},md(mon)+" 〜 "+md(sun)+(isThis?"（今週）":"")),
     el("button",{class:"navbtn","aria-label":"次の週",onclick:()=>shift(1)},"›")));
-  listRows(days,keys,false)}
-function renderMonth(days){
+  const shown=condSet?keys.filter(k=>condDayMatch(k,condSet)):keys;
+  listRows(days,shown,false);
+  if(condSet&&!shown.length)days.append(el("div",{class:"noper"},"この週に該当する種目の日はありません。"))}
+function renderMonth(days,condSet){
   if(!calMonth)calMonth=sel.slice(0,7);
   const [y,m]=calMonth.split("-").map(Number),n=new Date(y,m,0).getDate();
-  monthGrid(days,y,m,k=>false,true);
+  monthGrid(days,y,m,k=>condSet?!condDayMatch(k,condSet):false,true);
 }
-// 期間を選んでいるとき：期間がかかる月を並べて表示（期間外の日は薄く）
-function renderPeriodMonths(days,p){
+// 期間を選んでいるとき：期間がかかる月を並べて表示（期間外・条件外の日は薄く）
+function renderPeriodMonths(days,p,condSet){
   if(!calMonth)calMonth=sel.slice(0,7);
-  const [y,m]=calMonth.split("-").map(Number);monthGrid(days,y,m,k=>!inP(p,k),true);
+  const [y,m]=calMonth.split("-").map(Number);monthGrid(days,y,m,k=>!inP(p,k)||(condSet&&!condDayMatch(k,condSet)),true);
 }
 function renderPerEdit(){
   const cp=allMode?null:cur();
@@ -2644,7 +2643,7 @@ $("tplFromDayBtn").onclick=()=>{const ids=dayItems(sel);if(!ids.length)return;co
 
 const setView=v=>{viewMode=v;try{localStorage.setItem("kintore-view",v)}catch(e){}render()};
 (()=>{const ab=document.querySelector(".appbar"),ds=$("dayStick");const set=()=>{document.documentElement.style.setProperty("--abh",(ab?ab.offsetHeight:64)+"px");document.documentElement.style.setProperty("--dsh",(ds?ds.offsetHeight:0)+"px")};set();if(window.ResizeObserver){if(ab)new ResizeObserver(set).observe(ab);if(ds)new ResizeObserver(set).observe(ds)}let lc=isCompact();window.addEventListener("resize",()=>{set();if(isCompact()!==lc){lc=isCompact();render()}})})();
-$("vList").onclick=()=>setView("list");$("vCal").onclick=()=>{calMonth=sel.slice(0,7);setView("cal")};$("vFreq").onclick=()=>setView("freq");
+$("vList").onclick=()=>setView("list");$("vCal").onclick=()=>{calMonth=sel.slice(0,7);setView("cal")};
 
 $("editBtn").onclick=()=>{editing=!editing;render()};
 const addCat=()=>{const v=$("newCat").value.trim();if(!v)return;cats.push({id:uid(),kind:"f",name:v,color:COLORS[cats.filter(c=>!c.deleted).length%COLORS.length],items:[]});$("newCat").value="";saveCfg();render()};
