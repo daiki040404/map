@@ -170,7 +170,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .weeknav .range{font-family:var(--f-num);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
 .navbtn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;width:40px;height:36px;font-size:18px}
 .todaybtn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:0 10px;height:36px;font-size:13px}
-.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
 .days .wkh{font-size:11px;font-weight:700;color:var(--muted);text-align:center;padding-bottom:2px}
 .days .wkh.sun{color:var(--bad)} .days .wkh.sat{color:#3c74c8}
 .days .pad{min-height:0}
@@ -181,6 +181,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .lmon{font-family:var(--f-num);font-size:15px;font-weight:700;color:var(--muted);padding:8px 2px 0}
 .days .monhead{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
 .days .monhead .mt{font-family:var(--f-num);font-size:20px;font-weight:700}
+.days .monhead .mtbtn{border:0;background:none;color:inherit;cursor:pointer;padding:2px 8px;border-radius:8px;font-size:18px}
 .days .monfoot{grid-column:1/-1;margin-top:6px}
 .day.out{opacity:.45}
 .viewsw{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:10px}
@@ -236,10 +237,27 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .dayhead .yr{font-size:12px;color:var(--muted);font-weight:700;align-self:center}
 .dayhead .dw.sun{color:var(--bad)}.dayhead .dw.sat{color:#3c74c8}
 .dayhead .dht{font-size:11px;font-weight:700;border:1px solid currentColor;border-radius:6px;padding:0 5px;align-self:center}
-.day.cday{min-height:62px;padding:5px 1px 4px;gap:3px;justify-content:flex-start}
-.day.cday .dn{font-size:17px}
-.day.cday .ctag{height:14px;display:flex;justify-content:center;max-width:100%;overflow:hidden}
-.day.cday .ctag .dt{font-size:9px;padding:0 2px;line-height:12px}
+.day.cday{min-height:46px;padding:3px 1px 3px;gap:2px;justify-content:flex-start}
+.day.cday .dn{font-size:14px}
+.day.cday .ctag{height:12px;display:flex;justify-content:center;max-width:100%;overflow:hidden}
+.day.cday .ctag .dt{font-size:8px;padding:0 2px;line-height:11px}
+.hright{display:flex;align-items:center;gap:6px;min-width:0}
+.appbar .acct{flex-wrap:nowrap;gap:5px;min-width:0}
+.appbar .acct .sync{display:inline-flex;align-items:center;gap:4px;font-size:11px;min-width:0}
+.appbar .acct .syncmsg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:6em}
+.appbar .acct #authBtn{padding:4px 9px;font-size:12px;white-space:nowrap;flex:none}
+@media (max-width:460px){.appbar .acct .syncmsg{display:none}}
+.hright>*{flex:none}
+@media (max-width:500px){
+ .appbar .abin{padding-inline:8px;gap:4px}
+ .appbar .brand{font-size:15px}
+ .appbar .htimer{padding:2px 3px 2px 7px;gap:2px}
+ .appbar .htimer .ttime{font-size:16px;min-width:2.1em}
+ .appbar .htimer .ticon{width:25px;height:25px;font-size:13px}
+ .appbar .hleft{gap:1px}
+ .appbar .acct #authBtn{padding:3px 8px}
+}
+@media (max-width:384px){.appbar .acct .sync{display:none}}
 .cdots{display:flex;flex-wrap:wrap;justify-content:center;gap:3px;padding:0 3px;max-width:100%}
 .cdot{width:7px;height:7px;border-radius:50%}
 .cmore{font-size:9px;font-weight:700;line-height:7px;color:var(--muted)}
@@ -725,6 +743,8 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
       <button class="hico" id="hRedo" aria-label="やり直す（進む）" title="やり直す（進む）"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
       <button class="hico" id="hTrash" aria-label="ごみ箱" title="ごみ箱"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg><span class="hbadge" id="hTrashN" hidden></span></button>
     </div>
+    <div class="hright">
+    <div class="acct" id="acct"><span class="sync" id="sync"><span class="sync-dot"></span>確認中…</span><button class="ghost" id="authBtn">ログイン</button></div>
     <div class="htimer" id="htimer">
       <span class="hl">休憩</span>
       <button class="ttime" id="tTime" aria-label="休憩の時間を変える">3:00</button>
@@ -732,12 +752,10 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
       <button class="ticon play" id="tStart" aria-label="スタート">▶</button>
       <button class="ticon" id="tReset" aria-label="最初からやり直す">↻</button>
     </div>
+    </div>
   </div>
 </header>
 <div class="wrap">
-  <header class="top">
-    <div class="acct"><span class="sync" id="sync"><span class="sync-dot"></span>確認中…</span><button class="ghost" id="authBtn">Googleでログイン</button></div>
-  </header>
 
   <!-- ===== メニュー ===== -->
   <div class="tabpage" id="tabMenu">
@@ -766,8 +784,13 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
         <button class="ghost" id="pCancel">やめる</button>
       </div>
     </div>
-    <div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">予定</button><button id="vCal">カレンダー</button></div>
+    <div class="viewsw" role="group" aria-label="表示の切り替え"><button id="vList">予定</button><button id="vCal">カレンダー</button><button id="vFreq">頻度</button></div>
     <div class="days" id="days"></div>
+    <div id="freqWrap" hidden>
+      <div class="palhead"><div class="label">トレーニング頻度 <span class="hint" id="statsSub"></span></div><button class="ghost" id="freqCondBtn">条件</button></div>
+      <div id="freqCondPanel"></div>
+      <div id="stats"></div>
+    </div>
   </section>
 
   <div class="daygroup" id="dayGroup">
@@ -800,12 +823,6 @@ body.catopen #catSec{padding-bottom:80px}body.catopen #editBtn{position:fixed;ri
     </div>
   </section>
   </div>
-
-  <section class="panel">
-    <div class="palhead"><div class="label">トレーニング頻度 <span class="hint" id="statsSub"></span></div><button class="ghost" id="freqCondBtn">条件</button></div>
-    <div id="freqCondPanel"></div>
-    <div id="stats"></div>
-  </section>
 
   <section class="panel" id="reflPanel">
     <div class="label">この期間の振り返り <span class="hint" id="reflSub"></span></div>
@@ -918,7 +935,7 @@ function setDayStore(k,id){if(id)dayStore[k]=id;else delete dayStore[k];touch()}
 const storeChip=k=>{const s=storeOf(k);return s?el("span",{class:"stchip"},s.name):null};
 function addStore(name){const s={id:uid(),name:name||""};stores.push(s);touch();return s}
 function delStore(id){stores=stores.filter(s=>s.id!==id);Object.keys(dayStore).forEach(k=>{if(dayStore[k]===id)delete dayStore[k]});touch()}
-let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list"||v==="cal")return v}catch(e){}return window.innerWidth<700?"list":"cal"})();
+let viewMode=(()=>{try{const v=localStorage.getItem("kintore-view");if(v==="list"||v==="cal"||v==="freq")return v}catch(e){}return "cal"})();
 let statsZero=false,editRuleId=null,openDays=new Set(),editing=false,openArch=null,perMode=null;
 let freqConds=[],freqCondId=null,freqCondOpen=false,freqCondEdit=null,freqCondName="",freqCondSel=new Set(),freqView="strip",freqCalM=null;
 let curId=null,sel=todayK;
@@ -1089,12 +1106,15 @@ function renderInner(){
   ps.value=allMode?"__all__":(p?p.id:"");ps.classList.toggle("allm",allMode);
   // 表示
   const days=$("days");days.replaceChildren();cpShown=false;
-  $("vList").classList.toggle("on",viewMode==="list");$("vCal").classList.toggle("on",viewMode==="cal");
+  const freqMode=(tab==="menu"&&viewMode==="freq");
+  $("vList").classList.toggle("on",viewMode==="list");$("vCal").classList.toggle("on",viewMode==="cal");$("vFreq").classList.toggle("on",viewMode==="freq");
   days.classList.toggle("list",viewMode==="list");
-  if(allMode){
+  $("days").hidden=freqMode;$("freqWrap").hidden=!freqMode;$("dayGroup").hidden=freqMode;
+  if(freqMode){}
+  else if(allMode){
     const keys=allPeriodDays();
     $("plen").textContent="";
-    if(viewMode==="list")listMonth(days)
+    if(viewMode==="list")listWeek(days)
     else{renderMonth(days);if(isCompact())calPreview(days)}
   } else if(!p){$("plen").textContent="";days.append(el("div",{class:"noper"},"まず期間（開始日〜終了日）を決めてください。"))}
   else{
@@ -1238,6 +1258,18 @@ function listMonth(days){
   const mv=d=>{const t=new Date(y,m-1+d,1);calMonth=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0");render()};
   days.append(el("div",{class:"monhead"},el("button",{class:"navbtn","aria-label":"前の月",onclick:()=>mv(-1)},"‹"),el("span",{class:"mt"},y+"年 "+m+"月"),el("button",{class:"navbtn","aria-label":"次の月",onclick:()=>mv(1)},"›")));
   listRows(days,Array.from({length:n},(_,i)=>key(new Date(y,m-1,i+1))),false)}
+// 予定：今日を含む週を7日だけ表示。‹ › で先週・翌週
+let weekRef=null;
+function listWeek(days){
+  if(!weekRef)weekRef=todayK;
+  const d=parse(weekRef),mo=(d.getDay()+6)%7,mon=new Date(d.getFullYear(),d.getMonth(),d.getDate()-mo);
+  const keys=[];for(let i=0;i<7;i++)keys.push(key(new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+i)));
+  const sun=parse(keys[6]),isThis=keys.includes(todayK);
+  const shift=n=>{const t=parse(weekRef);t.setDate(t.getDate()+n*7);weekRef=key(t);render()};
+  days.append(el("div",{class:"monhead"},el("button",{class:"navbtn","aria-label":"前の週",onclick:()=>shift(-1)},"‹"),
+    el("button",{class:"mt mtbtn","aria-label":"今週に戻る",onclick:()=>{weekRef=todayK;render()}},md(mon)+" 〜 "+md(sun)+(isThis?"（今週）":"")),
+    el("button",{class:"navbtn","aria-label":"次の週",onclick:()=>shift(1)},"›")));
+  listRows(days,keys,false)}
 function renderMonth(days){
   if(!calMonth)calMonth=sel.slice(0,7);
   const [y,m]=calMonth.split("-").map(Number),n=new Date(y,m,0).getDate();
@@ -1577,7 +1609,7 @@ function fill1rm(box,s,id,k){
 function dsumCells(k,ids){let ns=0,nr=0,vol=0;ids.forEach(id=>{const fs=getFields(id),kg=fs.some(f=>f.id==="w"&&f.unit==="kg");doneSets(k,id).forEach(s=>{ns++;const r=parseInt(s.r)||0,w=toNum(s.w);nr+=r;if(kg&&w>0)vol+=w*r})});
   return [["種目数",ids.length,""],["セット数",ns,""],["レップ",nr,""],["総負荷量",Math.round(vol).toLocaleString(),"kg"]].map(([a,b,u])=>el("div",null,el("small",null,a),el("b",null,String(b),u?el("i",null,u):null)))}
 function renderDsum(p,ids){
-  $("dsum").hidden=!ids.length;
+  $("dsum").hidden=!ids.length||tab==="menu";
   $("dsum").replaceChildren(...dsumCells(sel,ids));
 }
 const exNote=(k,id)=>(exNotes[k]&&exNotes[k][id])||"";
@@ -2222,7 +2254,7 @@ function renderRecords(){
     const card=el("div",{class:"rday"+(allSet.has(k)?"":" rempty")+(k===todayK?" rtoday":"")}),rOpen=expandable&&(recFold[k]!==undefined?recFold[k]:k===sel);
     card.append(el("div",{class:"rh"},el("span",{class:"rd"},d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()),el("span",{class:"rw"+(w===0?" sun":"")+(w===6?" sat":"")},DOW[w]),storeChip(k),...dayTagList(k).map(t=>el("span",{class:"dt",style:"color:"+t.color},t.name)),
       expandable?el("button",{class:"mini rfold","aria-label":rOpen?"閉じる":"開く","aria-expanded":String(rOpen),onclick:()=>{recFold[k]=!rOpen;keepY(render)}},rOpen?"▲":"▼"):null,
-      el("button",{class:"mini",onclick:()=>openDayPop(k)},"記録")));
+      el("button",{class:"mini",onclick:()=>{tab="log";catOpen=false;pickDay(k);window.scrollTo({top:0})}},"編集")));
     if(!rOpen){box.append(card);return}
     const exIds=ids.slice();Object.keys(logs[k]||{}).forEach(id=>{if(!exIds.includes(id)&&itemById(id))exIds.push(id)});
     exIds.forEach(id=>{const r=itemById(id);if(!r||(eff.size&&!eff.has(baseId(id))))return;const ds=doneSets(k,id),x=el("div",{class:"rex",style:"--c:"+r.cat.color});
@@ -2612,7 +2644,7 @@ $("tplFromDayBtn").onclick=()=>{const ids=dayItems(sel);if(!ids.length)return;co
 
 const setView=v=>{viewMode=v;try{localStorage.setItem("kintore-view",v)}catch(e){}render()};
 (()=>{const ab=document.querySelector(".appbar"),ds=$("dayStick");const set=()=>{document.documentElement.style.setProperty("--abh",(ab?ab.offsetHeight:64)+"px");document.documentElement.style.setProperty("--dsh",(ds?ds.offsetHeight:0)+"px")};set();if(window.ResizeObserver){if(ab)new ResizeObserver(set).observe(ab);if(ds)new ResizeObserver(set).observe(ds)}let lc=isCompact();window.addEventListener("resize",()=>{set();if(isCompact()!==lc){lc=isCompact();render()}})})();
-$("vList").onclick=()=>setView("list");$("vCal").onclick=()=>{calMonth=sel.slice(0,7);setView("cal")};
+$("vList").onclick=()=>setView("list");$("vCal").onclick=()=>{calMonth=sel.slice(0,7);setView("cal")};$("vFreq").onclick=()=>setView("freq");
 
 $("editBtn").onclick=()=>{editing=!editing;render()};
 const addCat=()=>{const v=$("newCat").value.trim();if(!v)return;cats.push({id:uid(),kind:"f",name:v,color:COLORS[cats.filter(c=>!c.deleted).length%COLORS.length],items:[]});$("newCat").value="";saveCfg();render()};
@@ -2636,7 +2668,7 @@ const storeObj=()=>({cats,plan,planSrc,dayMemo,notes,periods,archPeriods,tags,da
 function applyStore(s){cats=clone(s.cats||[]);plan=clone(s.plan||{});planSrc=clone(s.planSrc||{});dayMemo=clone(s.dayMemo||{});notes=clone(s.notes||{});periods=clone(s.periods||[]);archPeriods=clone(s.archPeriods||[]);tags=s.tags?clone(s.tags):defaultTags();ensureMarks();dayTags=clone(s.dayTags||{});stores=clone(s.stores||[]);dayStore=clone(s.dayStore||{});logs=clone(s.logs||{});templates=clone(s.templates||[]);exNotes=clone(s.exNotes||{});trash=clone(s.trash||[]);customUnits=clone(s.customUnits||[]);rmF=clone(s.rmF||{custom:[],sel:{}});anF=clone(s.anF||{custom:[]});freqConds=clone(s.freqConds||[]);rebuildIdx();updatedAt=s.updatedAt||0}
 function lsSave(){try{localStorage.setItem(LS,JSON.stringify(storeObj()))}catch(e){}}
 function lsLoad(){try{const s=JSON.parse(localStorage.getItem(LS)||"null");if(s&&s.cats){applyStore(s);return}}catch(e){}applyStore(SEED)}
-function setSync(msg,state){$("sync").replaceChildren(el("span",{class:"sync-dot"+(state?" "+state:"")}),document.createTextNode(msg))}
+function setSync(msg,state){$("sync").replaceChildren(el("span",{class:"sync-dot"+(state?" "+state:"")}),el("span",{class:"syncmsg"},msg))}
 const stamp=t=>{if(!t)return"";const d=new Date(t);return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
 function touch(){updatedAt=Date.now();lsSave();push();if(!histApplying)histNote()}
 // ===== 戻す／進む（操作の履歴） =====
@@ -2702,7 +2734,7 @@ function startSync(){if(unsub)unsub();
 function initFirebase(){
   if(typeof firebase==="undefined"){setSync("同期ライブラリを読み込めませんでした。この端末に保存します","err");$("authBtn").hidden=true;return}
   try{firebase.initializeApp(FB_CONFIG);fbDb=firebase.firestore();
-    firebase.auth().onAuthStateChanged(u=>{fbUser=u;$("authBtn").textContent=u?"ログアウト":"Googleでログイン";
+    firebase.auth().onAuthStateChanged(u=>{fbUser=u;$("authBtn").textContent=u?"ログアウト":"ログイン";
       if(u){setSync("ログイン中："+(u.email||u.displayName||""),"on");startSync()}
       else{if(unsub){unsub();unsub=null}setSync("未ログイン（この端末だけに保存）")}});
     firebase.auth().getRedirectResult().catch(()=>{});
